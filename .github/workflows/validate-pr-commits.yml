@@ -1,0 +1,55 @@
+name: Validate Commits and PR Title
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Print versions
+        run: |
+          git --version
+          node --version
+          npm --version
+          npx commitlint --version
+
+      - name: Validate current commit (last commit) with commitlint
+        if: github.event_name == 'push'
+        run: npx commitlint --from HEAD~1 --to HEAD --verbose
+
+      - name: Validate PR commits with commitlint
+        if: github.event_name == 'pull_request'
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
+      - name: Validate PR title with commitlint
+        if: github.event_name == 'pull_request'
+        run: echo "${{ github.event.pull_request.title }}" | npx commitlint --verbose
+
+      - name: Check max one commit per PR
+        if: github.event_name == 'pull_request'
+        run: |
+          commit_count=${{ github.event.pull_request.commits }}
+          echo "Number of commits in PR: $commit_count"
+          
+          if [ $commit_count -gt 1 ]; then
+            echo "Error: This PR contains $commit_count commits. Please squash to exactly 1 commit."
+            exit 1
+          else
+            echo "PR contains exactly 1 commit as required."
+          fi
