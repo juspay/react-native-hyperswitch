@@ -74,6 +74,9 @@
     "react": "*",
     "react-native": "*"
   },
+  "workspaces": [
+    "example"
+  ],
   "jest": {
     "preset": "react-native",
     "modulePathIgnorePatterns": [

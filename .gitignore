@@ -36,6 +36,7 @@ coverage/
 
 # Package manager files
 package-lock.json
+packages/*/yarn.lock
 
 # Lerna
 lerna-debug.log*
