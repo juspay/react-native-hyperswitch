@@ -17,6 +17,13 @@ end
 target 'HyperswitchAuthenticationModuleExample' do
   config = use_native_modules!
 
+  # Local pod for development - specify the path to the local hyperswitch-authentication-sdk-ios
+  # Uncomment and update the path as needed for local development
+  # pod 'hyperswitch-authentication-sdk-ios', :path => '../../../hyperswitch-client-core/ios'
+  # pod 'hyperswitch-authentication-sdk-ios/netcetera3ds', :path => '../../../hyperswitch-client-core/ios'
+  # pod 'hyperswitch-authentication-sdk-ios/trident', :path => '../../../hyperswitch-client-core/ios'
+  # pod 'hyperswitch-authentication-sdk-ios/cardinal', :path => '../../../hyperswitch-client-core/ios'
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.

@@ -89,7 +89,7 @@
     "react-native": "*"
   },
   "workspaces": [
-    "example"
+    "./example"
   ],
   "jest": {
     "preset": "react-native",
