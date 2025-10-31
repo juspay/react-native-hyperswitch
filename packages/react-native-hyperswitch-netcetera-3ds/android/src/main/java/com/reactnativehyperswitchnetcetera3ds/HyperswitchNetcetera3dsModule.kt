@@ -53,7 +53,8 @@ class HyperswitchNetcetera3dsModule(reactContext: ReactApplicationContext) : Rea
     directoryServerId: String,
     callback: Callback
   ) {
-    hsNetceteraUtils.generateAReqParams(currentActivity, messageVersion, directoryServerId, callback)
+    val activity = currentActivity ?: reactApplicationContext.currentActivity
+    hsNetceteraUtils.generateAReqParams(activity, messageVersion, directoryServerId, callback)
   }
 
   @ReactMethod
@@ -77,7 +78,8 @@ class HyperswitchNetcetera3dsModule(reactContext: ReactApplicationContext) : Rea
 
   @ReactMethod
   fun generateChallenge(callback: Callback) {
-    hsNetceteraUtils.generateChallenge(currentActivity, 5, callback)
+    val activity = currentActivity ?: reactApplicationContext.currentActivity
+    hsNetceteraUtils.generateChallenge(activity, 5, callback)
 
   }
 
