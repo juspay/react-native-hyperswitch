@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Click to Pay Flow Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            height: 100vh;
+        }
+
+        .control-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+        }
+
+        .iframe-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        iframe {
+            width: 100%;
+            height: 400px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            background-color: #fafafa;
+        }
+
+        .section h3 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px 5px 5px 0;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-width: 500px;
+        }
+
+        .provider-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .provider-toggle button {
+            flex: 1;
+        }
+
+        .provider-toggle button.active {
+            background-color: #28a745;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .status.loading {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Click to Pay Flow Test</h1>
+
+    <div class="container">
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <!-- Provider Selection -->
+            <div class="section">
+                <h3>Provider Selection</h3>
+                <div class="provider-toggle">
+                    <button id="visaBtn" class="active" onclick="selectProvider('visa')">Visa</button>
+                    <button id="mastercardBtn" onclick="selectProvider('mastercard')">Mastercard</button>
+                </div>
+                <div class="form-group">
+                    <label>Environment:</label>
+                    <select id="environment">
+                        <option value="true">Sandbox</option>
+                        <option value="false">Production</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Configuration -->
+            <div class="section">
+                <h3>Configuration</h3>
+                <div class="form-group">
+                    <label>DPA ID:</label>
+                    <input type="text" id="dpaId" value="498WCF39JVQVH1UK4TGG21leLAj_MJQoapP5f12IanfEYaSno">
+                </div>
+                <div class="form-group">
+                    <label>Client ID:</label>
+                    <input type="text" id="clientId" value="TestMerchant">
+                </div>
+                <div class="form-group">
+                    <label>Locale:</label>
+                    <input type="text" id="locale" value="en_US">
+                </div>
+                <div class="form-group">
+                    <label>Card Brands:</label>
+                    <input type="text" id="cardBrands" value="visa,mastercard">
+                </div>
+                <button onclick="loadSDK()">Load SDK</button>
+                <button onclick="initializeSDK()">Initialize SDK</button>
+            </div>
+
+            <!-- User Identity -->
+            <div class="section">
+                <h3>User Identity</h3>
+                <div class="form-group">
+                    <label>Email/Phone:</label>
+                    <input type="text" id="userIdentity" value="shivam.shashank@juspay.in">
+                </div>
+                <div class="form-group">
+                    <label>Identity Type:</label>
+                    <select id="identityType">
+                        <option value="EMAIL_ADDRESS">Email</option>
+                        <option value="PHONE_NUMBER">Phone</option>
+                    </select>
+                </div>
+                <button onclick="idLookup()">ID Lookup</button>
+                <button onclick="getCards()">Get Cards</button>
+            </div>
+
+            <!-- Validation -->
+            <div class="section">
+                <h3>Validation</h3>
+                <div class="form-group">
+                    <label>OTP Code:</label>
+                    <input type="text" id="otpCode" placeholder="123456">
+                </div>
+                <button onclick="initiateValidation()">Send OTP</button>
+                <button onclick="validate()">Validate OTP</button>
+            </div>
+
+            <!-- Payment -->
+            <div class="section">
+                <h3>Payment</h3>
+                <div class="form-group">
+                    <label>Amount:</label>
+                    <input type="number" id="amount" value="99.99" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Currency:</label>
+                    <input type="text" id="currency" value="USD">
+                </div>
+                <div class="form-group">
+                    <label>Order ID:</label>
+                    <input type="text" id="orderId" value="order-123">
+                </div>
+                <div class="form-group">
+                    <label>Card ID (from getCards):</label>
+                    <input type="text" id="cardId" placeholder="Will be populated from getCards">
+                </div>
+                <button onclick="checkout()">Checkout</button>
+            </div>
+
+            <!-- Static Data Actions -->
+            <div class="section">
+                <h3>Static Data Actions</h3>
+                <button onclick="loadStaticConfig()">Load Static Config</button>
+                <button onclick="useStaticAuth()">Use Static Auth</button>
+                <button onclick="checkRecognitionToken()">Check Recognition Token</button>
+                <button onclick="clearRecognitionToken()">Clear Recognition Token</button>
+            </div>
+
+            <!-- Actions -->
+            <div class="section">
+                <h3>Actions</h3>
+                <button onclick="signOut()">Sign Out</button>
+                <button onclick="clearLog()">Clear Log</button>
+            </div>
+
+            <!-- Status -->
+            <div id="status" class="status">Ready to test</div>
+        </div>
+
+        <!-- iframe and Log -->
+        <div class="iframe-container">
+            <h3>Click to Pay WebView</h3>
+            <iframe id="clickToPayFrame" src="sdk.html"></iframe>
+
+            <h3>Message Log</h3>
+            <div id="messageLog" class="log">Waiting for messages...</div>
+        </div>
+    </div>
+
+    <script>
+
+        const getCookie = (name) => {
+            const nameEQ = `${encodeURIComponent(name)}=`;
+            const cookiesArray = document.cookie.split(";");
+            for (let cookie of cookiesArray) {
+                cookie = cookie.trim();
+                if (cookie.startsWith(nameEQ)) {
+                    return decodeURIComponent(cookie.substring(nameEQ.length));
+                }
+            }
+            return null;
+        };
+
+        // Provider-specific cookie management
+        const getRecognitionTokenCookieName = (isVisa) => {
+            return isVisa ? "__visa_click_to_pay" : "__mastercard_click_to_pay";
+        };
+
+        const getRecognitionToken = (isVisa) => {
+            const cookieName = getRecognitionTokenCookieName(isVisa);
+            return getCookie(cookieName);
+        };
+
+
+        // Unified static configuration generator
+        const getStaticConfig = (provider) => {
+            return {
+                dpaId: provider ? "b6e06cc6-3018-4c4c-bbf5-9fb232615090" : "498WCF39JVQVH1UK4TGG21leLAj_MJQoapP5f12IanfEYaSno",
+                initializeOptions: {
+                    srcDpaId: provider ? "b6e06cc6-3018-4c4c-bbf5-9fb232615090" : undefined,
+                    dpaData: provider ? {
+                        dpaName: "TestMerchant",
+                    } : undefined,
+                    dpaTransactionOptions: {
+                        dpaLocale: "en_US",
+                        authenticationPreferences: provider ? {
+                            payloadRequested: "AUTHENTICATED",
+                        } : {
+                            authenticationMethods: [
+                                {
+                                    authenticationMethodType: "3DS",
+                                    authenticationSubject: "CARDHOLDER",
+                                    methodAttributes: {
+                                        challengeIndicator: "01",
+                                    },
+                                },
+                            ],
+                            payloadRequested: "AUTHENTICATED",
+                        },
+                        paymentOptions: [
+                            {
+                                dpaDynamicDataTtlMinutes: 15,
+                                dynamicDataType: "CARD_APPLICATION_CRYPTOGRAM_LONG_FORM",
+                            },
+                        ],
+                        transactionAmount: {
+                            transactionAmount: provider ? 500 : "500.00",
+                            transactionCurrencyCode: "USD",
+                        },
+                        acquirerBIN: provider ? "545301" : "455555",
+                        acquirerMerchantId: provider ? "SRC3DS" : "12345678",
+                        merchantCategoryCode: provider ? "0001" : "4289",
+                        merchantCountryCode: "US",
+                        payloadTypeIndicator: provider ? undefined : "FULL",
+                        dpaBillingPreference: provider ? undefined : "NONE",
+                        merchantName: provider ? undefined : "TestMerchant",
+                        merchantOrderId: provider ? undefined : "ctp_2142",
+                    },
+                    checkoutExperience: provider ? "WITHIN_CHECKOUT" : undefined,
+                    cardBrands: provider ? ["mastercard", "visa"] : undefined,
+                },
+                authenticateOptions: {
+                    consumerIdentity: {
+                        identityProvider: provider ? undefined : "SRC",
+                        identityType: "EMAIL_ADDRESS",
+                        identityValue: provider ? "newaccount2@mailnator.com" : "shivam.shashank@juspay.in",
+                    },
+                    requestRecognitionToken: provider ? true : undefined,
+                }
+            };
+        };
+
+        // Static configuration data
+        const staticConfig = {
+            visa: getStaticConfig(false),
+            mastercard: getStaticConfig(true)
+        };
+
+        let currentProvider = 'visa';
+        let iframe;
+        let validationId = null;
+
+        // Initialize
+        window.onload = function () {
+            iframe = document.getElementById('clickToPayFrame');
+            updateStatus('Ready to test', 'success');
+
+            // Listen for messages from iframe
+            window.addEventListener('message', handleIframeMessage);
+        };
+
+        function selectProvider(provider) {
+            currentProvider = provider;
+            document.getElementById('visaBtn').classList.toggle('active', provider === 'visa');
+            document.getElementById('mastercardBtn').classList.toggle('active', provider === 'mastercard');
+            log(`Selected provider: ${provider.toUpperCase()}`);
+        }
+
+        function sendToIframe(type, message) {
+            const data = {
+                clickToPayRequest: {
+                    type: type,
+                    message: message
+                }
+            };
+            iframe.contentWindow.postMessage(JSON.stringify(data), '*');
+            log(`Sent to iframe: ${type}`, JSON.stringify(message, null, 2));
+        }
+
+        function handleIframeMessage(event) {
+            try {
+                let messageData;
+                // Handle both string and object messages
+                if (typeof event.data === 'string') {
+                    messageData = JSON.parse(event.data);
+                } else if (typeof event.data === 'object' && event.data !== null) {
+                    messageData = event.data;
+                } else {
+                    log('Unknown message format:', typeof event.data);
+                    return;
+                }
+
+                // Extract the clickToPayResponse
+                const message = messageData.clickToPayResponse;
+                if (!message) {
+                    return;
+                }
+
+                log(`Received from iframe: ${message.type}`, JSON.stringify(message.data, null, 2));
+
+                // Handle specific responses
+                switch (message.type) {
+                    case 'LOAD_SUCCESS':
+                        updateStatus('SDK Loaded Successfully', 'success');
+                        break;
+                    case 'LOAD_ERROR':
+                        updateStatus('SDK Load Failed', 'error');
+                        break;
+                    case 'INIT_SUCCESS':
+                        updateStatus('SDK Initialized Successfully', 'success');
+                        break;
+                    case 'INIT_FAILED':
+                        updateStatus('SDK Initialization Failed', 'error');
+                        break;
+                    case 'RECOGNITION_CHECK':
+                        const { isRecognized, hasToken } = message.data;
+                        updateStatus(`User Recognition: ${isRecognized ? 'Recognized' : 'New User'}`, isRecognized ? 'success' : 'loading');
+                        log(`Recognition status: ${isRecognized}, Has token: ${hasToken}`);
+                        break;
+                    case 'FLOW_TYPE':
+                        updateStatus(`Flow Type: ${message.data}`, 'loading');
+                        log(`Using flow type: ${message.data}`);
+                        break;
+                    case 'WAITING_FOR_OTP':
+                        updateStatus('Waiting for OTP Input', 'loading');
+                        log('Please enter OTP and click Validate OTP');
+                        break;
+                    case 'GET_CARDS_SUCCESS':
+                        updateStatus('Cards Retrieved Successfully', 'success');
+                        populateCardId(message.data);
+                        break;
+                    case 'INITIATE_VALIDATION_SUCCESS':
+                        updateStatus('OTP Sent Successfully', 'success');
+                        validationId = message.data.validationId;
+                        break;
+                    case 'VALIDATE_SUCCESS':
+                        updateStatus('OTP Validated Successfully', 'success');
+                        break;
+                    case 'CHECKOUT_SUCCESS':
+                        updateStatus('Checkout Completed Successfully', 'success');
+                        break;
+                    case 'RECOGNITION_TOKEN_SAVED':
+                        updateStatus('Recognition Token Saved', 'success');
+                        log('Recognition token saved for future sessions');
+                        break;
+                    case 'UNIFIED_FLOW_FAILED':
+                        updateStatus('Unified Flow Failed', 'error');
+                        break;
+                    default:
+                        if (message.type.includes('FAILED')) {
+                            updateStatus(`Operation Failed: ${message.type}`, 'error');
+                        }
+                }
+            } catch (error) {
+                log('Error parsing iframe message:', error.message);
+            }
+        }
+
+        function populateCardId(cardsData) {
+            try {
+                let cardId = '';
+                if (currentProvider === 'visa' && cardsData.profiles && cardsData.profiles[0] && cardsData.profiles[0].maskedCards) {
+                    cardId = cardsData.profiles[0].maskedCards[0].srcDigitalCardId;
+                } else if (currentProvider === 'mastercard' && cardsData.cards && cardsData.cards[0]) {
+                    cardId = cardsData.cards[0].srcDigitalCardId;
+                }
+
+                if (cardId) {
+                    document.getElementById('cardId').value = cardId;
+                    log('Auto-populated card ID:', cardId);
+                }
+            } catch (error) {
+                log('Error extracting card ID:', error.message);
+            }
+        }
+
+        function loadSDK() {
+            updateStatus('Loading SDK...', 'loading');
+
+            const isVisa = currentProvider === 'visa';
+            const testMode = document.getElementById('environment').value === 'true';
+            const dpaId = document.getElementById('dpaId').value;
+            const cardBrands = document.getElementById('cardBrands').value;
+            const clientId = document.getElementById('clientId').value;
+            const locale = document.getElementById('locale').value;
+
+            let sdkUrl;
+            if (isVisa) {
+                const baseUrl = testMode
+                    ? 'https://sandbox.secure.checkout.visa.com/checkout-widget/resources/js/integration/v2/sdk.js'
+                    : 'https://secure.checkout.visa.com/checkout-widget/resources/js/integration/v2/sdk.js';
+                sdkUrl = `${baseUrl}?dpaId=${dpaId}&cardBrands=${cardBrands}&dpaClientId=${clientId}&locale=${locale}`;
+            } else {
+                const baseUrl = testMode
+                    ? 'https://sandbox.src.mastercard.com/srci/integration/2/lib.js'
+                    : 'https://src.mastercard.com/srci/integration/2/lib.js';
+                sdkUrl = `${baseUrl}?srcDpaId=${dpaId}&locale=${locale}`;
+            }
+
+            const message = {
+                sdkUrl: sdkUrl
+            };
+            sendToIframe('LOAD', message);
+        }
+
+        function initializeSDK() {
+            updateStatus('Initializing SDK...', 'loading');
+            const provider = true; //currentProvider === 'mastercard';
+
+            // Use unified configuration with current form values
+            const initializeOptions = {
+                srcDpaId: provider ? "b6e06cc6-3018-4c4c-bbf5-9fb232615090" : undefined,
+                dpaData: provider ? {
+                    dpaName: "TestMerchant",
+                } : undefined,
+                dpaTransactionOptions: {
+                    dpaLocale: document.getElementById('locale').value,
+                    authenticationPreferences: provider ? {
+                        payloadRequested: "AUTHENTICATED",
+                    } : {
+                        authenticationMethods: [
+                            {
+                                authenticationMethodType: "3DS",
+                                authenticationSubject: "CARDHOLDER",
+                                methodAttributes: {
+                                    challengeIndicator: "01",
+                                },
+                            },
+                        ],
+                        payloadRequested: "AUTHENTICATED",
+                    },
+                    paymentOptions: [
+                        {
+                            dpaDynamicDataTtlMinutes: 15,
+                            dynamicDataType: "CARD_APPLICATION_CRYPTOGRAM_LONG_FORM",
+                        },
+                    ],
+                    transactionAmount: {
+                        transactionAmount: provider ?
+                            parseFloat(document.getElementById('amount').value) :
+                            document.getElementById('amount').value,
+                        transactionCurrencyCode: document.getElementById('currency').value,
+                    },
+                    acquirerBIN: provider ? "545301" : "455555",
+                    acquirerMerchantId: provider ? "SRC3DS" : "12345678",
+                    merchantCategoryCode: provider ? "0001" : "4289",
+                    merchantCountryCode: "US",
+                    payloadTypeIndicator: provider ? undefined : "FULL",
+                    dpaBillingPreference: provider ? undefined : "NONE",
+                    merchantName: provider ? undefined : "TestMerchant",
+                    merchantOrderId: provider ? undefined : document.getElementById('orderId').value,
+                },
+                checkoutExperience: provider ? "WITHIN_CHECKOUT" : undefined,
+                cardBrands: provider ? ["mastercard", "visa"] : undefined,
+            };
+
+            const message = {
+                isVISA: currentProvider === 'visa',
+                initializeOptions: initializeOptions
+            };
+            sendToIframe('INIT', message);
+        }
+
+        function idLookup() {
+            updateStatus('Looking up user...', 'loading');
+            const params = currentProvider === 'visa' ? {
+                consumerIdentity: {
+                    identityProvider: "SRC",
+                    identityValue: document.getElementById('userIdentity').value,
+                    identityType: document.getElementById('identityType').value
+                }
+            } : { email: document.getElementById('userIdentity').value };
+            const message = {
+                isVISA: currentProvider === 'visa',
+                params: params
+            };
+            sendToIframe('ID_LOOKUP', message);
+        }
+
+        function getCards() {
+            updateStatus('Getting cards...', 'loading');
+            const otpCode = document.getElementById('otpCode').value;
+            const message = {
+                isVISA: currentProvider === 'visa',
+                params: {
+                    consumerIdentity: {
+                        identityProvider: "SRC",
+                        identityValue: document.getElementById('userIdentity').value,
+                        identityType: document.getElementById('identityType').value
+                    }
+                }
+            };
+
+            if (otpCode) {
+                message.params.validationData = otpCode;
+            }
+
+            sendToIframe('GET_CARDS', message);
+        }
+
+        function initiateValidation() {
+            updateStatus('Sending OTP...', 'loading');
+            const message = {
+                isVISA: currentProvider === 'visa',
+                params: {
+                    consumerIdentity: {
+                        identityProvider: "SRC",
+                        identityValue: document.getElementById('userIdentity').value,
+                        identityType: document.getElementById('identityType').value
+                    }
+                }
+            };
+            sendToIframe('INITIATE_VALIDATION', message);
+        }
+
+        function validate() {
+            updateStatus('Validating OTP...', 'loading');
+            const message = {
+                isVISA: currentProvider === 'visa',
+                params: currentProvider === 'visa' ? {
+                    consumerIdentity: {
+                        identityProvider: "SRC",
+                        identityValue: document.getElementById('userIdentity').value,
+                        identityType: document.getElementById('identityType').value
+                    },
+                    validationData: document.getElementById('otpCode').value
+                } : {
+                    validationId: validationId,
+                    validationCode: document.getElementById('otpCode').value
+                }
+            };
+            sendToIframe('VALIDATE', message);
+        }
+
+        function checkout() {
+            updateStatus('Processing checkout...', 'loading');            
+            const message = {
+                isVISA: currentProvider === 'visa',
+                params: {
+                    srcDigitalCardId: document.getElementById('cardId').value,
+                    amount: parseFloat(document.getElementById('amount').value),
+                    currency: document.getElementById('currency').value,
+                    merchantOrderId: document.getElementById('orderId').value,
+                    dpaTransactionOptions: {
+                        transactionAmount: {
+                            transactionAmount: document.getElementById('amount').value,
+                            transactionCurrencyCode: document.getElementById('currency').value
+                        }
+                    }
+                }
+            };
+            sendToIframe('CHECKOUT', message);
+        }
+
+        // Unified flow function
+        function unifiedFlow() {
+            updateStatus('Starting unified flow...', 'loading');
+            const message = {
+                isVISA: currentProvider === 'visa',
+                params: {
+                    consumerIdentity: {
+                        identityProvider: "SRC",
+                        identityValue: document.getElementById('userIdentity').value,
+                        identityType: document.getElementById('identityType').value
+                    }
+                }
+            };
+            sendToIframe('UNIFIED_FLOW', message);
+        }
+
+
+        function signOut() {
+            updateStatus('Signing out...', 'loading');
+            const message = {
+                isVISA: currentProvider === 'visa',
+                params: {}
+            };
+            sendToIframe('SIGN_OUT', message);
+        }
+
+        function updateStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function log(title, data = '') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEl = document.getElementById('messageLog');
+            const entry = `[${timestamp}] ${title}\n${data}\n\n`;
+            logEl.textContent += entry;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('messageLog').textContent = 'Log cleared...\n';
+        }
+
+        // Static data functions
+        function loadStaticConfig() {
+            updateStatus('Loading static configuration...', 'loading');
+            const config = staticConfig[currentProvider];
+
+            // Update DPA ID
+            document.getElementById('dpaId').value = config.dpaId;
+
+            // Update user identity
+            document.getElementById('userIdentity').value = config.authenticateOptions.consumerIdentity.identityValue;
+            document.getElementById('identityType').value = config.authenticateOptions.consumerIdentity.identityType;
+
+            // Update transaction details
+            document.getElementById('amount').value = config.initializeOptions.dpaTransactionOptions.transactionAmount.transactionAmount;
+            document.getElementById('currency').value = config.initializeOptions.dpaTransactionOptions.transactionAmount.transactionCurrencyCode;
+            document.getElementById('locale').value = config.initializeOptions.dpaTransactionOptions.dpaLocale;
+
+            // Update order ID (only for Visa)
+            if (currentProvider === 'visa' && config.initializeOptions.dpaTransactionOptions.merchantOrderId) {
+                document.getElementById('orderId').value = config.initializeOptions.dpaTransactionOptions.merchantOrderId;
+            } else if (currentProvider === 'mastercard') {
+                document.getElementById('orderId').value = 'order-mc-' + Date.now();
+            }
+
+            // Update card brands
+            if (config.initializeOptions.cardBrands) {
+                document.getElementById('cardBrands').value = config.initializeOptions.cardBrands.join(',');
+            }
+
+            log('Static configuration loaded for:', currentProvider.toUpperCase());
+            log('Configuration data:', JSON.stringify(config, null, 2));
+            updateStatus('Static configuration loaded', 'success');
+        }
+
+        function useStaticAuth() {
+            updateStatus('Using static authentication...', 'loading');
+            const config = staticConfig[currentProvider];
+
+            // Update form fields with static auth data
+            document.getElementById('userIdentity').value = config.authenticateOptions.consumerIdentity.identityValue;
+            document.getElementById('identityType').value = config.authenticateOptions.consumerIdentity.identityType;
+
+            log('Static authentication data loaded');
+            log('Auth options:', JSON.stringify(config.authenticateOptions, null, 2));
+            updateStatus('Static authentication loaded', 'success');
+        }
+
+        function checkRecognitionToken() {
+            const isVisa = currentProvider === 'visa';
+            const token = getRecognitionToken(isVisa);
+            if (token) {
+                log(`${currentProvider.toUpperCase()} recognition token found:`, token);
+                updateStatus('Recognition token exists', 'success');
+            } else {
+                log(`No ${currentProvider.toUpperCase()} recognition token found`);
+                updateStatus('No recognition token', 'error');
+            }
+        }
+
+        function clearRecognitionToken() {
+            const isVisa = currentProvider === 'visa';
+            const token = getRecognitionToken(isVisa);
+            if (token) {
+                log(`${currentProvider.toUpperCase()} recognition token found but cannot be cleared from test interface`);
+                log('Note: Tokens can only be cleared by the SDK or browser settings');
+                updateStatus('Token found - clear via browser settings', 'error');
+            } else {
+                log(`No ${currentProvider.toUpperCase()} recognition token found`);
+                updateStatus('No token to clear', 'success');
+            }
+        }
+
+        // Enhanced initialization with static data
+        function initializeWithStaticData() {
+            updateStatus('Initializing with static data...', 'loading');
+            const config = staticConfig[currentProvider];
+
+            const message = {
+                isVISA: currentProvider === 'visa',
+                initializeOptions: config.initializeOptions
+            };
+
+            // Add recognition token for Mastercard if available
+            if (currentProvider === 'mastercard') {
+                const recognitionToken = getCookie(RECOGNITION_TOKEN_COOKIE_NAME);
+                if (recognitionToken) {
+                    message.initializeOptions.recognitionToken = recognitionToken;
+                    log('Added recognition token to initialization');
+                }
+            }
+
+            sendToIframe('INIT', message);
+            log('Initialized with static configuration');
+        }
+
+        // Enhanced authentication with static data
+        function authenticateWithStaticData() {
+            updateStatus('Authenticating with static data...', 'loading');
+            const config = staticConfig[currentProvider];
+
+            const message = {
+                isVISA: currentProvider === 'visa',
+                params: config.authenticateOptions
+            };
+
+            sendToIframe('GET_CARDS', message);
+            log('Authentication started with static data');
+        }
+
+        // Enhanced checkout with static configuration
+        function checkoutWithStaticData() {
+            updateStatus('Checkout with static data...', 'loading');
+            const config = staticConfig[currentProvider];
+            const cardId = document.getElementById('cardId').value;
+
+            if (!cardId) {
+                updateStatus('No card ID available', 'error');
+                log('Error: Card ID is required for checkout');
+                return;
+            }
+
+            const message = {
+                isVISA: currentProvider === 'visa',
+                params: {
+                    srcDigitalCardId: cardId,
+                    rememberMe: currentProvider === 'mastercard',
+                    payloadTypeIndicatorCheckout: currentProvider === 'visa' ? 'FULL' : undefined,
+                    dpaTransactionOptions: config.initializeOptions.dpaTransactionOptions
+                }
+            };
+
+            sendToIframe('CHECKOUT', message);
+            log('Checkout initiated with static configuration');
+        }
+
+    </script>
+</body>
+
+</html>
