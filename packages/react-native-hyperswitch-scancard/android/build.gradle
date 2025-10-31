@@ -139,14 +139,9 @@ def kotlin_version = getExtOrDefault('kotlinVersion')
 dependencies {
   //noinspection GradleDynamicVersion
   implementation "com.facebook.react:react-native:+"
-  implementation 'androidx.activity:activity:1.4.0'
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-  implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.2"
-  implementation "androidx.activity:activity-ktx:1.4.0"
-  implementation "androidx.core:core-ktx:1.7.0"
-  implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-  implementation 'org.tensorflow:tensorflow-lite:2.11.0'
-  implementation 'org.tensorflow:tensorflow-lite-support:0.4.3'
+  implementation 'com.google.ai.edge.litert:litert:1.4.0'
+  implementation 'com.google.ai.edge.litert:litert-support:1.4.0'
   implementation 'io.hyperswitch:base-release:1.0.0'
   implementation 'io.hyperswitch:camera-core-release:1.0.0'
   implementation 'io.hyperswitch:cardscan-release:1.0.0'
