@@ -55,3 +55,8 @@ lerna-debug.log*
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+.yarn/*
+
+.pnp.*
+.yarn.lock

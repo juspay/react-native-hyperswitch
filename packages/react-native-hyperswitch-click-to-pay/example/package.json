@@ -2,6 +2,7 @@
   "name": "react-native-hyperswitch-click-to-pay-example",
   "version": "0.0.1",
   "private": true,
+  "workspaces": [],
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",
@@ -10,6 +11,7 @@
     "build:ios": "react-native build-ios --mode Debug"
   },
   "dependencies": {
+    "@juspay-tech/react-native-hyperswitch-click-to-pay": "link:../",
     "@react-native/new-app-screen": "0.81.1",
     "react": "19.1.0",
     "react-native": "0.81.1",
