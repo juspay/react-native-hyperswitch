@@ -1,0 +1,116 @@
+buildscript {
+  ext.getExtOrDefault = {name ->
+    return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['HyperswitchSdkReactNative_' + name]
+  }
+
+  repositories {
+    mavenLocal()
+    google()
+    mavenCentral()
+  }
+
+  dependencies {
+    classpath "com.android.tools.build:gradle:8.7.2"
+    // noinspection DifferentKotlinGradleVersion
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${getExtOrDefault('kotlinVersion')}"
+  }
+}
+
+
+apply plugin: "com.android.library"
+apply plugin: "kotlin-android"
+
+apply plugin: "com.facebook.react"
+
+def getExtOrIntegerDefault(name) {
+  return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["HyperswitchSdkReactNative_" + name]).toInteger()
+}
+
+def isNewArchitectureEnabled() {
+  return project.hasProperty("newArchEnabled") && project.newArchEnabled == "true"
+}
+
+android {
+  namespace "com.hyperswitchsdkreactnative"
+
+  compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
+
+  defaultConfig {
+    minSdkVersion getExtOrIntegerDefault("minSdkVersion")
+    targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
+    versionCode 1
+    versionName "1.0"
+    buildConfigField "String", "VERSION_NAME", "\"${version}\""
+    buildConfigField "boolean", "IS_HERMES_ENABLED", hermesEnabled
+    buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", newArchEnabled
+  }
+  buildFeatures {
+    buildConfig true
+  }
+
+  buildTypes {
+    release {
+      minifyEnabled false
+      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+    }
+    debug {
+      debuggable true
+    }
+  }
+
+  lintOptions {
+    disable "GradleCompatible"
+    abortOnError false
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+
+  kotlinOptions {
+    jvmTarget = '17'
+  }
+
+  sourceSets {
+    main {
+      java.srcDirs += [
+        "generated/java",
+        "generated/jni",
+        "build/generated/source/packagelist"
+      ]
+    }
+  }
+
+  packagingOptions {
+    pickFirst '**/libc++_shared.so'
+    pickFirst '**/libfbjni.so'
+    pickFirst '**/libreactnativejni.so'
+  }
+}
+rootProject.allprojects {
+  repositories {
+    mavenCentral()
+    google()
+    maven { url "https://maven.juspay.in/hyper-sdk/" }
+    mavenLocal()
+  }
+}
+
+def kotlin_version = getExtOrDefault("kotlinVersion")
+
+apply from: "./hyperswitch_autolinking.gradle"
+applyHyperswitchAutolinking(project)
+
+dependencies {
+  implementation "com.facebook.react:react-android"
+  implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+  implementation "com.google.android.gms:play-services-wallet:19.4.0"
+  implementation 'androidx.activity:activity-ktx:1.10.1'
+  implementation("org.greenrobot:eventbus")
+  implementation "in.juspay:hyperotareact:0.0.1-xota.10"
+  implementation "io.hyperswitch:hyperswitch-sdk-android-common:1.0.0"
+  // implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
+  // implementation 'androidx.lifecycle:lifecycle-common-java8:2.8.7'
+  // implementation 'androidx.fragment:fragment-ktx:1.8.5'
+}
