@@ -1,0 +1,13 @@
+title = "Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Ignore Yarn"
+paths = [
+    "packages/react-native-hyperswitch-cardinal-3ds/.yarn/releases/yarn-3.6.1.cjs",
+    "packages/react-native-hyperswitch-authentication-module/.yarn/releases/yarn-3.6.1.cjs",
+    "packages/react-native-hyperswitch-trident-3ds/.yarn/releases/yarn-3.6.1.cjs"
+]
+regexes = ["/*In.isRecognitionException=void*/"]
