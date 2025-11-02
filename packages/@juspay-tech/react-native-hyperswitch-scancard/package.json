@@ -1,6 +1,6 @@
 {
   "name": "@juspay-tech/react-native-hyperswitch-scancard",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "React Native Hyperswitch ScanCard",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
