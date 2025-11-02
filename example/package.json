@@ -1,0 +1,40 @@
+{
+  "name": "react-native-hyperswitch-example",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "start": "react-native start --reset-cache",
+    "server": "node mockServer.js",
+    "build:android": "react-native build-android --extra-params \"--no-daemon --console=plain -PreactNativeArchitectures=arm64-v8a\"",
+    "build:ios": "react-native build-ios --mode Debug",
+    "adb": "adb reverse tcp:8081 tcp:8081"
+  },
+  "dependencies": {
+    "@sentry/react-native": "^6.20.0",
+    "react": "19.0.0",
+    "react-native": "0.79.2",
+    "react-native-inappbrowser-reborn": "^3.7.0",
+    "react-native-svg": "15.12.0",
+    "react-native-webview": "^13.16.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "18.0.0",
+    "@react-native-community/cli-platform-android": "18.0.0",
+    "@react-native-community/cli-platform-ios": "18.0.0",
+    "@react-native/babel-preset": "0.79.2",
+    "@react-native/metro-config": "0.79.2",
+    "@react-native/typescript-config": "0.79.2",
+    "@types/react": "^19.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "react-native-builder-bob": "^0.40.8",
+    "react-native-dotenv": "^3.4.11",
+    "react-native-monorepo-config": "^0.1.9"
+  }
+}
