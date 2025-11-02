@@ -94,9 +94,6 @@ rootProject.allprojects {
     google()
     maven { url "https://maven.juspay.in/hyper-sdk/" }
     mavenLocal()
-    maven {
-      url("/Users/shivam.shashank/Documents/repositories/hyperswitch-client-core/android/maven")
-    }
   }
 }
 

@@ -2,14 +2,6 @@ buildscript {
   // Buildscript is evaluated before everything else so we can't use getExtOrDefault
   def kotlin_version = rootProject.ext.has('kotlinVersion') ? rootProject.ext.get('kotlinVersion') : project.properties['HyperswitchScancard_kotlinVersion']
 
-
-  parent.allprojects {
-    repositories {
-      maven {
-        url("/Users/shivam.shashank/Documents/repositories/hyperswitch-client-core/android/maven")
-      }
-    }
-  }
   repositories {
     google()
     mavenCentral()
