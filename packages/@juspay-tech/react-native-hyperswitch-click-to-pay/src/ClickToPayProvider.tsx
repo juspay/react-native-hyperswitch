@@ -33,6 +33,8 @@ type CheckoutParams = {
   currency: string;
   orderId: string;
   rememberMe?: boolean;
+  mobileNumber?: string;
+  mobileCountryCode?: string;
 };
 
 type ClickToPayContextValue = {
@@ -202,6 +204,8 @@ export const ClickToPayProvider: React.FC<ClickToPayProviderProps> = ({
       expiryMonth: card.panExpirationMonth ?? card.digitalCardData?.expiryMonth,
       expiryYear: card.panExpirationYear ?? card.digitalCardData?.expiryYear,
       digitalCardId: card.srcDigitalCardId ?? card.digitalCardId,
+      paymentCardDescriptor: card.paymentCardDescriptor,
+      digitalCardData: {descriptorName: card.digitalCardData?.descriptorName},
     }));
   }, []);
 
@@ -552,12 +556,14 @@ export const ClickToPayProvider: React.FC<ClickToPayProviderProps> = ({
             },
             countryCode: 'IN',
             emailAddress: userIdentity?.value,
-            fullName: 'test test',
+            ...(params.cardData?.cardHolderName && { fullName: params.cardData.cardHolderName }),
             locale: 'en',
-            mobileNumber: {
-              phoneNumber: '8003132369',
-              countryCode: '91',
-            },
+            ...(params.mobileNumber && params.mobileCountryCode && {
+              mobileNumber: {
+                phoneNumber: params.mobileNumber,
+                countryCode: params.mobileCountryCode,
+              },
+            }),
           },
           payloadTypeIndicatorCheckout: 'FULL',
         };
