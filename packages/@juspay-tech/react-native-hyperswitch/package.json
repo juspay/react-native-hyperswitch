@@ -52,8 +52,7 @@
     "lint": "eslint \"**/*.{tsx,res}\"",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
     "prepare": "npm run re:build && bob build",
-    "release": "release-it --only-version",
-    "postinstall": "npm run re:build"
+    "release": "release-it --only-version"
   },
   "keywords": [
     "react-native",
