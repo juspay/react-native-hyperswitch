@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.webkit.WebSettings
 import android.view.WindowInsets
@@ -91,19 +92,21 @@ internal class HyperProvider internal constructor(private val activity: Activity
     activity?.let {
       try {
         if (reactFragment != null) {
+          reactFragment!!.unRegisterEventBus()
           it.supportFragmentManager.beginTransaction().remove(reactFragment!!).commitAllowingStateLoss()
         }
         if (reset) {
           reactFragment = null
         }
-      } catch (_: Exception) {
+      } catch (e: Exception) {
+        e.message?.let { msg -> Log.i("MANIDEEP", msg) }
       }
     }
   }
 
   companion object {
     @JvmStatic
-    var reactFragment: Fragment? = null
+    var reactFragment: ReactFragment? = null
 
     @JvmStatic
     private var publishableKey: String? = null
@@ -205,7 +208,7 @@ internal class HyperProvider internal constructor(private val activity: Activity
 
     private fun getHyperParams(context: Activity, configuration: Bundle): Bundle = Bundle().apply {
       putString("appId", context.packageName)
-      putString("country", context.resources?.configuration?.locale?.country)
+      putString("country", context.resources?.configuration?.locales?.get(0)?.country)
       putString("user-agent", getUserAgent(context))
       putDouble("launchTime", getCurrentTime())
       putString("sdkVersion", BuildConfig.VERSION_NAME)
