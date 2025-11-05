@@ -4,7 +4,6 @@ buildscript {
   }
 
   repositories {
-    mavenLocal()
     google()
     mavenCentral()
   }
@@ -88,12 +87,9 @@ android {
     pickFirst '**/libreactnativejni.so'
   }
 }
-rootProject.allprojects {
-  repositories {
-    mavenCentral()
-    google()
-    maven { url "https://maven.juspay.in/hyper-sdk/" }
-    mavenLocal()
+rootProject.allprojects { eachProject ->
+  eachProject.repositories.maven {
+    url "https://maven.juspay.in/hyper-sdk/"
   }
 }
 
@@ -110,6 +106,7 @@ dependencies {
   implementation("org.greenrobot:eventbus")
   implementation "in.juspay:hyperotareact:0.0.1-xota.10"
   implementation "io.hyperswitch:hyperswitch-sdk-android-common:1.0.0"
+  implementation "io.hyperswitch:hyperswitch-sdk-android-logger:1.0.0"
   // implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
   // implementation 'androidx.lifecycle:lifecycle-common-java8:2.8.7'
   // implementation 'androidx.fragment:fragment-ktx:1.8.5'

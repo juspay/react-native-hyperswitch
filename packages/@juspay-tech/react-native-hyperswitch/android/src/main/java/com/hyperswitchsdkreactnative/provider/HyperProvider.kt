@@ -91,6 +91,7 @@ internal class HyperProvider internal constructor(private val activity: Activity
     activity?.let {
       try {
         if (reactFragment != null) {
+          reactFragment!!.unRegisterEventBus()
           it.supportFragmentManager.beginTransaction().remove(reactFragment!!).commitAllowingStateLoss()
         }
         if (reset) {
@@ -103,7 +104,7 @@ internal class HyperProvider internal constructor(private val activity: Activity
 
   companion object {
     @JvmStatic
-    var reactFragment: Fragment? = null
+    var reactFragment: ReactFragment? = null
 
     @JvmStatic
     private var publishableKey: String? = null
@@ -205,7 +206,7 @@ internal class HyperProvider internal constructor(private val activity: Activity
 
     private fun getHyperParams(context: Activity, configuration: Bundle): Bundle = Bundle().apply {
       putString("appId", context.packageName)
-      putString("country", context.resources?.configuration?.locale?.country)
+      putString("country", context.resources?.configuration?.locales?.get(0)?.country)
       putString("user-agent", getUserAgent(context))
       putDouble("launchTime", getCurrentTime())
       putString("sdkVersion", BuildConfig.VERSION_NAME)

@@ -102,7 +102,7 @@ public final class OTAServices {
                 "forceUpdate": true,
                 "localAssets": (getHyperOTAPlist(configKey) ?? "releaseConfigURL") == "releaseConfigURL",
                 "fileName": getHyperOTAPlist("fileName") ?? "" ,
-                "releaseConfigURL": (getHyperOTAPlist(configKey) ?? "") +  "/mobile-ota/ios/" + SDKVersion.current + "/config.json",
+                "releaseConfigURL": (getHyperOTAPlist(configKey) ?? "") +  "/mobile-ota/rn/ios/" + SDKVersion.current + "/config.json",
             ] as [String: Any]
             self.otaServices = HyperOTAServices(payload: payload, loggerDelegate: logger, baseBundle: Bundle(for: OTAServices.self))
         }

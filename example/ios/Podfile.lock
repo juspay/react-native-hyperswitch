@@ -11,7 +11,7 @@ PODS:
   - HyperCore (0.1.2)
   - HyperOTA (0.0.8):
     - HyperCore (= 0.1.2)
-  - HyperswitchSdkReactNative (0.1.0):
+  - HyperswitchSdkReactNative (0.2.1):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -77,6 +77,7 @@ PODS:
     - React-RCTText (= 0.79.2)
     - React-RCTVibration (= 0.79.2)
   - React-callinvoker (0.79.2)
+  - React-Codegen (0.1.0)
   - React-Core (0.79.2):
     - glog
     - hermes-engine
@@ -1362,6 +1363,44 @@ PODS:
     - React-jsiexecutor
     - React-RCTFBReactNativeSpec
     - ReactCommon/turbomodule/core
+  - react-native-hyperswitch-netcetera-3ds (0.2.1):
+    - RCT-Folly
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Codegen
+    - React-Core
+    - ReactCommon/turbomodule/core
+  - react-native-hyperswitch-scancard (0.2.1):
+    - RCT-Folly
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Codegen
+    - React-Core
+    - ReactCommon/turbomodule/core
+  - react-native-webview (13.16.0):
+    - DoubleConversion
+    - glog
+    - hermes-engine
+    - RCT-Folly (= 2024.11.18.00)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-hermes
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - Yoga
   - React-NativeModulesApple (0.79.2):
     - glog
     - hermes-engine
@@ -1686,7 +1725,7 @@ PODS:
     - React-utils (= 0.79.2)
   - RNInAppBrowser (3.7.0):
     - React-Core
-  - RNSentry (6.21.0):
+  - RNSentry (6.22.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1709,7 +1748,7 @@ PODS:
     - ReactCodegen
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
-    - Sentry/HybridSDK (= 8.53.2)
+    - Sentry/HybridSDK (= 8.56.2)
     - Yoga
   - RNSVG (15.12.0):
     - DoubleConversion
@@ -1760,7 +1799,7 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
-  - Sentry/HybridSDK (8.53.2)
+  - Sentry/HybridSDK (8.56.2)
   - SocketRocket (0.7.1)
   - Yoga (0.0.0)
 
@@ -1772,7 +1811,7 @@ DEPENDENCIES:
   - fmt (from `../node_modules/react-native/third-party-podspecs/fmt.podspec`)
   - glog (from `../node_modules/react-native/third-party-podspecs/glog.podspec`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
-  - HyperswitchSdkReactNative (from `../..`)
+  - "HyperswitchSdkReactNative (from `../../packages/@juspay-tech/react-native-hyperswitch`)"
   - RCT-Folly (from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`)
   - RCT-Folly/Fabric (from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`)
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
@@ -1806,6 +1845,9 @@ DEPENDENCIES:
   - React-logger (from `../node_modules/react-native/ReactCommon/logger`)
   - React-Mapbuffer (from `../node_modules/react-native/ReactCommon`)
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
+  - "react-native-hyperswitch-netcetera-3ds (from `../../packages/@juspay-tech/react-native-hyperswitch-netcetera-3ds`)"
+  - "react-native-hyperswitch-scancard (from `../../packages/@juspay-tech/react-native-hyperswitch-scancard`)"
+  - react-native-webview (from `../node_modules/react-native-webview`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-oscompat (from `../node_modules/react-native/ReactCommon/oscompat`)
   - React-perflogger (from `../node_modules/react-native/ReactCommon/reactperflogger`)
@@ -1846,6 +1888,7 @@ SPEC REPOS:
   trunk:
     - HyperCore
     - HyperOTA
+    - React-Codegen
     - Sentry
     - SocketRocket
 
@@ -1866,7 +1909,7 @@ EXTERNAL SOURCES:
     :podspec: "../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     :tag: hermes-2025-03-03-RNv0.79.0-bc17d964d03743424823d7dd1a9f37633459c5c5
   HyperswitchSdkReactNative:
-    :path: "../.."
+    :path: "../../packages/@juspay-tech/react-native-hyperswitch"
   RCT-Folly:
     :podspec: "../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec"
   RCTDeprecation:
@@ -1929,6 +1972,12 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   React-microtasksnativemodule:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/microtasks"
+  react-native-hyperswitch-netcetera-3ds:
+    :path: "../../packages/@juspay-tech/react-native-hyperswitch-netcetera-3ds"
+  react-native-hyperswitch-scancard:
+    :path: "../../packages/@juspay-tech/react-native-hyperswitch-scancard"
+  react-native-webview:
+    :path: "../node_modules/react-native-webview"
   React-NativeModulesApple:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios"
   React-oscompat:
@@ -2010,13 +2059,14 @@ SPEC CHECKSUMS:
   hermes-engine: 314be5250afa5692b57b4dd1705959e1973a8ebe
   HyperCore: 22946379d44746dc6de385a90e383054e38a0692
   HyperOTA: b8d473168c4f8b79ce24bd493f216902ab73aaf3
-  HyperswitchSdkReactNative: 83de5b06cda7df3f1675d56b13544f6e9501a7cd
+  HyperswitchSdkReactNative: cdef2674c1d001a26407c0fec46c33681b9cd7a1
   RCT-Folly: 36fe2295e44b10d831836cc0d1daec5f8abcf809
   RCTDeprecation: 83ffb90c23ee5cea353bd32008a7bca100908f8c
   RCTRequired: eb7c0aba998009f47a540bec9e9d69a54f68136e
   RCTTypeSafety: 659ae318c09de0477fd27bbc9e140071c7ea5c93
   React: c2d3aa44c49bb34e4dfd49d3ee92da5ebacc1c1c
   React-callinvoker: 1bdfb7549b5af266d85757193b5069f60659ef9d
+  React-Codegen: 4b8b4817cea7a54b83851d4c1f91f79aa73de30a
   React-Core: 7150cf9b6a5af063b37003062689f1691e79c020
   React-CoreModules: 15a85e6665d61678942da6ae485b351f4c699049
   React-cxxreact: 74f9de59259ac951923f5726aa14f0398f167af9
@@ -2042,6 +2092,9 @@ SPEC CHECKSUMS:
   React-logger: 368570a253f00879a1e4fea24ed4047e72e7bbf3
   React-Mapbuffer: c04fcda1c6281fc0a6824c7dcc1633dd217ac1ec
   React-microtasksnativemodule: ca2804a25fdcefffa0aa942aa23ab53b99614a34
+  react-native-hyperswitch-netcetera-3ds: 925c0a12e7f090177292b269287ec31493d5bc90
+  react-native-hyperswitch-scancard: 65374b2a1f4237e4622ddb95a5f7754804016117
+  react-native-webview: 31e5182717002afb31a4452498e890daf28a77de
   React-NativeModulesApple: 452b86b29fae99ed0a4015dca3ad9cd222f88abf
   React-oscompat: ef5df1c734f19b8003e149317d041b8ce1f7d29c
   React-perflogger: 6fd2f6811533e9c19a61e855c3033eecbf4ad2a0
@@ -2074,9 +2127,9 @@ SPEC CHECKSUMS:
   ReactCodegen: fda99a79c866370190e162083a35602fdc314e5d
   ReactCommon: 4d0da92a5eb8da86c08e3ec34bd23ab439fb2461
   RNInAppBrowser: e36d6935517101ccba0e875bac8ad7b0cb655364
-  RNSentry: 0cade72239d3000990d6a9ee3f73e7a00cf054ea
+  RNSentry: aa69839c5d090f644e118c0fe59b2640137de440
   RNSVG: 50819276c95d91ccd8fbe5cfea7e09a416c9beaa
-  Sentry: 59993bffde4a1ac297ba6d268dc4bbce068d7c1b
+  Sentry: b53951377b78e21a734f5dc8318e333dbfc682d7
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: c758bfb934100bb4bf9cbaccb52557cee35e8bdf
 

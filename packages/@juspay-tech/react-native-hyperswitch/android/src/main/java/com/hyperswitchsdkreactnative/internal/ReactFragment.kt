@@ -30,12 +30,18 @@ import com.facebook.react.shell.MainReactPackage
 import com.hyperswitchsdkreactnative.BuildConfig
 import com.hyperswitchsdkreactnative.R
 import com.hyperswitchsdkreactnative.internal.DefaultReactHost.getDefaultReactHost
+import com.hyperswitchsdkreactnative.modules.HyperswitchSdkReactNativeModule
 import com.hyperswitchsdkreactnative.provider.HyperProvider
+import com.proyecto26.inappbrowser.ChromeTabsDismissedEvent
+import com.proyecto26.inappbrowser.ChromeTabsManagerActivity
 import `in`.juspay.hyperota.LazyDownloadCallback
 import `in`.juspay.hyperotareact.HyperOTAReact
 import io.hyperswitch.hyperota.HyperOtaLogger
 import io.hyperswitch.react.SDKEnvironment
 import io.hyperswitch.react.Utils.Companion.checkEnvironment
+import io.hyperswitch.redirect.RedirectEvent
+import org.greenrobot.eventbus.EventBus
+import org.greenrobot.eventbus.Subscribe
 
 /**
  * Fragment for creating a React View. This allows the developer to "embed" a React Application
@@ -46,7 +52,6 @@ internal open class ReactFragment : Fragment(), PermissionAwareActivity {
 
   private var disableHostLifecycleEvents = false
   private var permissionListener: PermissionListener? = null
-
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     var mainComponentName: String? = null
@@ -73,6 +78,7 @@ internal open class ReactFragment : Fragment(), PermissionAwareActivity {
           fabricEnabled,
         ))
       }
+    registerEventBus()
   }
 
   /**
@@ -81,6 +87,33 @@ internal open class ReactFragment : Fragment(), PermissionAwareActivity {
    * method if your application class does not implement `ReactApplication` or you simply have a
    * different mechanism for storing a `ReactNativeHost`, e.g. as a static field somewhere.
    */
+
+  @Subscribe
+  fun onEvent(event: RedirectEvent) {
+    unRegisterEventBus()
+    EventBus.getDefault().post(
+      ChromeTabsDismissedEvent(
+        event.message,
+        event.resultType,
+        event.isError
+      )
+    )
+    startActivity(ChromeTabsManagerActivity.createDismissIntent(context))
+  }
+  private fun registerEventBus() {try{
+    if (!EventBus.getDefault().isRegistered(this)) {
+      EventBus.getDefault().register(this)
+    }
+  }catch(_: Exception){}
+  }
+
+  fun unRegisterEventBus() {
+    try {
+      if (EventBus.getDefault().isRegistered(this)) {
+        EventBus.getDefault().unregister(this)
+      }
+    }catch(_: Exception){}
+  }
   @Suppress("DEPRECATION")
   @Deprecated(
     "You should not use ReactNativeHost directly in the New Architecture. Use ReactHost instead.",
@@ -159,6 +192,7 @@ internal open class ReactFragment : Fragment(), PermissionAwareActivity {
 
   override fun onDestroy() {
     super.onDestroy()
+    unRegisterEventBus()
     if (!disableHostLifecycleEvents) {
       reactDelegate.onHostDestroy()
     } else {
