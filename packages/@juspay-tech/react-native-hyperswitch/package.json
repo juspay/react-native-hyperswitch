@@ -1,6 +1,6 @@
 {
   "name": "@juspay-tech/react-native-hyperswitch",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Hyperswitch SDK for React Native",
   "main": "lib/commonjs/index.bundle.js",
   "module": "lib/module/index.bundle.js",

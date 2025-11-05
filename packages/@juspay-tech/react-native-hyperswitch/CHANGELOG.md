@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.3.0](https://github.com/juspay/hyperswitch-react-native-libraries/compare/@juspay-tech/react-native-hyperswitch@0.2.1...@juspay-tech/react-native-hyperswitch@0.3.0) (2025-11-05)
+
+### Features
+
+- bundling the code with bundler ([572cc53](https://github.com/juspay/hyperswitch-react-native-libraries/commit/572cc539fa0abe7d795c51c3073eb4a1d14c6dc8))
+
 ## [0.2.1](https://github.com/juspay/hyperswitch-react-native-libraries/compare/@juspay-tech/react-native-hyperswitch@0.2.0...@juspay-tech/react-native-hyperswitch@0.2.1) (2025-11-02)
 
 **Note:** Version bump only for package @juspay-tech/react-native-hyperswitch

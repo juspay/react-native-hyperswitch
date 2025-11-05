@@ -1,6 +1,6 @@
 {
   "name": "@juspay-tech/react-native-hyperswitch-click-to-pay",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "React Native Hyperswitch Click To Pay",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
