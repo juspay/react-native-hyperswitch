@@ -38,7 +38,6 @@ class HyperswitchSdkNativeModule(reactContext: ReactApplicationContext) :
 
   @ReactMethod
   override fun launchGPay(requestObj: String, callback: Callback) {
-    Log.i("Manideep", "called gpay here")
     currentActivity?.let {
       GooglePayCallbackManager.setCallback(
         it,
@@ -61,8 +60,8 @@ class HyperswitchSdkNativeModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   override fun exitPaymentsheet(rootTag: Double, result: String, reset: Boolean) {
     try {
-      resetView()
       resolvePromise(result)
+      resetView()
     } catch (e: JSONException) {
       // Log.e(NAME, "Failed to parse JSON result: $result", e)
       resolvePromise(result)
@@ -73,7 +72,13 @@ class HyperswitchSdkNativeModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   override fun exitPaymentMethodManagement(rootTag: Double, result: String, reset: Boolean) {
 //    Log.d(NAME, "exitPaymentMethodManagement called $result")
-    resolvePromise(result)
+    try {
+      resolvePromise(result)
+      resetView()
+    } catch (e: JSONException) {
+      // Log.e(NAME, "Failed to parse JSON result: $result", e)
+      resolvePromise(result)
+    }
 
     // Implementation for exiting payment method management
   }
@@ -81,7 +86,14 @@ class HyperswitchSdkNativeModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   override fun exitWidget(result: String, widgetType: String) {
 //    Log.d(NAME, "exitWidget called with result: $result, widgetType: $widgetType")
-    resolvePromise(result)
+    try {
+      resolvePromise(result)
+      resetView()
+    } catch (e: JSONException) {
+      // Log.e(NAME, "Failed to parse JSON result: $result", e)
+      resolvePromise(result)
+    }
+
 
     // Implementation for exiting widget
   }
@@ -89,7 +101,13 @@ class HyperswitchSdkNativeModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   override fun exitCardForm(result: String) {
 //    Log.d(NAME, "exitCardForm called with result: $result")
-    resolvePromise(result)
+    try {
+      resolvePromise(result)
+      resetView()
+    } catch (e: JSONException) {
+      // Log.e(NAME, "Failed to parse JSON result: $result", e)
+      resolvePromise(result)
+    }
 
     // Implementation for exiting card form
   }
@@ -97,7 +115,13 @@ class HyperswitchSdkNativeModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   override fun exitWidgetPaymentsheet(rootTag: Double, result: String, reset: Boolean) {
 //    Log.d(NAME, "exitWidgetPaymentsheet called")
-    resolvePromise(result)
+    try {
+      resolvePromise(result)
+      resetView()
+    } catch (e: JSONException) {
+      // Log.e(NAME, "Failed to parse JSON result: $result", e)
+      resolvePromise(result)
+    }
 
     // Implementation for exiting widget payment sheet
   }

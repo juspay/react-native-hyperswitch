@@ -2,23 +2,23 @@
   "name": "@juspay-tech/react-native-hyperswitch",
   "version": "0.2.1",
   "description": "Hyperswitch SDK for React Native",
-  "main": "lib/commonjs/index",
-  "module": "lib/module/index",
-  "types": "lib/typescript/commonjs/src/index.d.ts",
+  "main": "lib/commonjs/index.bundle.js",
+  "module": "lib/module/index.bundle.js",
+  "types": "lib/typescript/src/index.d.ts",
   "react-native": "src/index.tsx",
   "source": "src/index.tsx",
   "exports": {
     ".": {
       "source": "./src/index.tsx",
       "import": {
-        "types": "./lib/typescript/module/src/index.d.ts",
-        "default": "./lib/module/index.js"
+        "types": "./lib/typescript/src/index.d.ts",
+        "default": "./lib/module/index.bundle.js"
       },
       "require": {
-        "types": "./lib/typescript/commonjs/src/index.d.ts",
-        "default": "./lib/commonjs/index.js"
+        "types": "./lib/typescript/src/index.d.ts",
+        "default": "./lib/commonjs/index.bundle.js"
       },
-      "default": "./lib/module/index.js"
+      "default": "./lib/module/index.bundle.js"
     },
     "./package.json": "./package.json"
   },
@@ -39,7 +39,11 @@
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/__mocks__",
-    "!**/.*"
+    "!**/.*",
+    "tsconfig.build.json",
+    "rescript.json",
+    "scripts/copy-rescript-deps.js",
+    "scripts/rewrite-imports.js"
   ],
   "scripts": {
     "re:start": "rescript build -w",
@@ -51,9 +55,8 @@
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{tsx,res}\"",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
-    "prepare": "npm run re:build && bob build",
-    "release": "release-it --only-version",
-    "postinstall": "npm run re:build"
+    "prepare": "npm run re:build && bob build && rollup -c",
+    "release": "release-it --only-version"
   },
   "keywords": [
     "react-native",
@@ -78,6 +81,7 @@
     "../example"
   ],
   "devDependencies": {
+    "@babel/runtime": "^7.25.0",
     "@commitlint/config-conventional": "^19.6.0",
     "@eslint/compat": "^1.2.7",
     "@eslint/eslintrc": "^3.3.0",
@@ -87,6 +91,11 @@
     "@react-native/babel-preset": "0.79.2",
     "@react-native/eslint-config": "^0.78.0",
     "@release-it/conventional-changelog": "^10.0.1",
+    "@rescript/core": "^1.6.1",
+    "@rescript/react": "^0.14.0",
+    "@rollup/plugin-commonjs": "^28.0.2",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "@rollup/plugin-typescript": "^12.1.2",
     "@types/jest": "^30.0.0",
     "@types/react": "^19.1.11",
     "@types/react-dom": "^19.1.8",
@@ -101,7 +110,10 @@
     "react-native": "0.79.2",
     "react-native-builder-bob": "^0.40.8",
     "release-it": "^19.0.5",
+    "rescript": "11",
     "rescript-react-native": "^0.78.0",
+    "rollup": "^4.31.0",
+    "rollup-plugin-terser": "^7.0.2",
     "turbo": "^1.10.7",
     "typescript": "^5.9.2"
   },
@@ -110,13 +122,8 @@
     "react": "*",
     "react-native": "*",
     "react-native-inappbrowser-reborn": "*",
-    "react-native-svg": "*"
-  },
-  "dependencies": {
-    "@babel/runtime": "^7.25.0",
-    "@rescript/core": "^1.6.1",
-    "@rescript/react": "^0.14.0",
-    "rescript": "11"
+    "react-native-svg": "*",
+    "react-native-webview": "*"
   },
   "jest": {
     "preset": "react-native",
@@ -160,13 +167,6 @@
     "source": "src",
     "output": "lib",
     "targets": [
-      "commonjs",
-      [
-        "module",
-        {
-          "esm": true
-        }
-      ],
       [
         "typescript",
         {
