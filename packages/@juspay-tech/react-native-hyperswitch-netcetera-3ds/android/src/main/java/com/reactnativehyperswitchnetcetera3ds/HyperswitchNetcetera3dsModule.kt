@@ -2,7 +2,6 @@ package com.reactnativehyperswitchnetcetera3ds
 
 import android.app.Activity
 import android.app.Application
-import android.util.Log
 import androidx.annotation.Nullable
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Callback
@@ -14,8 +13,9 @@ class HyperswitchNetcetera3dsModule(reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
   val hsNetceteraUtils = HsNetceteraUtils()
   val applicationContext = reactApplicationContext.applicationContext as Application
-  val activity = currentActivity ?: reactApplicationContext.currentActivity
-
+  private fun getActivity(): Activity? {
+    return currentActivity ?: reactApplicationContext.currentActivity
+  }
   override fun getName(): String {
     return "HyperswitchNetcetera3ds"
   }
@@ -43,7 +43,7 @@ class HyperswitchNetcetera3dsModule(reactContext: ReactApplicationContext) :
   fun generateAReqParams(
     messageVersion: String, directoryServerId: String, callback: Callback
   ) {
-    hsNetceteraUtils.generateAReqParams(activity, messageVersion, directoryServerId, callback)
+    hsNetceteraUtils.generateAReqParams(getActivity(), messageVersion, directoryServerId, callback)
   }
 
   @ReactMethod
@@ -67,6 +67,6 @@ class HyperswitchNetcetera3dsModule(reactContext: ReactApplicationContext) :
 
   @ReactMethod
   fun generateChallenge(callback: Callback) {
-    hsNetceteraUtils.generateChallenge(activity, 5, callback)
+    hsNetceteraUtils.generateChallenge(getActivity(), 5, callback)
   }
 }
