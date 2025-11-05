@@ -3388,6 +3388,55 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@juspay-tech/react-native-hyperswitch@workspace:packages/@juspay-tech/react-native-hyperswitch":
+  version: 0.0.0-use.local
+  resolution: "@juspay-tech/react-native-hyperswitch@workspace:packages/@juspay-tech/react-native-hyperswitch"
+  dependencies:
+    "@babel/runtime": ^7.25.0
+    "@commitlint/config-conventional": ^19.6.0
+    "@eslint/compat": ^1.2.7
+    "@eslint/eslintrc": ^3.3.0
+    "@eslint/js": ^9.22.0
+    "@evilmartians/lefthook": ^1.5.0
+    "@react-native-community/cli": 15.0.0-alpha.2
+    "@react-native/babel-preset": 0.79.2
+    "@react-native/eslint-config": ^0.78.0
+    "@release-it/conventional-changelog": ^10.0.1
+    "@rescript/core": ^1.6.1
+    "@rescript/react": ^0.14.0
+    "@rollup/plugin-commonjs": ^29.0.0
+    "@rollup/plugin-node-resolve": ^16.0.3
+    "@rollup/plugin-typescript": ^12.3.0
+    "@types/jest": ^30.0.0
+    "@types/react": ^19.1.11
+    "@types/react-dom": ^19.1.8
+    commitlint: ^19.6.1
+    del-cli: ^5.1.0
+    eslint: ^9.22.0
+    eslint-config-prettier: ^10.1.1
+    eslint-plugin-prettier: ^5.2.3
+    jest: ^29.7.0
+    prettier: ^3.0.3
+    react: 19.0.0
+    react-native: 0.79.2
+    react-native-builder-bob: ^0.40.8
+    release-it: ^19.0.5
+    rescript: 11
+    rescript-react-native: ^0.78.0
+    rollup: ^4.52.5
+    rollup-plugin-terser: ^7.0.2
+    turbo: ^1.10.7
+    typescript: ^5.9.2
+  peerDependencies:
+    "@sentry/react-native": "*"
+    react: "*"
+    react-native: "*"
+    react-native-inappbrowser-reborn: "*"
+    react-native-svg: "*"
+    react-native-webview: "*"
+  languageName: unknown
+  linkType: soft
+
 "@lerna/create@npm:8.2.4":
   version: 8.2.4
   resolution: "@lerna/create@npm:8.2.4"
@@ -5570,16 +5619,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@rescript/std@npm:^11.0.1":
-  version: 11.0.1
-  resolution: "@rescript/std@npm:11.0.1"
-  checksum: 6a2c02b89cefb3e578d42483e14f52d8e2f6330389c6ba555bc54156600b33869dbcbb56ba47e6a0504cddf2dd960ef09121e65896480999aeb0084fc4a59b04
-  languageName: node
-  linkType: hard
-
-"@rollup/plugin-commonjs@npm:^28.0.2":
-  version: 28.0.9
-  resolution: "@rollup/plugin-commonjs@npm:28.0.9"
+"@rollup/plugin-commonjs@npm:^29.0.0":
+  version: 29.0.0
+  resolution: "@rollup/plugin-commonjs@npm:29.0.0"
   dependencies:
     "@rollup/pluginutils": ^5.0.1
     commondir: ^1.0.1
@@ -5593,11 +5635,11 @@ __metadata:
   peerDependenciesMeta:
     rollup:
       optional: true
-  checksum: 89d01a9d571a36eb4a02b7813d293fd79380eeed313ff80a57332af200ccc3fb35b3334e57ec0295103ac5658dde99da273e47d5bb634c042a6cca7e3540d16f
+  checksum: 308fd9880c1e2b6ed5a3b717e44d353d0e31288757fbadb118fe363804dede6db31e689f02253a612f08f304dba2afc735eca9b5208e17a94840cc30bf1c17e0
   languageName: node
   linkType: hard
 
-"@rollup/plugin-node-resolve@npm:^16.0.0":
+"@rollup/plugin-node-resolve@npm:^16.0.3":
   version: 16.0.3
   resolution: "@rollup/plugin-node-resolve@npm:16.0.3"
   dependencies:
@@ -5615,7 +5657,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@rollup/plugin-typescript@npm:^12.1.2":
+"@rollup/plugin-typescript@npm:^12.3.0":
   version: 12.3.0
   resolution: "@rollup/plugin-typescript@npm:12.3.0"
   dependencies:
@@ -18969,56 +19011,6 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"react-native-hyperswitch-mani@workspace:packages/@juspay-tech/react-native-hyperswitch":
-  version: 0.0.0-use.local
-  resolution: "react-native-hyperswitch-mani@workspace:packages/@juspay-tech/react-native-hyperswitch"
-  dependencies:
-    "@babel/runtime": ^7.25.0
-    "@commitlint/config-conventional": ^19.6.0
-    "@eslint/compat": ^1.2.7
-    "@eslint/eslintrc": ^3.3.0
-    "@eslint/js": ^9.22.0
-    "@evilmartians/lefthook": ^1.5.0
-    "@react-native-community/cli": 15.0.0-alpha.2
-    "@react-native/babel-preset": 0.79.2
-    "@react-native/eslint-config": ^0.78.0
-    "@release-it/conventional-changelog": ^10.0.1
-    "@rescript/core": ^1.6.1
-    "@rescript/react": ^0.14.0
-    "@rescript/std": ^11.0.1
-    "@rollup/plugin-commonjs": ^28.0.2
-    "@rollup/plugin-node-resolve": ^16.0.0
-    "@rollup/plugin-typescript": ^12.1.2
-    "@types/jest": ^30.0.0
-    "@types/react": ^19.1.11
-    "@types/react-dom": ^19.1.8
-    commitlint: ^19.6.1
-    del-cli: ^5.1.0
-    eslint: ^9.22.0
-    eslint-config-prettier: ^10.1.1
-    eslint-plugin-prettier: ^5.2.3
-    jest: ^29.7.0
-    prettier: ^3.0.3
-    react: 19.0.0
-    react-native: 0.79.2
-    react-native-builder-bob: ^0.40.8
-    release-it: ^19.0.5
-    rescript: ^11.1.4
-    rescript-react-native: ^0.78.0
-    rollup: ^4.31.0
-    rollup-plugin-terser: ^7.0.2
-    turbo: ^1.10.7
-    typescript: ^5.9.2
-  peerDependencies:
-    "@sentry/react-native": "*"
-    react: "*"
-    react-native: "*"
-    react-native-inappbrowser-reborn: "*"
-    react-native-svg: "*"
-    react-native-webview: "*"
-  languageName: unknown
-  linkType: soft
-
 "react-native-inappbrowser-reborn@npm:^3.7.0":
   version: 3.7.0
   resolution: "react-native-inappbrowser-reborn@npm:3.7.0"
@@ -19692,7 +19684,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"rescript@npm:^11.1.4":
+"rescript@npm:11":
   version: 11.1.4
   resolution: "rescript@npm:11.1.4"
   bin:
@@ -19947,7 +19939,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"rollup@npm:^4.31.0":
+"rollup@npm:^4.52.5":
   version: 4.52.5
   resolution: "rollup@npm:4.52.5"
   dependencies:
@@ -21221,8 +21213,8 @@ __metadata:
   linkType: hard
 
 "terser@npm:^5.0.0, terser@npm:^5.15.0":
-  version: 5.44.0
-  resolution: "terser@npm:5.44.0"
+  version: 5.44.1
+  resolution: "terser@npm:5.44.1"
   dependencies:
     "@jridgewell/source-map": ^0.3.3
     acorn: ^8.15.0
@@ -21230,7 +21222,7 @@ __metadata:
     source-map-support: ~0.5.20
   bin:
     terser: bin/terser
-  checksum: 4e1868d9662ea280dad7b49cfe61b7693187be2b529b31b1f86782db00833c03ba05f2b82fc513d928e937260f2a5fbf42a93724e86eaf55f069288f934ccdb3
+  checksum: 1113c5711bb53127f9886e3c906fde8a93a665b532db9c7e36ff7bf287e032ed48ea0e5a3a1a27f6a27c3c0f934e47e7590fcd15c76b7b7bd44ad751b8a9ede4
   languageName: node
   linkType: hard
 
