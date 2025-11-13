@@ -3224,6 +3224,21 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@juspay-tech/react-native-hyperswitch-3ds@*, @juspay-tech/react-native-hyperswitch-3ds@workspace:packages/@juspay-tech/react-native-hyperswitch-3ds":
+  version: 0.0.0-use.local
+  resolution: "@juspay-tech/react-native-hyperswitch-3ds@workspace:packages/@juspay-tech/react-native-hyperswitch-3ds"
+  dependencies:
+    "@types/react": ^19.0.0
+    "@types/react-native": 0.72.8
+    react: 19.0.0
+    react-native: 0.78.2
+    typescript: ^5.9.2
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  languageName: unknown
+  linkType: soft
+
 "@juspay-tech/react-native-hyperswitch-click-to-pay@workspace:packages/@juspay-tech/react-native-hyperswitch-click-to-pay":
   version: 0.0.0-use.local
   resolution: "@juspay-tech/react-native-hyperswitch-click-to-pay@workspace:packages/@juspay-tech/react-native-hyperswitch-click-to-pay"
@@ -5585,6 +5600,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@react-native/virtualized-lists@npm:^0.72.4":
+  version: 0.72.8
+  resolution: "@react-native/virtualized-lists@npm:0.72.8"
+  dependencies:
+    invariant: ^2.2.4
+    nullthrows: ^1.1.1
+  peerDependencies:
+    react-native: "*"
+  checksum: ad9628a04e72420326fd5ef09c746ad9cd6cff745b73850c7297429e3c42927043d1310896a72aa94497dc6b7f1abc2be1081b465734f7673f0e7d36aaae5e53
+  languageName: node
+  linkType: hard
+
 "@release-it/conventional-changelog@npm:^10.0.1":
   version: 10.0.1
   resolution: "@release-it/conventional-changelog@npm:10.0.1"
@@ -6485,6 +6512,16 @@ __metadata:
   dependencies:
     "@types/react": "*"
   checksum: 00d089003c28496209050285ea21c16673e24533522093a318c818fa874534c8c05c0a933c2d44b1e7b8302c9ecff6bb778889e70b749b02a539641696dc34b2
+  languageName: node
+  linkType: hard
+
+"@types/react-native@npm:0.72.8":
+  version: 0.72.8
+  resolution: "@types/react-native@npm:0.72.8"
+  dependencies:
+    "@react-native/virtualized-lists": ^0.72.4
+    "@types/react": "*"
+  checksum: a9fdf0a11ed42f800eb646d038702d3652d0732aa017ecd8203fb2aee77a782fa7ef388433e5cfcb6ab658a1642e1286698fecedcbc379547e4aeefa681ed685
   languageName: node
   linkType: hard
 
@@ -18972,6 +19009,7 @@ __metadata:
     "@babel/core": ^7.25.2
     "@babel/preset-env": ^7.25.3
     "@babel/runtime": ^7.25.0
+    "@juspay-tech/react-native-hyperswitch-3ds": "*"
     "@react-native-community/cli": 18.0.0
     "@react-native-community/cli-platform-android": 18.0.0
     "@react-native-community/cli-platform-ios": 18.0.0
