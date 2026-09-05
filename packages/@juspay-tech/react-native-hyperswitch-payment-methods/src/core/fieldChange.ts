@@ -1,6 +1,5 @@
 import type { ElementType, FieldChange } from './types';
 
-/** The web SDK's brand spellings, for the strings each provider reports. */
 const BRANDS: Record<string, string> = {
   visa: 'Visa',
   mastercard: 'Mastercard',
@@ -34,7 +33,6 @@ export interface FieldChangeInput {
   error?: string;
 }
 
-/** Builds the web-shaped change from what a provider reports. */
 export function fieldChange(
   elementType: ElementType,
   input: FieldChangeInput

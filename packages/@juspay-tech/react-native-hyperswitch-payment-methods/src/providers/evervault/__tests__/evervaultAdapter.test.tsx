@@ -139,7 +139,7 @@ describe('evervaultAdapter', () => {
     expect(last.payload.expiryMonth).toBe('12');
     expect(last.payload.expiryYear).toBe('2030');
     expect(last.payload.formattedExpiry).toBe('12 / 30');
-    /* The encrypted values never ride along. */
+
     expect(JSON.stringify(changes)).not.toMatch(/enc_/);
   });
 

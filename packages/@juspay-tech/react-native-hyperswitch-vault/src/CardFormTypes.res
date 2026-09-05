@@ -30,7 +30,7 @@ type cardLabels = {
   cardholderNamePlaceholder: string,
   cardholderNameFloatingLabel: string,
   notEligibleText: string,
-  /* Heading of the co-badge network chooser. */
+
   selectCardBrandLabel: string,
   isRtl: bool,
 }
@@ -50,13 +50,13 @@ type cardFieldValues = {
   expiryDisplay: string,
   cvc: string,
   cardholderName: string,
-  /* The network in force — the saved card's hint, else the co-badge pick, else the detected brand. */
+
   brand: string,
-  /* The schemes this number matches, filtered to those the merchant accepts. */
+
   eligibleSchemes: array<string>,
-  /* Whether to offer the customer a choice between them. */
+
   isCoBadged: bool,
-  /* Present while the CVC field is mounted with a saved card. */
+
   savedCard: option<CardStateReducer.savedCard>,
 }
 

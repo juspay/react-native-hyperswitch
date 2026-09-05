@@ -15,13 +15,13 @@ import type {cardFormEvent as VaultPublicState_cardFormEvent} from './VaultPubli
 
 import type {cardholderNameMode as CardFieldOptions_cardholderNameMode} from './CardFieldOptions.gen';
 
+import type {customEndpoints as VaultEndpoint_customEndpoints} from './VaultEndpoint.gen';
+
 import type {eligibilityConfig as VaultFormOptions_eligibilityConfig} from './VaultFormOptions.gen';
 
 import type {localisation as VaultFormOptions_localisation} from './VaultFormOptions.gen';
 
 import type {vaultDetails as VaultDetails_vaultDetails} from './VaultDetails.gen';
-
-import type {vaultEndpointConfig as VaultEndpoint_vaultEndpointConfig} from './VaultEndpoint.gen';
 
 import type {vaultEnvironment as VaultFormOptions_vaultEnvironment} from './VaultFormOptions.gen';
 
@@ -38,6 +38,7 @@ export type Props = {
   readonly appearance?: VaultFormOptions_appearance; 
   readonly cardholderName?: CardFieldOptions_cardholderNameMode; 
   readonly children: React.ReactNode; 
+  readonly customEndpoints?: VaultEndpoint_customEndpoints; 
   readonly disabled?: boolean; 
   readonly eligibility?: VaultFormOptions_eligibilityConfig; 
   readonly enabledCardSchemes?: string[]; 
@@ -49,8 +50,7 @@ export type Props = {
   readonly sdkAuthorization?: string; 
   readonly session?: VaultFormOptions_vaultSession; 
   readonly unstyled?: boolean; 
-  readonly vaultDetails?: VaultDetails_vaultDetails; 
-  readonly vaultEndpoint?: VaultEndpoint_vaultEndpointConfig
+  readonly vaultDetails?: VaultDetails_vaultDetails
 };
 
 export const make: React.ComponentType<{
@@ -58,6 +58,7 @@ export const make: React.ComponentType<{
   readonly appearance?: VaultFormOptions_appearance; 
   readonly cardholderName?: CardFieldOptions_cardholderNameMode; 
   readonly children: React.ReactNode; 
+  readonly customEndpoints?: VaultEndpoint_customEndpoints; 
   readonly disabled?: boolean; 
   readonly eligibility?: VaultFormOptions_eligibilityConfig; 
   readonly enabledCardSchemes?: string[]; 
@@ -69,6 +70,5 @@ export const make: React.ComponentType<{
   readonly sdkAuthorization?: string; 
   readonly session?: VaultFormOptions_vaultSession; 
   readonly unstyled?: boolean; 
-  readonly vaultDetails?: VaultDetails_vaultDetails; 
-  readonly vaultEndpoint?: VaultEndpoint_vaultEndpointConfig
+  readonly vaultDetails?: VaultDetails_vaultDetails
 }> = CardFormJS.make as any;

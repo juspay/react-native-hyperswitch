@@ -1,35 +1,13 @@
 open ReactNative
 open Style
 
-/*
- * The co-badge network chooser, moved inside the library.
- *
- * ── WHY IT HAD TO MOVE ─────────────────────────────────────────────────────────
- *
- * A co-badged card carries two networks — RuPay and Visa on the same plastic is the common case —
- * and which one a payment is routed over is the CUSTOMER'S choice, with real consequences for fees
- * and for which issuer rules apply. The classic form offered that choice because it could see the
- * PAN. Now that every new-card flow is library-owned, only the library can: the decision is driven
- * entirely by which schemes the typed number matches.
- *
- * Dropping the feature was not an option that could be taken quietly. It would have silently routed
- * every co-badged card over whichever network happened to match first, for every merchant who
- * upgraded, with no error and nothing in the UI to show what had been lost.
- *
- * ── THE CHOICE STAYS INSIDE ────────────────────────────────────────────────────
- *
- * Nothing about the selection is published. There is no `onNetworkChange`, no selected-network
- * prop, and no way to read it back: the pick lands in the reducer, changes which CVC length is
- * valid, changes the artwork, and reaches `payment_method_data.card.card_network` in the direct
- * confirm. A host learns nothing about the card from any of it.
- */
-
 module Option_ = {
   @react.component
   let make = (
     ~scheme: string,
     ~isSelected: bool,
     ~theme: CardFormTypes.cardTheme,
+    ~baseUrl: string,
     ~onSelect: string => unit,
   ) =>
     <Pressable
@@ -48,7 +26,7 @@ module Option_ = {
         })}>
       {_ =>
         <>
-          <CardIcons detectedScheme=scheme size=30. mode=#standard />
+          <CardIcons detectedScheme=scheme baseUrl size=30. mode=#standard />
           <View style={s({width: 10.->dp})} />
           <Text
             style={s({
@@ -62,11 +40,6 @@ module Option_ = {
     </Pressable>
 }
 
-/*
- * The trigger sits in the card field's accessory slot, in place of the plain brand icon. It shows
- * the network in force plus a caret, so a customer can see that the artwork is a control rather
- * than a status indicator.
- */
 @react.component
 let make = (
   ~schemes: array<string>,
@@ -74,6 +47,7 @@ let make = (
   ~theme: CardFormTypes.cardTheme,
   ~label: string,
   ~brandIconMode: CardIcons.brandIconMode,
+  ~baseUrl: string,
   ~editable: bool,
   ~onSelect: string => unit,
 ) => {
@@ -89,8 +63,8 @@ let make = (
       style={_ => s({flexDirection: #row, alignItems: #center})}>
       {_ =>
         <>
-          <CardIcons detectedScheme=selected size=30. mode=brandIconMode />
-          /* A glyph rather than an asset: one more PNG for a 6-pixel triangle is not worth it. */
+          <CardIcons detectedScheme=selected baseUrl size=30. mode=brandIconMode />
+
           <Text
             style={s({
               color: theme.placeholderColor,
@@ -106,10 +80,7 @@ let make = (
       transparent=true
       animationType=#fade
       onRequestClose={() => setIsOpen(_ => false)}>
-      /*
-       * The backdrop dismisses. On a sheet the customer opened by accident this is the only way out
-       * that does not require them to choose a network they did not want.
-       */
+
       <Pressable
         accessibilityRole=#button
         accessibilityLabel=label
@@ -149,6 +120,7 @@ let make = (
                   scheme
                   isSelected={scheme === selected}
                   theme
+                  baseUrl
                   onSelect={picked => {
                     onSelect(picked)
                     setIsOpen(_ => false)

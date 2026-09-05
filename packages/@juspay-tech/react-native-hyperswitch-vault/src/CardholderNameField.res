@@ -2,7 +2,7 @@
 let make = React.forwardRef((
   props: {
     "styles": option<CardFieldStyles.fieldStyles>,
-    /* No `cardBrandIcon` and no `cvcIcon`: a name field has neither element to turn on. */
+
     "placeholder": option<string>,
     "label": option<string>,
     "labelBehavior": option<CardFieldOptions.labelBehavior>,

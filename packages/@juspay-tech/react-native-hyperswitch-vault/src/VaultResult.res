@@ -1,34 +1,6 @@
-/*
- * The two public results, one per operation (ADR-0003), spelled the way hyperswitch-web spells them.
- *
- * ── WHY TWO RESULTS AND NOT ONE ────────────────────────────────────────────────
- *
- *   `tokenize()`       — the merchant wants a payment-method token and will do the rest themselves.
- *                        `vaultTokenizeResult` is the ONLY public type with a `token`.
- *
- *   `confirmPayment()` — the library performs the tokenization AND the final payment confirmation.
- *                        The intermediate token never leaves the library, so `vaultPaymentResult`
- *                        has no `token` member and no way to grow one.
- *
- * ── THE WEB'S ERROR ENVELOPE ───────────────────────────────────────────────────
- *
- * A failure carries `error: {code, message, type}` — the members and the codes the web SDK's
- * `tokenize()` resolves with (`session_expired`, `session_consumed`, `tokenization_in_progress`,
- * `incomplete_field_set`, `validation_error`, `tokenization_failed`), plus the codes only this
- * library can produce, and `type` classifies the code exactly as the web does. `if (result.error)`
- * therefore works on both SDKs unchanged. The `status` discriminant is this library's addition, so
- * a TypeScript caller gets narrowing the web's untyped object cannot give.
- *
- * ── EVERY MESSAGE IS OURS ──────────────────────────────────────────────────────
- *
- * A backend error string can echo request context and is written for an operator, not a customer.
- * No mapper below forwards one: the transport maps a backend code to a fixed string of its own,
- * and that string — never the backend's — is what arrives here.
- */
-
 @genType
 type safeVaultErrorCode = [
-  /* web vocabulary */
+
   | #validation_error
   | #incomplete_field_set
   | #session_expired
@@ -36,20 +8,19 @@ type safeVaultErrorCode = [
   | #tokenization_in_progress
   | #confirm_in_progress
   | #tokenization_failed
-  /* this library's additions */
+
   | #invalid_session
   | #unsupported_configuration
   | #unknown_outcome
   | #payment_failed
   | #forbidden_card_data
-  /* The backend's eligibility step declined this card. Nothing was charged. */
+
   | #card_not_eligible
 ]
 
 @genType
 type safeVaultErrorType = [#validation_error | #api_error | #card_error]
 
-/* The web's classification of a code, member for member where the codes are shared. */
 let typeOf = (code: safeVaultErrorCode): safeVaultErrorType =>
   switch code {
   | #validation_error | #incomplete_field_set | #forbidden_card_data => #validation_error
@@ -69,7 +40,7 @@ let typeOf = (code: safeVaultErrorCode): safeVaultErrorType =>
 @genType
 type safeVaultError = {
   code: safeVaultErrorCode,
-  /* Library-owned, customer-safe display text. Never a backend message. */
+
   message: string,
   @as("type") type_: safeVaultErrorType,
 }
@@ -100,20 +71,9 @@ type vaultPaymentStatus = [
   | #validation_error
 ]
 
-/*
- * Tokenization uses `#success`/`#error` rather than `#succeeded`/`#failed`. The spellings differ on
- * purpose: the two results are not interchangeable, and a caller who copies a `status` comparison
- * from one flow into the other gets a compile error instead of a branch that silently never runs.
- */
 @genType
 type vaultTokenizeStatus = [#success | #validation_error | #error]
 
-/*
- * Records rather than `@tag` variants: ReScript compiles a payload-less variant constructor to a
- * bare string, so `Succeeded` came out as `"succeeded"` and `result.status` was `undefined` for the
- * most common outcome. `public.ts` republishes the same runtime shapes as hand-written TypeScript
- * discriminated unions, so merchants still get narrowing.
- */
 @genType
 type vaultPaymentResult = {
   status: vaultPaymentStatus,
@@ -121,14 +81,6 @@ type vaultPaymentResult = {
   nextAction?: safeNextAction,
 }
 
-/*
- * The card the vault stored, as it answered. The same members `onChange` already publishes, spelled
- * the same way, so a merchant reads `result.card.last4` and `event.payload.last4` identically. The
- * PAN and the CVC are not here and cannot be: the response never carries them either.
- *
- * Present when the response described a card — a new card minted through `tokenize()`. The
- * saved-card CVC refresh returns nothing but the token, so `card` is absent there.
- */
 @genType
 type vaultTokenizedCard = {
   bin?: string,
@@ -138,7 +90,6 @@ type vaultTokenizedCard = {
   expiryYear: string,
 }
 
-/* The ONLY public type carrying a token. */
 @genType
 type vaultTokenizeResult = {
   status: vaultTokenizeStatus,
@@ -147,10 +98,6 @@ type vaultTokenizeResult = {
   error?: safeVaultError,
 }
 
-/*
- * `None` when the response carried no card block: every member would be blank, and an object of
- * empty strings reads as "the vault said the last four digits are ''" rather than "it said nothing".
- */
 let tokenizedCardOf = (metadata: VaultConfirm.vaultCardMetadata): option<vaultTokenizedCard> => {
   let described =
     metadata.last4Digits->String.length > 0 ||
@@ -159,7 +106,7 @@ let tokenizedCardOf = (metadata: VaultConfirm.vaultCardMetadata): option<vaultTo
   let last4 = metadata.last4Digits
   let expiryMonth = metadata.expiryMonth
   let expiryYear = metadata.expiryYear
-  /* Spelled out rather than `?`-spread so an absent member is an ABSENT KEY, not `undefined`. */
+
   described
     ? Some(
         switch (metadata.binNumber, metadata.network) {
@@ -171,8 +118,6 @@ let tokenizedCardOf = (metadata: VaultConfirm.vaultCardMetadata): option<vaultTo
       )
     : None
 }
-
-/* ── Fixed messages ────────────────────────────────────────────────────────── */
 
 let invalidCardMessage = "Please check your card details and try again."
 let incompleteFieldSetMessage = "Mount a card-number, expiry and CVC field, or one CVC field with a saved card, before submitting."
@@ -191,9 +136,6 @@ let malformedResponseMessage = "The payment response could not be read."
 let forbiddenCardDataMessage = "Card data must not be supplied by the host; the library owns the card fields."
 let unsupportedConfigurationMessage = "This payment cannot be completed with the current configuration."
 let cardNotEligibleMessage = "This card is not accepted for this payment."
-let missingSavedCardTokenMessage = "The saved-card CVC flow requires a payment token: mount the CVC field with savedCard: {paymentToken, paymentMethodData: {card: {cardNetwork}}}."
-
-/* ── Payment constructors (Flows 2 and 3) ─────────────────────────────────── */
 
 let failedWith = (code, message): vaultPaymentResult => {
   status: #failed,
@@ -221,20 +163,9 @@ let forbiddenCardData = () => failedWith(#forbidden_card_data, forbiddenCardData
 let unsupportedConfiguration = () =>
   failedWith(#unsupported_configuration, unsupportedConfigurationMessage)
 
-/*
- * A DENIAL, not a failure to ask. `VaultEligibility` resolves a transport problem to "allowed", so
- * reaching this constructor means the backend explicitly said no — and nothing was charged.
- */
 let cardNotEligible = () => failedWith(#card_not_eligible, cardNotEligibleMessage)
 let unknownOutcome = () => failedWith(#unknown_outcome, unknownOutcomeMessage)
 
-/* ── Tokenize constructors (Flow 1) ────────────────────────────────────────── */
-
-/*
- * The key is not written at all when there is no card, rather than written as `undefined`: a
- * merchant reading `Object.keys(result)` — or an assertion on the whole object — should see the
- * members that exist and no others.
- */
 let tokenizeSuccess = (~card=?, token): vaultTokenizeResult =>
   switch card {
   | Some(card) => {status: #success, token, card}
@@ -263,12 +194,6 @@ let tokenizeSessionConsumed = () => tokenizeFailedWith(#session_consumed, sessio
 let tokenizeConfirmInProgress = () =>
   tokenizeFailedWith(#confirm_in_progress, confirmInProgressMessage)
 
-/*
- * The SAME transport failure taxonomy as the payment flow, re-tagged for this result's statuses.
- * The transport's message is forwarded: every one of them is a string the transport itself wrote
- * — including the specific "already used" / "expired" wording it derives from a backend CODE —
- * never a backend message.
- */
 let tokenizeFromPmsFailure = (error: VaultConfirm.vaultError): vaultTokenizeResult =>
   switch error.code {
   | #invalid_card_data => tokenizeInvalidCardData()
@@ -282,9 +207,6 @@ let tokenizeFromPmsFailure = (error: VaultConfirm.vaultError): vaultTokenizeResu
     tokenizeFailedWith(#tokenization_failed, error.message)
   }
 
-/* ── Payment mappers (Flow 2) ──────────────────────────────────────────────── */
-
-/* Call 1 (token mint) failed: nothing was charged, and no token exists. */
 let fromPmsFailure = (error: VaultConfirm.vaultError): vaultPaymentResult =>
   switch error.code {
   | #invalid_card_data => invalidCardData()
@@ -298,7 +220,6 @@ let fromPmsFailure = (error: VaultConfirm.vaultError): vaultPaymentResult =>
     failedWith(#tokenization_failed, error.message)
   }
 
-/* Call 2 (final confirm) returned. Only navigation crosses the boundary. */
 let fromNavOutcome = (outcome: VaultFinalConfirm.navOutcome): vaultPaymentResult =>
   switch outcome {
   | VaultFinalConfirm.Succeeded => {status: #succeeded}
@@ -313,10 +234,7 @@ let fromNavOutcome = (outcome: VaultFinalConfirm.navOutcome): vaultPaymentResult
         sessionToken: ?sessionToken,
       },
     }
-  /*
-   * The transport hands over a closed REASON; every word below is this module's own. There is no
-   * string on that boundary for backend prose to arrive in.
-   */
+
   | VaultFinalConfirm.Failed({reason}) =>
     switch reason {
     | VaultFinalConfirm.Unauthorized => failedWith(#payment_failed, unauthorizedMessage)

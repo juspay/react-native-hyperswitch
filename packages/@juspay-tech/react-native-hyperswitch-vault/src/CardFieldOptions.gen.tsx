@@ -40,6 +40,12 @@ export type expiryOptions = fieldOptions;
 
 export type cardholderNameOptions = fieldOptions;
 
+export type savedCardData = { readonly cardNetwork?: string };
+
+export type savedCardPaymentMethodData = { readonly card?: savedCardData };
+
+export type savedCard = { readonly paymentMethodToken?: string; readonly paymentMethodData?: savedCardPaymentMethodData };
+
 export type cvcOptions = {
   readonly placeholder?: string; 
   readonly label?: string; 
@@ -49,7 +55,8 @@ export type cvcOptions = {
   readonly accessibilityHint?: string; 
   readonly testID?: string; 
   readonly unstyled?: boolean; 
-  readonly cvcIcon?: cvcIconDisplay
+  readonly cvcIcon?: cvcIconDisplay; 
+  readonly savedCard?: savedCard
 };
 
 export type formFieldOptions = {
@@ -58,12 +65,6 @@ export type formFieldOptions = {
   readonly cardCvc?: cvcOptions; 
   readonly cardholderName?: cardholderNameOptions
 };
-
-export type savedCardData = { readonly cardNetwork?: string };
-
-export type savedCardPaymentMethodData = { readonly card?: savedCardData };
-
-export type savedCard = { readonly paymentToken?: string; readonly paymentMethodData?: savedCardPaymentMethodData };
 
 export type cardholderNameMode = "collect" | "external" | "omit";
 

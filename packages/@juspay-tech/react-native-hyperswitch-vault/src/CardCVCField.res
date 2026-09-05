@@ -11,14 +11,7 @@ let make = React.forwardRef((
     "testID": option<string>,
     "unstyled": option<bool>,
     "cvcIcon": option<CardFieldOptions.cvcIconDisplay>,
-    /*
-     * A card the merchant has already saved, as the web SDK's `create('cardCvc', {savedCard})`
-     * takes it: `{paymentToken, paymentMethodData: {card: {cardNetwork}}}`. Mount ONLY this
-     * field with it and `tokenize()` refreshes that card's CVC, resolving to the token the response
-     * carries. The network selects the CVC length rule; pass the listing's `card_network`, or
-     * `valid` turns true one digit early on an Amex card.
-     */
-    "savedCard": option<CardFieldOptions.savedCard>,
+    "options": option<CardFieldOptions.cvcOptions>,
     "onReady": option<VaultPublicState.fieldEvent => unit>,
     "onFocus": option<VaultPublicState.fieldEvent => unit>,
     "onBlur": option<VaultPublicState.fieldEvent => unit>,
@@ -42,23 +35,24 @@ let make = React.forwardRef((
     clear: () => controller.clearField(#cardCvc),
   })
 
+  let provided: CardFieldOptions.cvcOptions = props["options"]->Option.getOr({})
   let options: CardFieldOptions.cvcOptions = {
-    placeholder: ?props["placeholder"],
-    label: ?props["label"],
-    labelBehavior: ?props["labelBehavior"],
-    errorDisplay: ?props["errorDisplay"],
-    accessibilityLabel: ?props["accessibilityLabel"],
-    accessibilityHint: ?props["accessibilityHint"],
-    testID: ?props["testID"],
-    unstyled: ?props["unstyled"],
-    cvcIcon: ?props["cvcIcon"],
+    placeholder: ?props["placeholder"]->Option.orElse(provided.placeholder),
+    label: ?props["label"]->Option.orElse(provided.label),
+    labelBehavior: ?props["labelBehavior"]->Option.orElse(provided.labelBehavior),
+    errorDisplay: ?props["errorDisplay"]->Option.orElse(provided.errorDisplay),
+    accessibilityLabel: ?props["accessibilityLabel"]->Option.orElse(provided.accessibilityLabel),
+    accessibilityHint: ?props["accessibilityHint"]->Option.orElse(provided.accessibilityHint),
+    testID: ?props["testID"]->Option.orElse(provided.testID),
+    unstyled: ?props["unstyled"]->Option.orElse(provided.unstyled),
+    cvcIcon: ?props["cvcIcon"]->Option.orElse(provided.cvcIcon),
   }
 
   <BoundCardFields.Cvc
     ctx
     styles=?{props["styles"]}
     options
-    savedCard=?{props["savedCard"]}
+    savedCard=?{provided.savedCard}
     onFocus=?{props["onFocus"]}
     onBlur=?{props["onBlur"]}
   />

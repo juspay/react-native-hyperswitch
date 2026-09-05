@@ -1,21 +1,27 @@
-
 open ReactNative
 
-type assetTable = {
-  visa: Image.Source.t,
-  mastercard: Image.Source.t,
-  americanexpress: Image.Source.t,
-  dinersclub: Image.Source.t,
-  discover: Image.Source.t,
-  jcb: Image.Source.t,
-  cartesbancaires: Image.Source.t,
-  interac: Image.Source.t,
-  waitcard: Image.Source.t,
-  cvv: Image.Source.t,
-  camera: Image.Source.t,
+module SvgUri = {
+  @module("react-native-svg") @react.component
+  external make: (
+    ~uri: string,
+    ~width: float=?,
+    ~height: float=?,
+    ~color: string=?,
+  ) => React.element = "SvgUri"
 }
 
-@module("./cardIconAssets.mjs") external assets: assetTable = "cardIconAssets"
+module SvgXml = {
+  @module("react-native-svg") @react.component
+  external make: (
+    ~xml: string,
+    ~width: float=?,
+    ~height: float=?,
+    ~color: string=?,
+  ) => React.element = "SvgXml"
+}
+
+@module("./cardIconSvgs.mjs") external cvvSvg: string = "cvv"
+@module("./cardIconSvgs.mjs") external cameraSvg: string = "camera"
 
 type detectedScheme =
   | Visa
@@ -51,24 +57,23 @@ let fromDetectedName = (name: string): detectedScheme =>
   | _ => Unrecognised
   }
 
-let artworkFor = (scheme: detectedScheme): Image.Source.t =>
+let artworkFor = (scheme: detectedScheme): string =>
   switch scheme {
-  | Visa => assets.visa
-  | Mastercard => assets.mastercard
-  | AmericanExpress => assets.americanexpress
-  | DinersClub => assets.dinersclub
-  | Discover => assets.discover
-  | JCB => assets.jcb
-  | CartesBancaires => assets.cartesbancaires
-  | Interac => assets.interac
+  | Visa => "visa"
+  | Mastercard => "mastercard"
+  | AmericanExpress => "americanexpress"
+  | DinersClub => "dinersclub"
+  | Discover => "discover"
+  | JCB => "jcb"
+  | CartesBancaires => "cartesbancaires"
+  | Interac => "interac"
 
   | RuPay
   | UnionPay
   | Maestro
   | Bajaj
   | Sodexo
-  | Unrecognised =>
-    assets.waitcard
+  | Unrecognised => "waitcard"
   }
 
 @genType
@@ -77,7 +82,12 @@ type brandIconMode = [#standard | #animated | #hidden | #hideGeneric]
 let placeholderCycle = ["visa", "mastercard", "americanexpress", "dinersclub", "discover", "jcb"]
 
 @react.component
-let make = (~detectedScheme: string, ~size: float=30., ~mode: brandIconMode=#standard) => {
+let make = (
+  ~detectedScheme: string,
+  ~baseUrl: string,
+  ~size: float=30.,
+  ~mode: brandIconMode=#standard,
+) => {
   let hasBrand = detectedScheme->String.trim->String.length > 0
 
   let fadeAnim = CardAnimatedValue.useAnimatedValue(1.)
@@ -169,40 +179,27 @@ let make = (~detectedScheme: string, ~size: float=30., ~mode: brandIconMode=#sta
           opacity: fadeAnim->Animated.StyleProp.float,
           transform: [Style.scale(~scale=scaleAnim->Animated.StyleProp.float)],
         })}>
-        <Image
-          source={iconName->fromDetectedName->artworkFor}
-          resizeMode=#contain
-          style={Style.s({width: size->Style.dp, height: size->Style.dp})}
-          accessible=false
+        <SvgUri
+          uri={CardIconUrls.iconUrl(~baseUrl, ~name=iconName->fromDetectedName->artworkFor)}
+          width=size
+          height=size
         />
       </Animated.View>
     : React.null
 }
 
-/*
- * The scan-card glyph — client-core's `Icon.res` camera path, rasterised black and TINTED here, so
- * it takes the merchant's colour exactly as `fill=primaryColor` did there. `tintColor` on a
- * monochrome PNG is what lets one asset serve every theme without shipping a variant per colour.
- */
 module Camera = {
   @react.component
   let make = (~size: float=20., ~color: string) =>
-    <Image
-      source={assets.camera}
-      resizeMode=#contain
-      tintColor=color
-      style={Style.s({width: size->Style.dp, height: size->Style.dp})}
-      accessible=false
-    />
+    cameraSvg->String.length === 0
+      ? React.null
+      : <SvgXml xml=cameraSvg width=size height=size color />
 }
 
 module Cvc = {
   @react.component
   let make = (~size: float=32.) =>
-    <Image
-      source={assets.cvv}
-      resizeMode=#contain
-      style={Style.s({width: size->Style.dp, height: size->Style.dp})}
-      accessible=false
-    />
+    cvvSvg->String.length === 0
+      ? React.null
+      : <SvgXml xml=cvvSvg width=size height=size />
 }

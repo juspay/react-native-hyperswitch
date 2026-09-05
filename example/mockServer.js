@@ -214,6 +214,7 @@ app.post('/create-payment-intent', async (req, res) => {
     res.json({
       publishableKey: HYPERSWITCH_PUBLISHABLE_KEY,
       clientSecret: response.data.client_secret,
+      sdkAuthorization: response.data.sdk_authorization,
     });
   } catch (error) {
     logger.error(
@@ -223,6 +224,57 @@ app.post('/create-payment-intent', async (req, res) => {
 
     res.status(error.response?.status || 500).json({
       error: 'Failed to create payment intent',
+      details: error.response?.data || error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+
+app.post('/create-payment-method-session', async (req, res) => {
+  try {
+    if (!PROFILE_ID) {
+      return res.status(400).json({
+        error: 'PROFILE_ID is required to create a payment-method session',
+      });
+    }
+
+    const body = {
+      customer_id: req.body?.customer_id || 'hyperswitch_sdk_demo_id',
+      storage_type: 'persistent',
+      ...req.body,
+    };
+
+    logger.debug('Creating payment-method session', body);
+
+    const response = await makeHyperswitchRequest('/v1/payment-method-sessions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `api-key=${HYPERSWITCH_SECRET_KEY}`,
+        'X-Profile-Id': PROFILE_ID,
+      },
+      body: JSON.stringify(body),
+    });
+
+    logger.debug('Payment-method session created', {
+      id: response.data.id,
+      vaults: Object.keys(response.data.external_vault_details || {}),
+    });
+
+    res.json({
+      ...response.data,
+      sdkAuthorization: response.data.sdk_authorization,
+      clientSecret: response.data.client_secret,
+    });
+  } catch (error) {
+    logger.error(
+      'Error creating payment-method session',
+      error.response?.data || error.message
+    );
+
+    res.status(error.response?.status || 500).json({
+      error: 'Failed to create payment method session',
       details: error.response?.data || error.message,
       timestamp: new Date().toISOString(),
     });

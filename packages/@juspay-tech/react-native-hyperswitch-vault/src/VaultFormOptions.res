@@ -1,12 +1,8 @@
 open ReactNative
 
 @genType
-/*
- * Declared here rather than re-exported from the internal transport. ReScript polymorphic variants
- * are structural, so this is the same type `VaultConfirm` uses — but the merchant-facing name now
- * lives in the merchant-facing module, and no public declaration points at the transport.
- */
-type vaultEnvironment = [#production | #sandbox | #integ]
+
+type vaultEnvironment = [#PROD | #SANDBOX | #INTEG]
 
 @genType.import(("./merchantTypes", "MerchantSession"))
 type vaultSession
@@ -16,18 +12,6 @@ external sessionToJson: vaultSession => JSON.t = "%identity"
 @genType
 type brandIconMode = CardIcons.brandIconMode
 
-/*
- * ── APPEARANCE, IN HYPERSWITCH-WEB'S SHAPE ───────────────────────────────────
- *
- * `appearance.variables.*` carries the web's variable names where the web has one — `colorPrimary`,
- * `colorText`, `colorDanger`, `colorTextPlaceholder`, `colorBackground`, `borderColor`,
- * `borderRadius`, `fontFamily`, `inputFieldHeight` — typed for this platform (a number of points
- * where the web takes a CSS string). The members after them have no web equivalent and are this
- * library's own. `appearance.labels` is the web's label mode, applied to every field.
- *
- * The web's `theme`, `rules` (CSS selectors), `innerLayout` and `fonts` are CSS concepts with no
- * React Native analogue and are deliberately absent.
- */
 @genType
 type appearanceVariables = {
   colorPrimary?: string,
@@ -39,31 +23,24 @@ type appearanceVariables = {
   borderRadius?: float,
   fontFamily?: string,
   inputFieldHeight?: float,
-  /* This library's additions. */
+
   borderWidth?: float,
   gap?: float,
   fontScale?: float,
   placeholderTextSizeAdjust?: float,
   errorTextSizeAdjust?: float,
   errorMessageSpacing?: float,
-  /* The form-wide brand-icon default; a card-number field's own `cardBrandIcon` overrides it. */
+
   cardBrandIcon?: brandIconMode,
 }
 
 @genType
 type appearance = {
   variables?: appearanceVariables,
-  /* `above` | `floating` | `never`, as on the web. Absent => `floating`. */
+
   labels?: CardFieldOptions.labelBehavior,
 }
 
-/*
- * ── LOCALISATION ──────────────────────────────────────────────────────────────
- *
- * `locale` (on the form) selects one of the sdk-utils bundles the web SDK also ships — the same
- * strings, in the same languages. `localisation` is this library's override layer on top of it:
- * a merchant may replace any label, placeholder or validation message, and force the direction.
- */
 @genType
 type localisationLabels = {
   cardNumberPlaceholder?: string,
@@ -74,7 +51,7 @@ type localisationLabels = {
   cvcFloatingLabel?: string,
   cardholderNamePlaceholder?: string,
   cardholderNameFloatingLabel?: string,
-  /* Heading of the co-badge network chooser. */
+
   selectCardBrandLabel?: string,
 }
 
@@ -86,9 +63,9 @@ type localisationMessages = {
   expiryInvalid?: string,
   cvcRequired?: string,
   cvcInvalid?: string,
-  /* The chosen or detected network is not one the merchant accepts. */
+
   unsupportedCard?: string,
-  /* The backend's eligibility step declined this card. */
+
   cardNotEligible?: string,
 }
 
@@ -117,23 +94,6 @@ type paymentConfirmInput = VaultFormCoordinator.paymentConfirmInput
 @genType
 type vaultField = VaultPublicState.elementType
 
-/*
- * ── LIVE ELIGIBILITY (optional) ──────────────────────────────────────────────
- *
- * Eligibility asks the backend whether a BIN is accepted for this payment, so the request needs the
- * PAN — which now only the library has. Supplying this prop lets the library run that check AS THE
- * CUSTOMER TYPES and show the "card not accepted" message inline, which is what the classic form
- * did.
- *
- * It is optional and purely about WHEN the check happens. `confirmPayment` re-checks before it
- * confirms whether or not this prop was given, so omitting it costs the inline message, never the
- * enforcement.
- *
- * Every field is non-card. The credential is the same PAYMENT credential the final confirm uses,
- * in either of the two shapes Hyperswitch accepts: the payment-intent `sdkAuthorization`
- * (preferred), or the legacy `publishableKey` + `clientSecret` pair. `sdkAuthorization` wins when
- * both are given; with neither shape complete the probe simply does not run.
- */
 @genType
 type eligibilityConfig = {
   paymentId: string,
@@ -144,23 +104,11 @@ type eligibilityConfig = {
   endpoint?: VaultEndpoint.vaultEndpointConfig,
 }
 
-/*
- * TWO explicit operations, not one ambiguous `submit()`. Which one you call decides what can come
- * back: `tokenize` is the only route to a token, and `confirmPayment` is the only route that
- * charges anything. Neither throws for a documented outcome.
- */
 @genType
 type vaultFormHandle = {
-  /*
-   * Flow 1 — mint a payment-method token and stop. Takes no input: there is no payment to
-   * configure, and nothing here charges the customer. With one CVC field mounted with `savedCard`,
-   * it updates that saved card's CVC instead and resolves to the token the response carries.
-   */
+
   tokenize: unit => promise<vaultTokenizeResult>,
-  /*
-   * Flow 2 — mint a token internally, then confirm the payment with it. Takes NON-CARD inputs only
-   * and resolves to a navigation decision. The intermediate token is never returned.
-   */
+
   confirmPayment: paymentConfirmInput => promise<vaultPaymentResult>,
   reset: unit => unit,
   focus: vaultField => unit,
@@ -211,11 +159,6 @@ let cardBrandIconOf = (appearance: option<appearance>): brandIconMode =>
 let labelsModeOf = (appearance: option<appearance>): CardFieldOptions.labelBehavior =>
   appearance->Option.flatMap(a => a.labels)->Option.getOr(CardFieldOptions.defaultLabelBehavior)
 
-/*
- * The library's strings. English keeps the strings this library has always shown — a merchant who
- * set nothing sees exactly what they saw before `locale` existed. Any other locale reads the
- * sdk-utils bundle the web SDK also ships, so `locale: "fr"` on both SDKs reads the same French.
- */
 let englishLabels: CardFormTypes.cardLabels = {
   cardNumberPlaceholder: "Card number",
   cardNumberFloatingLabel: "Card number",
@@ -306,11 +249,6 @@ let resolveMessages = (
   }
 }
 
-/*
- * The co-badge network rule, reproducing `Validation.CardNetwork`: the network in force must be one
- * the merchant accepts. `None` when the merchant supplied no scheme list, which is the common case.
- * The list arrives already canonicalised (`CardNetworkNames.normaliseList`).
- */
 let makeNetworkValidator = (
   ~enabledCardSchemes: array<string>,
   messages: resolvedMessages,
@@ -320,11 +258,7 @@ let makeNetworkValidator = (
     : Some(
         (value: option<string>) => {
           let network = value->Option.getOr("")
-          /*
-           * An empty network is "not detected yet", not "unsupported" — the card-number validator
-           * already owns the empty and malformed cases, and reporting both would show the customer
-           * two errors for one blank field.
-           */
+
           network->String.length === 0 ||
           enabledCardSchemes->Array.some(scheme => scheme === network)
             ? None

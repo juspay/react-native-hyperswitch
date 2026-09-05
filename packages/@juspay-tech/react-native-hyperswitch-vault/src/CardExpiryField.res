@@ -1,7 +1,7 @@
 @genType
 let make = React.forwardRef((
   props: {
-    /* Expiry has no accessory element, so its slot set is one member smaller. */
+
     "styles": option<CardFieldStyles.expiryStyles>,
     "placeholder": option<string>,
     "label": option<string>,

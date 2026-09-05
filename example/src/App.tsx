@@ -20,6 +20,9 @@ import {
   serverURL,
 } from "./utils";
 import DemoPopup from "./pages/DemoPopup";
+import PaymentMethodFlow from "./pages/PaymentMethodFlow";
+
+type Flow = "home" | "payment" | "paymentMethod";
 let hyperSingleton: Promise<HyperswitchSession> | null = null;
 
 function getHyperSingleton(): Promise<HyperswitchSession> {
@@ -33,6 +36,7 @@ function getHyperSingleton(): Promise<HyperswitchSession> {
 }
 
 export default function App() {
+  const [flow, setFlow] = useState<Flow>("home");
   const [status, setStatus] = useState<string | null>(null);
   const [session, setSession] = useState<PaymentSession | null>(null);
   const hyperPromise = getHyperSingleton();
@@ -125,6 +129,33 @@ export default function App() {
     onClose: () => setOpenEmbeddedSheet(false),
   };
 
+  if (flow === "home") {
+    return (
+      <View style={styles.container}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setFlow("payment")}
+        >
+          <Text style={styles.buttonText}>Payment</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, { marginTop: 16 }]}
+          onPress={() => setFlow("paymentMethod")}
+        >
+          <Text style={styles.buttonText}>Payment Method</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (flow === "paymentMethod") {
+    return (
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+        <PaymentMethodFlow onBack={() => setFlow("home")} />
+      </KeyboardAvoidingView>
+    );
+  }
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       <View style={styles.container}>
@@ -151,6 +182,12 @@ export default function App() {
           }}
         >
           <Text style={styles.buttonText}>Open Custom Sheet</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.secondary, { marginTop: 16 }]}
+          onPress={() => setFlow("home")}
+        >
+          <Text style={[styles.buttonText, { color: "#111827" }]}>Back</Text>
         </TouchableOpacity>
         {openEmbeddedSheet && <DemoPopup {...props} />}
       </View>
@@ -188,6 +225,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     textAlign: "center",
+  },
+  secondary: {
+    backgroundColor: "#e5e7eb",
   },
   buttonText: {
     color: "#fff",

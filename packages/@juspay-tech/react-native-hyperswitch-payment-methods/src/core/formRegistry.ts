@@ -1,4 +1,15 @@
-import type { FormId, TokenizeResult } from './types';
+import type { CardFormInstance, FormId, TokenizeResult } from './types';
+import type { FormCore } from './formCore';
+
+const cores = new WeakMap<CardFormInstance, FormCore>();
+
+export function attachCore(instance: CardFormInstance, core: FormCore): void {
+  cores.set(instance, core);
+}
+
+export function coreOf(instance: CardFormInstance): FormCore | undefined {
+  return cores.get(instance);
+}
 
 export type FormTokenizeFn = (
   providerData?: unknown

@@ -1,6 +1,7 @@
 import {
   forwardRef,
   useCallback,
+  useContext,
   useEffect,
   useImperativeHandle,
   useMemo,
@@ -15,15 +16,25 @@ import { createFormSession } from './formSession';
 import type { CreateFormSessionOptions } from './formSession';
 import { registerForm } from './formRegistry';
 import { resolveAdapter } from '../providers/registry';
+import { SessionContext } from '../session/SessionContext';
 import type { ProviderAdapter } from './ProviderAdapter';
 import { errorResult, tokenizedCardOf } from './results';
+import {
+  checkConfiguration,
+  mountedField,
+  savedCardOf,
+  withSavedCard,
+} from './savedCard';
+import type { MountedFields, UnresolvedVault } from './savedCard';
 import type {
+  Appearance,
   CardDetails,
   CardFormChange,
   CardFormEvent,
   CardFormHandle,
   ElementType,
   FieldChange,
+  FieldOptions,
   FormId,
   FormStatus,
   TokenizeResult,
@@ -47,15 +58,14 @@ function unavailableAdapter(vaultType: VaultType): ProviderAdapter {
 }
 
 export interface CardFormProps {
-  /** The web SDK's `vaultDetails`: `{vaultType, vaultData}`. */
-  vaultDetails: VaultDetails;
+  vaultDetails?: VaultDetails;
+
+  appearance?: Appearance;
 
   id?: FormId;
 
-  /** The provider's fields are mounted and usable. */
   onReady?: (event: CardFormEvent) => void;
 
-  /** The web's `cardDetailsChange`, on every change to any field. Always on. */
   onChange?: (event: CardFormChange) => void;
 
   onError?: (error: unknown) => void;
@@ -110,41 +120,59 @@ function buildChange(
 
 export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
   function CardFormImpl(
-    { vaultDetails, id, onReady, onChange, onError, readyTimeoutMs, children },
+    {
+      vaultDetails,
+      appearance,
+      id,
+      onReady,
+      onChange,
+      onError,
+      readyTimeoutMs,
+      children,
+    },
     ref
   ) {
+    const session = useContext(SessionContext);
+
+    const details = vaultDetails ?? session?.vaultDetails;
+    const vaultType = details?.vaultType;
+
     const { adapter, resolveError } = useMemo(() => {
+      if (!vaultType) {
+        return { adapter: null, resolveError: undefined as unknown };
+      }
       try {
         return {
-          adapter: resolveAdapter(vaultDetails.vaultType),
+          adapter: resolveAdapter(vaultType),
           resolveError: undefined as unknown,
         };
       } catch (error) {
         return {
-          adapter: unavailableAdapter(vaultDetails.vaultType),
+          adapter: unavailableAdapter(vaultType),
           resolveError: error as unknown,
         };
       }
-    }, [vaultDetails.vaultType]);
+    }, [vaultType]);
 
     const validated = useMemo<ValidatedData>(() => {
       if (resolveError !== undefined) return { ok: false, error: resolveError };
+      if (!adapter || !details) return { ok: false, error: undefined };
       try {
         return {
           ok: true,
-          value: adapter.validateVaultData(vaultDetails.vaultData),
+          value: adapter.validateVaultData(details.vaultData),
         };
       } catch (error) {
         return { ok: false, error };
       }
-    }, [adapter, resolveError, vaultDetails.vaultData]);
+    }, [adapter, details, resolveError]);
 
     const sessionOptions = useMemo<CreateFormSessionOptions>(
       () => (readyTimeoutMs !== undefined ? { readyTimeoutMs } : {}),
       [readyTimeoutMs]
     );
 
-    const session = useMemo(
+    const formSession = useMemo(
       () => createFormSession(adapter, sessionOptions),
       [adapter, sessionOptions]
     );
@@ -152,14 +180,22 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
     const [collector, setCollector] = useState<unknown>(undefined);
     const [status, setStatus] = useState<FormStatus>('initializing');
 
-    /* The merchant's callbacks, read at call time, so a new arrow per render never re-subscribes. */
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
     const onReadyRef = useRef(onReady);
     onReadyRef.current = onReady;
 
     const fieldsRef = useRef<Partial<Record<ElementType, FieldChange>>>({});
+    const mountedRef = useRef<MountedFields>({});
     const detailsRef = useRef<Partial<CardDetails>>({});
+
+    const unresolvedRef = useRef<UnresolvedVault>({ pending: false });
+    unresolvedRef.current = {
+      pending: session?.loading ?? false,
+      reason: session?.error
+        ? `Could not resolve the vault configuration: ${session.error.message}`
+        : undefined,
+    };
 
     const emitChange = useCallback(() => {
       const listener = onChangeRef.current;
@@ -175,13 +211,21 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
       [emitChange]
     );
 
+    const registerField = useCallback(
+      (elementType: ElementType, options?: FieldOptions) => {
+        mountedRef.current[elementType] = mountedField(elementType, options);
+      },
+      []
+    );
+
     const forgetField = useCallback((elementType: ElementType) => {
       delete fieldsRef.current[elementType];
+      delete mountedRef.current[elementType];
     }, []);
 
     const handleCardDetails = useCallback(
-      (details: Partial<CardDetails>) => {
-        detailsRef.current = { ...detailsRef.current, ...details };
+      (next: Partial<CardDetails>) => {
+        detailsRef.current = { ...detailsRef.current, ...next };
         emitChange();
       },
       [emitChange]
@@ -189,34 +233,45 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
 
     const handleReady = useCallback(
       (next: unknown) => {
-        session.attachCollector(next);
+        formSession.attachCollector(next);
         setCollector(next);
         setStatus('ready');
         onReadyRef.current?.({ elementType: 'cardForm' });
       },
-      [session]
+      [formSession]
     );
 
     const handleError = useCallback(
       (error: unknown) => {
-        session.fail(error);
+        formSession.fail(error);
         setStatus('error');
         onError?.(error);
       },
-      [session, onError]
+      [formSession, onError]
     );
 
     const tokenize = useCallback(
       async (providerData?: unknown): Promise<TokenizeResult> => {
-        const result = await session.tokenize(providerData);
-        setStatus(session.status);
+        const mounted = mountedRef.current;
+
+        const problem = checkConfiguration(
+          vaultType,
+          mounted,
+          unresolvedRef.current
+        );
+        if (problem) return problem;
+
+        const result = await formSession.tokenize(providerData);
+        setStatus(formSession.status);
         if (result.status !== 'success') return result;
-        /* The same values the form has been publishing on `cardDetailsChange`, echoed back on the
-         * result so a caller that never subscribed still gets them. */
+
         const card = tokenizedCardOf(detailsRef.current);
-        return card ? { ...result, card } : result;
+        return withSavedCard(
+          card ? { ...result, card } : result,
+          savedCardOf(mounted)
+        );
       },
-      [session]
+      [formSession, vaultType]
     );
 
     useImperativeHandle(
@@ -236,35 +291,48 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
     }, [id, tokenize]);
 
     useEffect(() => {
-      if (!validated.ok) handleError(validated.error);
+      if (!validated.ok && validated.error !== undefined) {
+        handleError(validated.error);
+      }
     }, [validated, handleError]);
+
+    const appearances = useMemo<readonly Appearance[]>(() => {
+      const layers: Appearance[] = [];
+      if (session?.appearance) layers.push(session.appearance);
+      if (appearance) layers.push(appearance);
+      return layers;
+    }, [session?.appearance, appearance]);
 
     const value = useMemo<FormContextValue>(
       () => ({
-        vaultType: vaultDetails.vaultType,
+        vaultType,
         adapter,
         collector,
         status,
+        appearances,
         tokenize,
         reportChange,
+        registerField,
         forgetField,
       }),
       [
-        vaultDetails.vaultType,
+        vaultType,
         adapter,
         collector,
         status,
+        appearances,
         tokenize,
         reportChange,
+        registerField,
         forgetField,
       ]
     );
 
-    const Host = adapter.Host;
+    const Host = adapter?.Host;
 
     return (
       <FormContext.Provider value={value}>
-        {validated.ok ? (
+        {validated.ok && Host ? (
           <Host
             vaultData={validated.value}
             onReady={handleReady}

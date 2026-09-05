@@ -1,6 +1,6 @@
 {
   "name": "@juspay-tech/react-native-hyperswitch-payment-methods",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Provider-agnostic React Native card collection widgets (VGS, Skyflow, Basis Theory, Evervault + request-builder) behind one widget interface.",
   "main": "./lib/commonjs/index.js",
   "module": "./lib/module/index.js",
@@ -110,6 +110,7 @@
   "peerDependencies": {
     "@basis-theory/react-native-elements": "*",
     "@evervault/react-native": "*",
+    "@juspay-tech/react-native-hyperswitch-vault": "*",
     "@vgs/collect-react-native": "*",
     "react": "*",
     "react-native": "*",
@@ -122,6 +123,9 @@
     "@evervault/react-native": {
       "optional": true
     },
+    "@juspay-tech/react-native-hyperswitch-vault": {
+      "optional": true
+    },
     "@vgs/collect-react-native": {
       "optional": true
     },
@@ -132,7 +136,6 @@
   "workspaces": [
     "../../../example"
   ],
-  "packageManager": "yarn@4.11.0",
   "react-native-builder-bob": {
     "source": "src",
     "output": "lib",

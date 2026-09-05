@@ -1,4 +1,3 @@
-
 open ReactNative
 
 let useAnimatedValue = (initialValue: float) => {

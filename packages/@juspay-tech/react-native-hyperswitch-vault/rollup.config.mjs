@@ -38,7 +38,7 @@ import { nodeResolve } from '@rollup/plugin-node-resolve';
  */
 
 /* Always external: the host application's own React / React Native must be the only instances. */
-const hostRuntime = ['react', 'react/jsx-runtime', 'react-native'];
+const hostRuntime = ['react', 'react/jsx-runtime', 'react-native', 'react-native-svg'];
 
 
 
@@ -50,8 +50,6 @@ const plugins = [nodeResolve({ extensions: ['.js', '.mjs'] })];
  * works for a static path. `scripts/copy-assets.mjs` puts the PNGs at dist/assets/, so the emitted
  * `../assets/<name>.png` resolves from both dist/esm/ and dist/cjs/.
  */
-const isImageAsset = (id) => /\.(png|jpe?g|gif|webp)$/.test(id);
-
 const treeshake = {
   moduleSideEffects: false,
   propertyReadSideEffects: false,
@@ -96,7 +94,7 @@ export default [
    */
   {
     input: {index: 'src/standalone-entry.mjs'},
-    external: (id) => hostRuntime.includes(id) || isImageAsset(id),
+    external: (id) => hostRuntime.includes(id),
     plugins,
     treeshake,
     output: outputs('shared'),
@@ -114,7 +112,7 @@ export default [
    */
   {
     input: {orchestration: 'src/orchestration-entry.mjs'},
-    external: (id) => hostRuntime.includes(id) || isImageAsset(id),
+    external: (id) => hostRuntime.includes(id),
     plugins,
     treeshake,
     output: outputs('orch'),
@@ -130,7 +128,7 @@ export default [
    */
   {
     input: {host: 'src/host-entry.mjs'},
-    external: (id) => hostRuntime.includes(id) || isImageAsset(id) || /standalone-entry\.mjs$/.test(id),
+    external: (id) => hostRuntime.includes(id) || /standalone-entry\.mjs$/.test(id),
     plugins,
     treeshake,
     output: outputs('host').map((o) => ({

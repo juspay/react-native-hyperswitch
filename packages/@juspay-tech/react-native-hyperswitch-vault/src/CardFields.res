@@ -7,22 +7,6 @@ type common = {
   accessible: option<bool>,
 }
 
-/*
- * `errorDisplay` governs the COLOUR too, not only the message — but the two are now separable.
- *
- * `#colorOnly` tints without printing, which is the composable default and the web SDK's
- * behaviour; `#none` still suppresses both, for a merchant who wants the field left entirely
- * alone. Only `#none` returns the plain text colour, so the tint is the DEFAULT behaviour and
- * silence is the opt-in.
- *
- * It used to govern the message alone: a merchant who configured nothing got no error text and a
- * red field anyway, because the tint read `dangerColor` straight off the theme. That made "inline
- * error rendering is OPT-IN" true of the sentence and false of the styling, and it painted a
- * judgement onto a merchant's form in a colour they never chose.
- *
- * The validity verdict is returned unchanged — only the colour is gated — so nothing downstream
- * starts believing an invalid field is valid.
- */
 let inputColors = (
   ~theme: CardFormTypes.cardTheme,
   ~error: option<string>,
@@ -33,21 +17,6 @@ let inputColors = (
   (ok, !ok && errorDisplay !== #none ? theme.dangerColor : theme.textColor)
 }
 
-/*
- * Inline error rendering is separate from the error EVENT, and the two surfaces default it
- * differently — see `CardFieldOptions.defaultErrorDisplayComposable`:
- *
- *   composable fields  #colorOnly  the box is tinted, no message is drawn
- *   ready-made forms   #inline     the message is drawn under the field
- *
- * `#none` renders nothing at all — not an empty container, not reserved space — while the same
- * safe error still reaches the merchant through the field and form state callbacks, so a merchant
- * drawing their own chrome loses no information by it.
- *
- * (This comment previously claimed `#none` was "the default", full stop. It was not: the single
- * default was `#inline` for every surface, which is what made a composed field render our message
- * underneath the merchant's own.)
- */
 module ErrorSlot = {
   @react.component
   let make = (
@@ -81,7 +50,7 @@ module Number = {
     ~borderBottomWidth: option<float>=?,
     ~borderBottomLeftRadius: option<float>=?,
     ~borderBottomRightRadius: option<float>=?,
-    /* Merchant per-field style slots. None => byte-identical to the unstyled render. */
+
     ~styles: option<CardFieldStyles.fieldStyles>=?,
   ) => {
     let (isValid, textColor) = inputColors(
@@ -148,7 +117,7 @@ module Expiry = {
     ~borderBottomRightRadius: option<float>=?,
     ~borderBottomWidth: option<float>=?,
     ~borderBottomLeftRadius: option<float>=?,
-    /* Widened from `expiryStyles`; `accessory` is structurally absent for this field. */
+
     ~styles: option<CardFieldStyles.fieldStyles>=?,
   ) => {
     let (isValid, textColor) = inputColors(
@@ -196,11 +165,6 @@ module Expiry = {
   }
 }
 
-/*
- * A plain text field: no brand artwork, no CVC glyph, no auto-advance. It is not part of the
- * number → expiry → CVC focus chain, because a cardholder name has no completion signal that could
- * tell us when to move on.
- */
 module CardholderName = {
   @react.component
   let make = (
@@ -282,7 +246,7 @@ module Cvc = {
     ~borderBottomRightRadius: option<float>=?,
     ~borderBottomWidth: option<float>=?,
     ~borderRightWidth: option<float>=?,
-    /* Merchant per-field style slots. None => byte-identical to the unstyled render. */
+
     ~styles: option<CardFieldStyles.fieldStyles>=?,
   ) => {
     let (isValid, textColor) = inputColors(

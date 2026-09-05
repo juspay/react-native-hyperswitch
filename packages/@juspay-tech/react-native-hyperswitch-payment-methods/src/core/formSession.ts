@@ -19,11 +19,12 @@ export interface FormSession {
 }
 
 export function createFormSession(
-  adapter: ProviderAdapter,
+  adapter: ProviderAdapter | null,
   options: CreateFormSessionOptions = {}
 ): FormSession {
   const readyTimeoutMs = options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS;
   const ready = createDeferred<void>();
+  const vaultType = adapter?.vaultType;
 
   let collector: unknown | undefined;
   let failure: { error: unknown } | undefined;
@@ -43,13 +44,22 @@ export function createFormSession(
   }
 
   async function run(providerData?: unknown): Promise<TokenizeResult> {
+    if (!adapter) {
+      return errorResult(
+        undefined,
+        'unsupported_configuration',
+        'No vault configuration. Pass options.vaultDetails or options.sdkAuthorization on ' +
+          '<HyperPaymentMethodsSession>, or vaultDetails directly on <CardForm>.'
+      );
+    }
+
     if (collector === undefined && !failure) {
       await waitForReady();
     }
 
     if (failure) {
       return errorResult(
-        adapter.vaultType,
+        vaultType,
         'tokenization_failed',
         messageOf(failure.error)
       );
@@ -57,9 +67,9 @@ export function createFormSession(
 
     if (collector === undefined) {
       return errorResult(
-        adapter.vaultType,
+        vaultType,
         'sdk_not_ready',
-        `The ${adapter.vaultType} card fields are not ready yet. Try again once the form has finished initializing.`
+        `The ${vaultType} card fields are not ready yet. Try again once the form has finished initializing.`
       );
     }
 
@@ -70,11 +80,7 @@ export function createFormSession(
       return result;
     } catch (error) {
       status = 'ready';
-      return errorResult(
-        adapter.vaultType,
-        'tokenization_failed',
-        messageOf(error)
-      );
+      return errorResult(vaultType, 'tokenization_failed', messageOf(error));
     }
   }
 
@@ -96,7 +102,6 @@ export function createFormSession(
       ready.resolve();
     },
 
-    /* Two calls at once share one request, as the Hyperswitch vault form does. */
     tokenize(providerData?: unknown): Promise<TokenizeResult> {
       if (inFlight) return inFlight;
       const pending = run(providerData).finally(() => {

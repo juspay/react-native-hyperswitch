@@ -20,11 +20,11 @@ export interface MockAdapterOptions {
 
   tokenizeResult?: TokenizeResult;
 
-  /** What every mock field reports on mount, through `onChange`. */
   fieldState?: FieldChangeInput;
 
-  /** What the mock host reports about the card, as Evervault's host does. */
   cardDetails?: Partial<CardDetails>;
+
+  onTokenize?: () => void;
 }
 
 export function createMockAdapter(
@@ -56,26 +56,52 @@ export function createMockAdapter(
     return <Fragment>{children}</Fragment>;
   }
 
-  function Field({ elementType, onChange }: ProviderFieldProps) {
+  function Field({
+    elementType,
+    onChange,
+    styles,
+    savedCard,
+  }: ProviderFieldProps) {
     const state = options.fieldState;
     useEffect(() => {
       if (state) onChange?.(fieldChange(elementType, state));
     }, [elementType, onChange, state]);
     return (
-      <Text testID={`mock-field-${elementType}`}>{`mock:${elementType}`}</Text>
+      <Text
+        testID={`mock-field-${elementType}`}
+        style={styles?.container}
+        accessibilityLabel={
+          savedCard
+            ? `saved:${savedCard.paymentMethodToken}:${savedCard.paymentMethodData?.card?.cardNetwork ?? ''}`
+            : undefined
+        }
+      >{`mock:${elementType}`}</Text>
     );
   }
 
   return {
     vaultType,
     validateVaultData: (raw) => raw,
+    createCollector: async () => {
+      if (options.failOnInit !== undefined) throw options.failOnInit;
+      if (options.readyDelayMs) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, options.readyDelayMs)
+        );
+      }
+      return { mock: true };
+    },
     Host,
     Field,
-    tokenize: async () =>
-      options.tokenizeResult ?? {
-        status: 'success',
-        vaultType,
-        data: { tokens: { card_number: 'tok_mock' } },
-      },
+    tokenize: async () => {
+      options.onTokenize?.();
+      return (
+        options.tokenizeResult ?? {
+          status: 'success',
+          vaultType,
+          data: { tokens: { card_number: 'tok_mock' } },
+        }
+      );
+    },
   };
 }

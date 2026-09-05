@@ -68,7 +68,6 @@ const fourDigitYear = (year: unknown): string | null => {
   return year.length === 2 ? `20${year}` : year;
 };
 
-/* Evervault reports the card at the form level, so this is where the web's payload members come from. */
 function cardDetailsOf(payload: any): Partial<CardDetails> {
   const card = payload?.card ?? {};
   const expiryMonth =

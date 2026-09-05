@@ -1,23 +1,32 @@
 import { createContext } from 'react';
 import type { ProviderAdapter } from './ProviderAdapter';
+import type { MountedField } from './savedCard';
 import type {
+  Appearance,
   ElementType,
   FieldChange,
+  FieldOptions,
   FormStatus,
   TokenizeResult,
   VaultType,
 } from './types';
 
 export interface FormContextValue {
-  vaultType: VaultType;
-  adapter: ProviderAdapter;
+  vaultType: VaultType | undefined;
+  adapter: ProviderAdapter | null;
   collector: unknown | undefined;
   status: FormStatus;
+
+  appearances: readonly Appearance[];
   tokenize: (providerData?: unknown) => Promise<TokenizeResult>;
-  /** A field's latest change, folded into the form's `cardDetailsChange`. Stable. */
+
   reportChange: (change: FieldChange) => void;
-  /** Called when a field unmounts, so the form stops counting it. Stable. */
+
+  registerField: (elementType: ElementType, options?: FieldOptions) => void;
+
   forgetField: (elementType: ElementType) => void;
 }
+
+export type { MountedField };
 
 export const FormContext = createContext<FormContextValue | null>(null);

@@ -7,7 +7,6 @@ import type {
   VaultType,
 } from './types';
 
-/** The web's classification: the two field-level codes are validation errors, the rest API errors. */
 export function errorTypeFor(code: TokenizeErrorCode): TokenizeErrorType {
   return code === 'validation_error' || code === 'incomplete_field_set'
     ? 'validation_error'
@@ -27,11 +26,6 @@ export function errorResult(
   };
 }
 
-/**
- * The card metadata to hang on a successful result, or `undefined` when the provider described no
- * card. Written key by key so a member the provider did not report is an absent key rather than
- * `undefined`.
- */
 export function tokenizedCardOf(
   details: Partial<CardDetails>
 ): TokenizedCard | undefined {

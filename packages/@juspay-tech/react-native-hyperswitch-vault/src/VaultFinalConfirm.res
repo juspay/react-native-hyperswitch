@@ -1,57 +1,8 @@
-/*
- * INTERNAL. The payment-intent confirmation transport — call 2 of the two the library owns.
- *
- * Like `VaultConfirm`, this module has no genType annotations, is not re-exported from `public.ts`,
- * and has no package subpath. A merchant has no supported or physical path to call it.
- *
- * ── WHY THE LIBRARY MAKES THIS CALL ────────────────────────────────────────────
- *
- * `VaultConfirm` mints a payment-method token from the card the library owns. If the host then had
- * to make the final `/payments/{id}/confirm` call itself, the token would have to cross the public
- * boundary. Owning both calls is what lets `submit()` return a navigation decision and nothing else.
- *
- * ── THE TWO CREDENTIALS ARE NOT INTERCHANGEABLE ────────────────────────────────
- *
- * Call 1 authenticates with the VAULT credential carried inside `vault_details`. This call
- * authenticates with the PAYMENT credential the host supplies — the payment-intent
- * `sdkAuthorization`, or the legacy publishable-key + `client_secret` pair — already resolved into
- * a `VaultCredential.t` by the caller. They are different secrets with different scopes; neither is
- * ever logged, returned or re-emitted.
- *
- * ── STATUS MAPPING IS A REPRODUCTION, NOT A DESIGN ─────────────────────────────
- *
- * The outcome table below reproduces client-core's confirm-response handling
- * (`AllPaymentHooks.res`, `handleApiRes` → `handleDefaultPaymentFlows`) so a merchant migrating to
- * the vault flow sees the same navigation decisions. That behaviour was pinned first, by
- * `hyperswitch-client-core/__tests__/PaymentStatusCharacterization-test.js`, before it was
- * collapsed here.
- *
- * Two details of that reproduction are easy to get wrong and are deliberate:
- *
- *   - `next_action.type` is consulted BEFORE `status`. client-core routes `three_ds_invoke`,
- *     `third_party_sdk_session_token`, `display_bank_transfer_information` and `invoke_ddc` on the
- *     next action regardless of the status field, and only falls through to the status switch when
- *     the next action is none of those.
- *   - `cancelled` is NOT a processing status here. The redirect-RETURN site in client-core does
- *     treat it as processing, but the confirm-RESPONSE site — the one this module replaces — does
- *     not, and the characterization test records both.
- */
-
 type nextActionType = VaultNavigation.nextActionType
 type safeThreeDs = VaultNavigation.safeThreeDs
 type safeDdc = VaultNavigation.safeDdc
 type safeSessionToken = VaultNavigation.safeSessionToken
 
-/*
- * A closed REASON, never a string.
- *
- * An earlier revision had `Failed` carry a message that this module had already mapped to safe
- * wording. It was safe, but only by convention: nothing stopped a later edit from putting backend
- * text in that slot, and `VaultResult` — which cannot tell one string from another — would have
- * forwarded it to the customer. Carrying a reason makes "no backend prose crosses this boundary" a
- * property of the TYPE: there is no slot for a string to travel in, and `VaultResult` owns every
- * word the merchant ever sees.
- */
 type finalFailureReason =
   | GenericFailure
   | Unauthorized
@@ -76,20 +27,16 @@ type navOutcome =
 type finalConfirmRequest = {
   baseUrl: string,
   paymentId: string,
-  /* Resolved by the caller; see `VaultCredential` for the two shapes and their precedence. */
+
   credential: VaultCredential.t,
-  /* Reproduces the `x-app-id` header client-core sends on every backend call. Non-card. */
+
   appId?: string,
-  /* Fully built by VaultConfirmBody; this module never inspects or amends it. */
+
   body: JSON.t,
   timeoutMs?: int,
   signal?: VaultConfirm.abortSignal,
 }
 
-/*
- * A SMALL allowlist of backend codes mapped to our own reasons. An unrecognised code becomes
- * `GenericFailure`, so an unknown backend condition can never smuggle text or detail through.
- */
 let reasonForCode = (code: string) =>
   switch code {
   | "IR_00" | "IR_01" | "IR_03" => Unauthorized
@@ -98,8 +45,6 @@ let reasonForCode = (code: string) =>
   | "IR_24" => SessionExpired
   | _ => GenericFailure
   }
-
-/* ── Response reading ───────────────────────────────────────────────────────── */
 
 let stringAt = (dict, key) =>
   dict->Dict.get(key)->Option.flatMap(JSON.Decode.string)->Option.getOr("")
@@ -126,11 +71,6 @@ let nextActionTypeOf = (raw: string): option<nextActionType> =>
   | _ => None
   }
 
-/*
- * Only allowlisted NAVIGATION fields are lifted out of the next action. A response that carries
- * `payment_method_data.card.*` — which a confirm response legitimately can — is simply never read
- * here, so there is no path by which card metadata could reach the outcome.
- */
 let readNextAction = (root: Dict.t<JSON.t>, ~type_: nextActionType) => {
   let nextAction = root->objectAt("next_action")
 
@@ -179,10 +119,6 @@ let readNextAction = (root: Dict.t<JSON.t>, ~type_: nextActionType) => {
   })
 }
 
-/*
- * The reproduction of client-core's `handleApiRes`. The next-action check comes first, exactly as it
- * does there; the status switch is the fall-through.
- */
 let decodeConfirmResponse = (json: JSON.t): navOutcome =>
   switch json->JSON.Decode.object {
   | None => Failed({reason: MalformedResponse})
@@ -243,11 +179,7 @@ let confirmPayment = async (request: finalConfirmRequest): navOutcome => {
 
   let options: VaultConfirm.fetchOptions = {
     method: "POST",
-    /*
-     * Raw credential, no scheme — matching client-core's `Utils.getHeader`: `Authorization` for the
-     * payment-intent credential, `api-key` for the legacy publishable key. The legacy pair's
-     * `client_secret` is already in the body, written by `VaultConfirmBody.build`.
-     */
+
     headers: [
       ("Content-Type", "application/json"),
       request.credential->VaultCredential.authHeader,
@@ -268,11 +200,7 @@ let confirmPayment = async (request: finalConfirmRequest): navOutcome => {
 
   switch attempted {
   | Error() =>
-    /*
-     * A thrown fetch, a timeout and an abort are indistinguishable from a request the backend
-     * already processed. There is no idempotency key on this endpoint, so the outcome is genuinely
-     * unknown and the library never retries it.
-     */
+
     UnknownOutcome
   | Ok(response) =>
     let status = response->VaultConfirm.responseStatus

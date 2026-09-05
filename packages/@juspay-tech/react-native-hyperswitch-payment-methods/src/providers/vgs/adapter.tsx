@@ -120,7 +120,6 @@ const Field: ProviderAdapter['Field'] = ({
   const containerHeight =
     typeof flatStyle?.height === 'number' ? flatStyle.height : undefined;
 
-  /* VGS reports focus inside the same state object; focus and blur are its transitions. */
   const handleState = (state: unknown) => {
     const s = (state ?? {}) as VgsFieldState;
     onChange?.(
@@ -208,9 +207,18 @@ const tokenize: ProviderAdapter['tokenize'] = async (
   }
 };
 
+const createCollector = async (vaultData: unknown): Promise<VGSCollect> => {
+  const data = vaultData as VgsVaultData;
+  const collector = new VGSCollect(data.vaultId, data.environment);
+  if (data.routeId) collector.setRouteId(data.routeId);
+  if (data.cname) await collector.setCname(data.cname);
+  return collector;
+};
+
 export const vgsAdapter: ProviderAdapter = {
   vaultType: VAULT_TYPE,
   validateVaultData,
+  createCollector,
   Host,
   Field,
   tokenize,

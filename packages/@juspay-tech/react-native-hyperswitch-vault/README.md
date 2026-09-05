@@ -8,6 +8,20 @@ are `react` (>=19 <20) and `react-native` (>=0.79 <0.88); no runtime dependencie
 
 ---
 
+## Which library to reach for
+
+Use this one when the profile stores cards in **Hyperswitch's own vault** and you want its card
+fields directly — the library renders them, with labels, brand marks and error states.
+
+If the profile might instead be configured with an **external vault** (VGS, Skyflow, Basis Theory,
+Evervault), reach for `@juspay-tech/react-native-hyperswitch-payment-methods`. It drives all five,
+this library included, behind one set of components — so nothing in your app changes when that
+server-side setting moves. It reads `vault_details` and `external_vault_details` off the same
+payment-method-session response and picks the right one, loading this package as an optional peer
+when the answer is `hyperswitch`.
+
+---
+
 ## One vocabulary with the web SDK
 
 Where hyperswitch-web's separate card fields have a name, this library uses it; what it adds is
@@ -16,8 +30,8 @@ additive and cannot collide.
 | Web SDK | This library |
 |---|---|
 | `cardForm.create('cardNumber' \| 'cardExpiry' \| 'cardCvc', options)` | `<CardNumberField />` `<CardExpiryField />` `<CardCVCField />`, options as props |
-| `cardForm.tokenize()` | `tokenize()` on the `CardForm` ref, or `createCardForm().tokenize()` |
-| `field.on(…)`, `cardForm.on(…)` | `onReady` `onFocus` `onBlur` `onChange` props, or `createCardForm().on()` |
+| `cardForm.tokenize()` | `tokenize()` on the `CardForm` ref |
+| `field.on(…)`, `cardForm.on(…)` | `onReady` `onFocus` `onBlur` `onChange` props |
 | `change` payload, `cardDetailsChange` envelope | the same keys, plus `touched`, `errorCode`, `isCoBadged`, `canSubmit`, `fields` |
 | `{error: {code, message, type}}`, `placeholder`, `savedCard`, `appearance`, `locale` | the same envelope, codes and names, plus a `status` discriminant |
 
@@ -49,7 +63,7 @@ const [canSave, setCanSave] = useState(false);
 <CardForm
   ref={formRef}
   session={session}
-  environment="sandbox"
+  environment="SANDBOX"
   locale="en"
   onChange={e => setCanSave(e.canSubmit)}>
   <CardNumberField />
@@ -87,12 +101,9 @@ Mount **only** `CardCVCField`, pass the stored card's token and network, settle 
 `tokenize()`.
 
 ```tsx
-<CardForm ref={formRef} session={session} environment="sandbox" onChange={e => setReady(e.canSubmit)}>
+<CardForm ref={formRef} session={session} environment="SANDBOX" onChange={e => setReady(e.canSubmit)}>
   <CardCVCField
-    savedCard={{
-      paymentToken: entry.payment_method_token,
-      paymentMethodData: {card: {cardNetwork: entry.payment_method_data.card.card_network}},
-    }}
+    options={{savedCard: {token: entry.payment_method_token, brand: entry.payment_method_data.card.card_network}}}
   />
 </CardForm>;
 
@@ -104,9 +115,14 @@ Your backend lists the cards with `GET /v1/payment-method-sessions/{id}/list-pay
 `true` mounts this field with that entry's token. The CVC is held under the returned token for 15
 minutes — confirm inside that window.
 
-`cardNetwork` sets the CVC length rule (`'amex'` and similar aliases are understood); without it
-`valid` turns true at three digits even on an Amex. The field must be the only one in the form, and
-`paymentToken` must be present — blank, `tokenize()` answers `validation_error` naming the fix.
+`brand` sets the CVC length rule (`'amex'` and similar aliases are understood); without it
+`valid` turns true at three digits even on an Amex. The field must be the only one in the form.
+
+`paymentMethodToken` is optional, as it is on the route: supply it and the CVC is refreshed on
+that saved card; omit it and the key is left out of the request. Know what the backend does with
+an absent one — it mints a **new** `TemporaryCardToken` and stores the CVC under that, the update
+answers 200, and the payment confirm that follows fails with `HE_00`. Pass the listing's token
+unless you specifically want that.
 
 ---
 
@@ -117,7 +133,7 @@ CVC field per form (or one CVC field with `savedCard`). `CardholderNameField` is
 web SDK lacks; blank, it is omitted from the request.
 
 ```tsx
-<CardForm ref={formRef} session={session} environment="sandbox" appearance={{labels: 'above'}}>
+<CardForm ref={formRef} session={session} environment="SANDBOX" appearance={{labels: 'above'}}>
   <CardholderNameField label="Name on card" />
   <CardNumberField placeholder="Card number" cardBrandIcon="standard" />
   <CardExpiryField placeholder="MM / YY" />
@@ -157,20 +173,6 @@ complete. `onChange` gives the web's `cardDetailsChange` envelope plus this libr
 `payload` comes from the same sdk-utils function the web SDK uses: `bin` at six digits, `last4` when
 the number completes. It is the only place a card-derived digit reaches your code — never the PAN,
 the CVC or the token.
-
-For a form held outside React state:
-
-```ts
-const cardForm = createCardForm({session, environment: 'sandbox'});
-cardForm.on('change', e => setEnabled(e.canSubmit));
-
-<cardForm.Form>
-  <CardNumberField /> <CardExpiryField /> <CardCVCField />
-</cardForm.Form>;
-
-const result = await cardForm.tokenize();
-cardForm.getState(); // the last `change`, or null
-```
 
 ---
 
@@ -274,7 +276,7 @@ analogue. Per-field looks use `styles` slots (`root`, `container`, `input`, `pla
 | `errorDisplay` | all | `'none' \| 'colorOnly' \| 'inline'` | `'colorOnly'` composed, `'inline'` ready-made |
 | `cardBrandIcon` | card number | `'standard' \| 'hidden' \| 'animated' \| 'hideGeneric'` | `appearance.variables.cardBrandIcon`, else `'standard'` |
 | `cvcIcon` | CVC | `'hidden' \| 'default'` | `'default'` |
-| `savedCard` | CVC | `{paymentToken, paymentMethodData: {card: {cardNetwork}}}` | none |
+| `savedCard` | CVC, under `options` | `{token, brand}` | none |
 | `unstyled` | all | boolean | the form's `unstyled` |
 | `accessibilityLabel`, `accessibilityHint`, `testID` | all | string | library defaults |
 
@@ -286,11 +288,11 @@ development-only warning.
 
 ## Self-hosted deployments
 
-`environment` selects a public Hyperswitch host; `vaultEndpoint` overrides it with your own, and is
+`environment` selects a public Hyperswitch host; `customEndpoints` overrides it with your own, and is
 where `tokenize()` posts:
 
 ```tsx
-<CardForm session={session} environment="sandbox" vaultEndpoint={{baseUrl: 'https://payments.your-company.example/api'}} />
+<CardForm session={session} environment="SANDBOX" customEndpoints={{commonEndpoint: 'https://payments.your-company.example/api'}} />
 ```
 
 The base is validated — `https` required (`http` only on loopback, never in production), no
@@ -334,7 +336,6 @@ protection from malicious code inside your own app. Only your assessor can deter
 | `invalid_session` immediately, nothing sent | the session has no `vault_details`, an unsupported `vault_type`, or a blank authorization. Check your server returned the response *verbatim*. |
 | `incomplete_field_set` | a required field is not mounted, or is mounted twice. |
 | `session_consumed` | this session already tokenized a card. Fetch a new one. |
-| `validation_error` with a message about `savedCard` | the lone CVC field has no `paymentToken`. |
 | every card reports `networkError` | `enabledCardSchemes` contains no recognised network. Check the development warning. |
 | `Cannot read properties of null (reading 'useMemo')` at render | two copies of React in the bundle. Alias `react`, `react-dom` and `react-native` to single absolute paths. |
 
@@ -355,7 +356,6 @@ protection from malicious code inside your own app. Only your assessor can deter
 | `appearance.primaryColor`, `textColor`, `errorColor`, `placeholderColor`, `backgroundColor`, `inputHeight`, `brandIconMode` | `appearance.variables.colorPrimary`, `colorText`, `colorDanger`, `colorTextPlaceholder`, `colorBackground`, `inputFieldHeight`, `cardBrandIcon` |
 | `HyperswitchVaultSavedCardForm` + `updateSavedPaymentMethod()` | `<CardCVCField savedCard={…} />` inside `<CardForm>` + `tokenize()` |
 | `invalid_card_data`, `not_ready`, `server_error` | `validation_error`, `incomplete_field_set`, `tokenization_failed` |
-| `createCardForm().subscribe(cb)` | `createCardForm().on('change', cb)` |
 
 ## Example app
 

@@ -1,9 +1,8 @@
 {
   "name": "@juspay-tech/react-native-hyperswitch-vault",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "description": "Hyperswitch card form for React Native. Authored in ReScript, published as JavaScript with genType-generated TypeScript declarations.",
   "license": "Apache-2.0",
-  "packageManager": "yarn@3.6.4",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/types/public.d.ts",
@@ -49,45 +48,19 @@
     "node": ">=18.18.0"
   },
   "scripts": {
-    "check:submodule": "node scripts/check-submodule.mjs",
-    "check:generated": "node scripts/check-generated.mjs",
-    "check:surface": "node scripts/verify-public-surface.mjs",
-    "check:icons": "node scripts/verify-icon-coverage.mjs",
-    "check:consumer-types": "tsc -p tsconfig.consumer.json",
     "re:build": "rescript",
     "re:clean": "rescript clean",
-    "types": "node scripts/clean-declarations.mjs && tsc -p tsconfig.build.json",
-    "icons": "node scripts/generate-icons.mjs",
-    "bundle": "node scripts/clean-bundles.mjs && rollup -c && node scripts/copy-assets.mjs",
-    "build": "node scripts/check-submodule.mjs && node scripts/verify-icon-coverage.mjs && rescript && node scripts/check-generated.mjs && node scripts/verify-public-surface.mjs && node scripts/clean-declarations.mjs && tsc -p tsconfig.build.json && node scripts/clean-bundles.mjs && rollup -c && node scripts/copy-assets.mjs && node scripts/emit-package-type.mjs && tsc -p tsconfig.consumer.json && node scripts/verify-docs.mjs && node scripts/verify-flow-docs.mjs && node scripts/verify-publishable.mjs",
-    "clean": "rescript clean && node scripts/clean.mjs",
-    "prepack": "node scripts/check-submodule.mjs && node scripts/verify-icon-coverage.mjs && rescript && node scripts/check-generated.mjs && node scripts/verify-public-surface.mjs && node scripts/clean-declarations.mjs && tsc -p tsconfig.build.json && node scripts/clean-bundles.mjs && rollup -c && node scripts/copy-assets.mjs && node scripts/emit-package-type.mjs && tsc -p tsconfig.consumer.json && node scripts/verify-docs.mjs && node scripts/verify-flow-docs.mjs && node scripts/verify-publishable.mjs",
-    "verify:mapping": "node scripts/verify-result-mapping.mjs",
-    "verify:consumers": "node scripts/verify-consumers.mjs",
-    "verify:treeshaking": "node scripts/verify-treeshaking.mjs",
-    "verify:style-bridge": "node scripts/verify-style-bridge.mjs",
-    "verify:tarball": "node scripts/verify-tarball.mjs",
-    "verify": "node scripts/verify-icon-coverage.mjs && node scripts/verify-result-mapping.mjs && node scripts/verify-tarball.mjs && node scripts/verify-consumers.mjs && node scripts/verify-treeshaking.mjs && node scripts/verify-style-bridge.mjs && node scripts/verify-event-surface.mjs && node scripts/verify-package-contents.mjs && node scripts/verify-merchant-only.mjs && node scripts/verify-docs.mjs && node scripts/verify-flow-docs.mjs && node scripts/verify-publishable.mjs && node scripts/verify-card-source.mjs && node scripts/verify-final-confirm.mjs && node scripts/verify-noncard-input.mjs && node scripts/verify-eligibility.mjs && node scripts/verify-orchestration.mjs && node scripts/verify-saved-card.mjs",
-    "build:clean": "rescript clean && node scripts/clean.mjs && node scripts/check-submodule.mjs && node scripts/verify-icon-coverage.mjs && rescript && node scripts/check-generated.mjs && node scripts/verify-public-surface.mjs && node scripts/clean-declarations.mjs && tsc -p tsconfig.build.json && node scripts/clean-bundles.mjs && rollup -c && node scripts/copy-assets.mjs && node scripts/emit-package-type.mjs && tsc -p tsconfig.consumer.json && node scripts/verify-docs.mjs && node scripts/verify-flow-docs.mjs && node scripts/verify-publishable.mjs",
-    "verify:event-surface": "node scripts/verify-event-surface.mjs",
-    "verify:package-contents": "node scripts/verify-package-contents.mjs",
-    "verify:merchant-only": "node scripts/verify-merchant-only.mjs",
-    "verify:publishable": "node scripts/verify-publishable.mjs",
-    "verify:docs": "node scripts/verify-docs.mjs",
-    "verify:flow-docs": "node scripts/verify-flow-docs.mjs",
-    "verify:card-source": "node scripts/verify-card-source.mjs",
-    "verify:final-confirm": "node scripts/verify-final-confirm.mjs",
-    "verify:noncard-input": "node scripts/verify-noncard-input.mjs",
-    "verify:eligibility": "node scripts/verify-eligibility.mjs",
-    "verify:orchestration": "node scripts/verify-orchestration.mjs",
-    "verify:saved-card": "node scripts/verify-saved-card.mjs",
-    "smoke:saved-card": "node scripts/smoke-saved-card.mjs",
-    "verify:rn-matrix": "node scripts/verify-rn-matrix.mjs",
-    "verify:scancard-packaging": "node scripts/verify-scancard-packaging.mjs"
+    "types": "tsc -p tsconfig.build.json",
+    "bundle": "rollup -c",
+    "build": "rescript && tsc -p tsconfig.build.json && rollup -c",
+    "build:clean": "rescript clean && rescript && tsc -p tsconfig.build.json && rollup -c",
+    "clean": "rescript clean",
+    "prepack": "rescript && tsc -p tsconfig.build.json && rollup -c"
   },
   "peerDependencies": {
-    "react": ">=19.0.0 <20.0.0",
-    "react-native": ">=0.79.0 <0.88.0"
+    "react": "*",
+    "react-native": "*",
+    "react-native-svg": "*"
   },
   "devDependencies": {
     "@babel/runtime": "^7.25.0",
@@ -105,8 +78,5 @@
   },
   "hyperswitch": {
     "sdkUtilsCommit": "1669cc28955bf547b7fe35d6401ea47720019ff9"
-  },
-  "workspaces": [
-    "example"
-  ]
+  }
 }

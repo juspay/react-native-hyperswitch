@@ -1,4 +1,3 @@
-
 export type MerchantSession = {
   vault_details?: {
     vault_type?: string;

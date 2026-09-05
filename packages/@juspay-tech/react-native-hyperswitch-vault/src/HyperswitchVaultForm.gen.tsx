@@ -19,6 +19,8 @@ import type {cardSourceType as VaultCardSource_cardSourceType} from './VaultCard
 
 import type {cardholderNameMode as CardFieldOptions_cardholderNameMode} from './CardFieldOptions.gen';
 
+import type {customEndpoints as VaultEndpoint_customEndpoints} from './VaultEndpoint.gen';
+
 import type {eligibilityConfig as VaultFormOptions_eligibilityConfig} from './VaultFormOptions.gen';
 
 import type {expiryStyles as CardFieldStyles_expiryStyles} from './CardFieldStyles.gen';
@@ -46,8 +48,6 @@ import type {safeVaultErrorCode as VaultResult_safeVaultErrorCode} from './Vault
 import type {safeVaultError as VaultResult_safeVaultError} from './VaultResult.gen';
 
 import type {vaultDetails as VaultDetails_vaultDetails} from './VaultDetails.gen';
-
-import type {vaultEndpointConfig as VaultEndpoint_vaultEndpointConfig} from './VaultEndpoint.gen';
 
 import type {vaultEnvironment as VaultFormOptions_vaultEnvironment} from './VaultFormOptions.gen';
 
@@ -107,6 +107,7 @@ export type Props = {
   readonly accessible?: boolean; 
   readonly appearance?: appearance; 
   readonly cardholderName?: cardholderNameMode; 
+  readonly customEndpoints?: VaultEndpoint_customEndpoints; 
   readonly disabled?: boolean; 
   readonly eligibility?: eligibilityConfig; 
   readonly enabledCardSchemes?: string[]; 
@@ -122,14 +123,14 @@ export type Props = {
   readonly sdkAuthorization?: string; 
   readonly session?: vaultSession; 
   readonly unstyled?: boolean; 
-  readonly vaultDetails?: VaultDetails_vaultDetails; 
-  readonly vaultEndpoint?: VaultEndpoint_vaultEndpointConfig
+  readonly vaultDetails?: VaultDetails_vaultDetails
 };
 
 export const make: React.ComponentType<{
   readonly accessible?: boolean; 
   readonly appearance?: appearance; 
   readonly cardholderName?: cardholderNameMode; 
+  readonly customEndpoints?: VaultEndpoint_customEndpoints; 
   readonly disabled?: boolean; 
   readonly eligibility?: eligibilityConfig; 
   readonly enabledCardSchemes?: string[]; 
@@ -145,6 +146,5 @@ export const make: React.ComponentType<{
   readonly sdkAuthorization?: string; 
   readonly session?: vaultSession; 
   readonly unstyled?: boolean; 
-  readonly vaultDetails?: VaultDetails_vaultDetails; 
-  readonly vaultEndpoint?: VaultEndpoint_vaultEndpointConfig
+  readonly vaultDetails?: VaultDetails_vaultDetails
 }> = HyperswitchVaultFormJS.make as any;

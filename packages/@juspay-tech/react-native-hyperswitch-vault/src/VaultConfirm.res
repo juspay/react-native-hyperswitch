@@ -1,21 +1,4 @@
-/*
- * INTERNAL. The payment-method-session confirmation transport.
- *
- * This module is deliberately NOT part of the public surface. It has no genType annotations, so no
- * declaration is emitted for it; it is not re-exported from `public.ts`; and there is no package
- * subpath that reaches it. Its code lives inside the root runtime bundle because the merchant card
- * form cannot tokenize without it — but a merchant has no supported or physical path to call it.
- *
- * That is the point of the merchant-only contract: the card values travel from library-owned state
- * straight into this module and out to the vault. They are never handed to, nor accepted from, the
- * merchant.
- *
- * A previous revision published this as the `/vault` subpath so a caller could bring their own card
- * UI. That entry was removed in the merchant-only scope reset; the transport itself was kept,
- * unchanged, including its concurrency and unknown-outcome handling.
- */
-
-type vaultEnvironment = [#production | #sandbox | #integ]
+type vaultEnvironment = [#PROD | #SANDBOX | #INTEG]
 
 type cardDetails = {
   cardNumber: string,
@@ -26,32 +9,20 @@ type cardDetails = {
   cvc: string,
 }
 
-/* Opaque to ReScript; a real AbortSignal at runtime, produced by makeAbortController. */
 type abortSignal
 
 type confirmRequest = {
   sdkAuthorization: string,
-  /* Where the payment-method-session confirm is posted. Resolved by the host — see VaultEndpoint. */
+
   vaultBaseUrl: string,
-  /* Reproduces the `x-app-id` header client-core sends on every backend call. Non-card. */
+
   appId?: string,
   card: cardDetails,
 
-  /* Library-owned field value. Omitted from the request entirely when blank. */
   cardholderName?: string,
 
-  /*
-   * The customer's co-badge choice, already filtered to a value the backend's `CardNetwork` enum
-   * accepts. Omitted when the card carries one network, or when the detected scheme has no enum
-   * member — see `VaultConfirmBody.cardNetworkToWire`.
-   */
   cardNetwork?: string,
 
-  /*
-   * Names the SAVED card, so it belongs to this call only. `VaultPaymentMethodData.nickNameOf` is
-   * the sole reader of the host's `nickName`, and the final-confirm encoder has no branch that can
-   * emit it — one merchant string, one request.
-   */
   nickName?: string,
 
   timeoutMs?: int,
@@ -65,7 +36,7 @@ type vaultCardMetadata = {
   binNumber?: string,
   expiryMonth: string,
   expiryYear: string,
-  /* The network the vault stored, which for a co-badged card is the one the customer chose. */
+
   network?: string,
 }
 
@@ -243,9 +214,9 @@ let validateCard = (card: cardDetails): option<confirmOutcome> => {
 
 let vaultBaseUrl = (environment: vaultEnvironment) =>
   switch environment {
-  | #production => "https://checkout.hyperswitch.io/api"
-  | #integ => "https://dev.hyperswitch.io/api"
-  | #sandbox => "https://beta.hyperswitch.io/api"
+  | #PROD => "https://live.hyperswitch.io/api"
+  | #SANDBOX => "https://app.hyperswitch.io/api"
+  | #INTEG => "https://integ.hyperswitch.io/api"
   }
 
 @val external encodeURIComponent: string => string = "encodeURIComponent"
@@ -253,7 +224,6 @@ let vaultBaseUrl = (environment: vaultEnvironment) =>
 let confirmUrl = (~baseUrl, ~sessionId) =>
   `${baseUrl}/v1/payment-method-sessions/${sessionId->encodeURIComponent}/confirm`
 
-/* Matches client-core's `Utils.getHeader`: the scheme prefix is stripped, and the header is sent even if blank. */
 let appIdHeader = (appId: option<string>) =>
   appId->Option.getOr("")->String.replace(".hyperswitch://", "")
 
@@ -268,15 +238,7 @@ let buildConfirmBody = (
   card: cardDetails,
   ~cardholderName: option<string>=?,
   ~nickName: option<string>=?,
-  /*
-   * The customer's co-badge choice. The payment-method-session confirm accepts `card_network` on
-   * the same card object the final confirm does — verified against
-   * `PaymentMethodSessionConfirmRequest.payment_method_data` — so a network the customer picked
-   * reaches the vault too, and the saved card records the network they chose.
-   *
-   * It arrives already filtered to values the backend enum accepts; see
-   * `VaultConfirmBody.cardNetworkToWire`.
-   */
+
   ~cardNetwork: option<string>=?,
 ) => {
   let cardObject =
@@ -442,7 +404,6 @@ let confirmPaymentMethodSession = async (request: confirmRequest): confirmOutcom
       let options = {
         method: "POST",
 
-        /* The same header set client-core puts on every backend call (`Utils.getHeader`). */
         headers: [
           ("Content-Type", "application/json"),
           ("Authorization", request.sdkAuthorization),

@@ -1,23 +1,31 @@
-/*
- * INTERNAL. Validation for a host-supplied base URL.
- *
- * ── THE HOST OWNS THE ENDPOINT ─────────────────────────────────────────────────
- * The host that mounts the form is the authority on where its backend lives: client-core resolves
- * `hyperswitchConfig.customEndpoints` or its build-time environment host, and a standalone merchant
- * may run a self-hosted deployment. Every request the library sends therefore takes its base from
- * the host, and only falls back to the public-cloud host of the selected environment when the host
- * says nothing at all.
- *
- * Rejected: non-https (except loopback outside production); userinfo; query; fragment; unparseable.
- * A PATH PREFIX IS ACCEPTED (`https://checkout.hyperswitch.io/api`), normalised (trailing slashes
- * removed) and returned as part of the base; the library still appends its own route after it.
- *
- * Two bases exist because two backends MAY exist: `resolveBaseUrl` serves the payment calls
- * (eligibility, final confirm) and `resolveVaultBaseUrl` the payment-method-session confirm.
- */
-
 @genType
 type vaultEndpointConfig = {baseUrl: string}
+
+@genType
+type overrideEndpointConfiguration = {
+  customBackendEndpoint?: string,
+  customLoggingEndpoint?: string,
+  customAssetEndpoint?: string,
+  customSDKConfigEndpoint?: string,
+  customAirborneEndpoint?: string,
+}
+
+@genType
+type customEndpoints = {
+  commonEndpoint?: string,
+  overrideEndpoints?: overrideEndpointConfiguration,
+}
+
+let configOf = (custom: option<customEndpoints>): option<vaultEndpointConfig> =>
+  custom->Option.flatMap(entry =>
+    switch entry.commonEndpoint {
+    | Some(url) => Some({baseUrl: url})
+    | None =>
+      entry.overrideEndpoints
+      ->Option.flatMap(over => over.customBackendEndpoint)
+      ->Option.map(url => {baseUrl: url})
+    }
+  )
 
 type parsedUrl
 
@@ -36,11 +44,10 @@ let loopbackHosts = ["localhost", "127.0.0.1", "10.0.2.2"]
 
 let allowsCleartext = (environment: VaultConfirm.vaultEnvironment) =>
   switch environment {
-  | #sandbox | #integ => true
-  | #production => false
+  | #SANDBOX | #INTEG => true
+  | #PROD => false
   }
 
-/* `/api/` → `/api`, `/` → ``. The parser has already normalised dot segments and encoding. */
 let normalisePath = (path: string) => path->String.replaceRegExp(%re("/\/+$/"), "")
 
 let validateEndpoint = (
@@ -83,25 +90,7 @@ let validateEndpoint = (
     }
   }
 
-let defaultBaseUrl = (environment: VaultConfirm.vaultEnvironment) =>
-  switch environment {
-  | #production => "https://checkout.hyperswitch.io/api"
-  | #integ => "https://dev.hyperswitch.io/api"
-  | #sandbox => "https://beta.hyperswitch.io/api"
-  }
-
 let resolveBaseUrl = (endpoint, ~environment: VaultConfirm.vaultEnvironment): result<string, unit> =>
-  switch endpoint->validateEndpoint(~environment) {
-  | Error() => Error()
-  | Ok(None) => Ok(environment->defaultBaseUrl)
-  | Ok(Some(base)) => Ok(base)
-  }
-
-/* The payment-method-session confirm base. Same validation; its own default. */
-let resolveVaultBaseUrl = (endpoint, ~environment: VaultConfirm.vaultEnvironment): result<
-  string,
-  unit,
-> =>
   switch endpoint->validateEndpoint(~environment) {
   | Error() => Error()
   | Ok(None) => Ok(environment->VaultConfirm.vaultBaseUrl)

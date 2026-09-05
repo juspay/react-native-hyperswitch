@@ -1,4 +1,3 @@
-
 @react.component
 let make = (~condition, ~children) => {
   if condition {

@@ -5,7 +5,8 @@ import type { FormStatus, TokenizeResult, VaultType } from './types';
 export interface UseCardForm {
   tokenize: (providerData?: unknown) => Promise<TokenizeResult>;
   status: FormStatus;
-  vaultType: VaultType;
+
+  vaultType: VaultType | undefined;
 }
 
 export function useCardForm(): UseCardForm {
