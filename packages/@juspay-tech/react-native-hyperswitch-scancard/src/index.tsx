@@ -1,8 +1,10 @@
-import { NativeModules } from 'react-native';
+import NativeHyperswitchScancard from './NativeHyperswitchScancard';
+import type {ScanCardResponse} from './NativeHyperswitchScancard';
 
-const HyperswitchScancard = NativeModules.HyperswitchScancard || null;
-
-const isAvailable = HyperswitchScancard && HyperswitchScancard.launchScanCard;
+// TurboModuleRegistry.get resolves the TurboModule on the new architecture
+// and falls back to the legacy NativeModules entry on the old architecture,
+// so this single code path supports both.
+const isAvailable = NativeHyperswitchScancard != null;
 
 export interface ScanCardReturnType {
   status: string;
@@ -16,26 +18,23 @@ interface ScanCardData {
 }
 
 function launchScanCard(callback: (s: ScanCardReturnType) => void): void {
-  if (isAvailable) {
-    return HyperswitchScancard.launchScanCard(
-      '',
-      (response: Record<string, any>) => {
-        const status = response.status || 'Default';
-        const data: ScanCardData | undefined = response.data;
-        const scanData: ScanCardReturnType = {
-          status,
-          data: data
-            ? {
-                pan: data.pan || '',
-                expiryMonth: data.expiryMonth || '',
-                expiryYear: data.expiryYear || '',
-              }
-            : undefined,
-        };
-        callback(scanData);
-      }
-    );
+  if (NativeHyperswitchScancard) {
+    NativeHyperswitchScancard.launchScanCard('', (response: ScanCardResponse) => {
+      const status = response.status || 'Default';
+      const data = response.data;
+      const scanData: ScanCardReturnType = {
+        status,
+        data: data
+          ? {
+              pan: data.pan || '',
+              expiryMonth: data.expiryMonth || '',
+              expiryYear: data.expiryYear || '',
+            }
+          : undefined,
+      };
+      callback(scanData);
+    });
   }
 }
 
-export { isAvailable, launchScanCard };
+export {isAvailable, launchScanCard};

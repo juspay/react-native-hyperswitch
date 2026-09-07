@@ -1,33 +1,33 @@
 import UIKit
 import PayPal
 
-class PaypalButtonView: UIView {
+@objc public class PaypalButtonView: UIView {
 
   private var payPalButton: PayPalButton?
   private var containerView: UIView?
 
-  @objc dynamic var buttonColor: String = "gold" {
+  @objc public dynamic var buttonColor: String = "gold" {
     didSet { updateButton() }
   }
 
-  @objc dynamic var buttonLabel: String = "paypal" {
+  @objc public dynamic var buttonLabel: String = "paypal" {
     didSet { updateButton() }
   }
 
-  @objc dynamic var buttonSize: String = "medium" {
+  @objc public dynamic var buttonSize: String = "medium" {
     didSet { updateButton() }
   }
 
-  @objc dynamic var borderRadius: Double = 0 {
+  @objc public dynamic var borderRadius: Double = 0 {
     didSet { updateButton() }
   }
 
-  override init(frame: CGRect) {
+  public override init(frame: CGRect) {
     super.init(frame: frame)
     setupButton()
   }
 
-  required init?(coder: NSCoder) {
+  public required init?(coder: NSCoder) {
     super.init(coder: coder)
     setupButton()
   }
@@ -119,11 +119,11 @@ class PaypalButtonView: UIView {
     reactView.reactSubviews().first?.perform(#selector(UIView.didMoveToWindow))
   }
 
-  override var intrinsicContentSize: CGSize {
+  public override var intrinsicContentSize: CGSize {
     return CGSize(width: UIView.noIntrinsicMetric, height: 48)
   }
 
-  override func layoutSubviews() {
+  public override func layoutSubviews() {
     super.layoutSubviews()
     payPalButton?.layoutSubviews()
   }

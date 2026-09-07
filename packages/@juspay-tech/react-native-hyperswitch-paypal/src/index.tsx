@@ -1,8 +1,14 @@
-import { NativeModules } from 'react-native';
+import NativeHyperswitchPaypal from './NativeHyperswitchPaypal';
 
-const { HyperswitchPaypal } = NativeModules;
+// TurboModuleRegistry.get resolves the TurboModule on the new architecture
+// and falls back to the legacy NativeModules entry on the old architecture,
+// so this single code path supports both.
+export const isAvailable = NativeHyperswitchPaypal != null;
 
-export const isAvailable = !!HyperswitchPaypal;
+import PaypalButtonNativeComponent from './PaypalButtonNativeComponent';
+
+export const PaypalButton = PaypalButtonNativeComponent;
+export type {NativeProps as PaypalButtonProps} from './PaypalButtonNativeComponent';
 
 export type PayPalResult = {
   status: string;
@@ -23,12 +29,12 @@ export function launchPayPal(
   requestObj: string,
   callback: (result: PayPalResult) => void
 ): void {
-  if (!HyperswitchPaypal) {
+  if (!NativeHyperswitchPaypal) {
     callback({
       status: 'failed',
       error_message: 'PayPal module not available',
     });
     return;
   }
-  return HyperswitchPaypal.launchPayPal(requestObj, callback);
+  return NativeHyperswitchPaypal.launchPayPal(requestObj, callback);
 }
