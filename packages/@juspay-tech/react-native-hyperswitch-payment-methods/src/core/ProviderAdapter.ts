@@ -33,6 +33,14 @@ export interface ProviderFieldProps<Collector = unknown> {
   onBlur?: (event: FieldEvent) => void;
 
   fieldRef?: Ref<FieldHandle>;
+
+  /*
+   * Lets a field push a replacement collector once one resolves asynchronously post-mount, for
+   * adapters whose collector can only be built inside a mounted component (Hyperswitch's own
+   * vault SDK, whose fields coordinate through a React context rather than a plain client
+   * object). Adapters that resolve their collector up front via `createCollector` ignore it.
+   */
+  onCollectorReady?: (next: Collector) => void;
 }
 
 export interface ProviderAdapter<Collector = unknown, Data = unknown> {

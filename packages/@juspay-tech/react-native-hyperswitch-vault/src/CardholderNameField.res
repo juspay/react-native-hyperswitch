@@ -15,10 +15,11 @@ let make = React.forwardRef((
     "onFocus": option<VaultPublicState.fieldEvent => unit>,
     "onBlur": option<VaultPublicState.fieldEvent => unit>,
     "onChange": option<VaultPublicState.fieldChange => unit>,
+    "form": option<VaultWidgetContext.contextValue>,
   },
   ref,
 ) => {
-  let ctx = VaultWidgetContext.useRequired("CardholderNameField")
+  let ctx = VaultWidgetContext.useResolved("CardholderNameField", ~override=?props["form"])
 
   VaultStateEmitter.use(
     ~build=() => ctx.publicSnapshot().cardholderName,

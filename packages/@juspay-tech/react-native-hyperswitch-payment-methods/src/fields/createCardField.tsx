@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { useFormBinding } from './useFormBinding';
 import { resolveFieldStyles } from '../core/appearance';
+import { coreOf } from '../core/formRegistry';
 import type { ElementType, FieldChange, FieldHandle } from '../core/types';
 import { Placeholder } from './Placeholder';
 import type { FieldProps } from './types';
@@ -26,6 +27,18 @@ export function createCardField(elementType: ElementType, displayName: string) {
       ...rest
     } = props;
     const ctx = useFormBinding(form);
+    const core = form ? coreOf(form) : undefined;
+
+    const onCollectorReady = useCallback(
+      (next: unknown) => {
+        if (!core) return;
+        core.collector = next;
+        core.session.attachCollector(next);
+        core.status = 'ready';
+        core.notify();
+      },
+      [core]
+    );
 
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
@@ -106,6 +119,7 @@ export function createCardField(elementType: ElementType, displayName: string) {
         onChange={handleChange}
         onFocus={onFocus}
         onBlur={onBlur}
+        onCollectorReady={onCollectorReady}
         {...rest}
       />
     );
