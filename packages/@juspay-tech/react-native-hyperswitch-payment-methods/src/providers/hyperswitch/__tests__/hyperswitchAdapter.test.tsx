@@ -49,6 +49,7 @@ jest.mock(
 );
 
 import { Hyperswitch } from '../../../session/init';
+import { CardForm } from '../../../core/CardForm';
 import {
   CardNumberField,
   CardExpiryField,
@@ -115,5 +116,30 @@ describe('hyperswitchVaultAdapter (headless)', () => {
     const result = await cardForm.tokenize();
     expect(result.status).toBe('error');
     expect(result.status === 'error' && result.error.code).toBe('sdk_not_ready');
+  });
+});
+
+describe('hyperswitchVaultAdapter (context mode)', () => {
+  /*
+   * Regression: `Host` hands back the vault form's imperative HANDLE as the collector, which has
+   * no `vaultData`. Reading `session.vaultData.sdkAuthorization` unconditionally threw
+   * "Cannot read property 'sdkAuthorization' of undefined" and took the whole screen down.
+   */
+  it('renders inside <CardForm> without reading vaultData off the form handle', async () => {
+    const errors: unknown[] = [];
+    render(
+      <CardForm
+        vaultDetails={hyperswitchDetails}
+        onError={(e) => errors.push(e)}
+      >
+        <CardNumberField />
+        <CardExpiryField />
+        <CardCVCField />
+      </CardForm>
+    );
+
+    /* Host mounts exactly one vault form and the tree survives the commit. */
+    await waitFor(() => expect(mockMountSpy).toHaveBeenCalled());
+    expect(errors).toEqual([]);
   });
 });

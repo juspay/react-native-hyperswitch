@@ -120,6 +120,7 @@ const Host: ProviderAdapter['Host'] = ({
         const payload = event?.payload ?? {};
         const details: Partial<CardDetails> = {
           bin: payload.bin ?? null,
+          extendedBin: payload.extendedBin ?? null,
           last4: payload.last4 ?? null,
           brand: payload.brand ?? null,
           expiryMonth: payload.expiryMonth ?? null,
@@ -146,11 +147,16 @@ const Field: ProviderAdapter['Field'] = ({
   onCollectorReady,
 }) => {
   const Component = FIELD_COMPONENT[elementType] as any;
-  if (!Component) return null;
 
+  /*
+   * Only HEADLESS mode's collector is a HyperswitchSession. In context mode `Host` mounted the
+   * vault form and handed back its imperative handle, which has no `vaultData` — reading through
+   * it unconditionally threw "Cannot read property 'sdkAuthorization' of undefined".
+   */
   const session = collector as HyperswitchSession | undefined;
-  const sdkAuthorization = session?.vaultData.sdkAuthorization;
-  const environment = session?.vaultData.environment;
+  const headless = session && 'vaultData' in session ? session : undefined;
+  const sdkAuthorization = headless?.vaultData?.sdkAuthorization;
+  const environment = headless?.vaultData?.environment;
   const formRef = useRef<any>(null);
 
   // Read by the (identity-stable) handleContext below, so its own identity never depends on
@@ -194,7 +200,9 @@ const Field: ProviderAdapter['Field'] = ({
       />
     ) : null;
 
-  if (!session || session.contextValue === undefined) {
+  if (!Component) return null;
+
+  if (!session || (headless && headless.contextValue === undefined)) {
     return (
       <>
         {activator}
@@ -207,7 +215,7 @@ const Field: ProviderAdapter['Field'] = ({
     <>
       {activator}
       <Component
-        form={session.contextValue}
+        form={headless?.contextValue}
         styles={styles}
         placeholder={placeholder}
         testID={testID}

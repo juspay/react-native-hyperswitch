@@ -90,6 +90,7 @@ type vaultFormFields = {
 @genType
 type cardDetails = {
   bin: Js.Nullable.t<string>,
+  extendedBin: Js.Nullable.t<string>,
   last4: Js.Nullable.t<string>,
   brand: Js.Nullable.t<string>,
   expiryMonth: Js.Nullable.t<string>,
@@ -110,6 +111,7 @@ let nullable = (value: option<string>): Js.Nullable.t<string> =>
 
 let cardDetailsOf = (info: PaymentEventData.cardInfo): cardDetails => {
   bin: info.bin->nullable,
+  extendedBin: info.extendedBin->nullable,
   last4: info.last4->nullable,
   brand: info.brand->nullable,
   expiryMonth: info.expiryMonth->nullable,

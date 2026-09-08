@@ -66,6 +66,7 @@ export type vaultFormFields = {
 
 export type cardDetails = {
   readonly bin: (null | undefined | string); 
+  readonly extendedBin: (null | undefined | string); 
   readonly last4: (null | undefined | string); 
   readonly brand: (null | undefined | string); 
   readonly expiryMonth: (null | undefined | string); 

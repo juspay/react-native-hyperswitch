@@ -101,6 +101,7 @@ function buildChange(
     eventName: 'cardDetailsChange',
     payload: {
       bin: details.bin ?? null,
+      extendedBin: details.extendedBin ?? null,
       last4: details.last4 ?? null,
       brand: details.brand ?? number?.brand ?? null,
       expiryMonth,
