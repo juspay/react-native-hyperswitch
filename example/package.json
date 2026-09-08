@@ -12,6 +12,7 @@
     "adb": "adb reverse tcp:8081 tcp:8081"
   },
   "dependencies": {
+    "@juspay-tech/react-native-hyperswitch-scancard": "workspace:^",
     "@sentry/react-native": "^6.20.0",
     "@vgs/collect-react-native": "^1.1.5",
     "react": "19.0.0",

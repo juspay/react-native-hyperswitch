@@ -29,6 +29,10 @@ config.resolver.extraNodeModules = {
     root,
     'packages/@juspay-tech/react-native-hyperswitch-vault'
   ),
+  '@juspay-tech/react-native-hyperswitch-scancard': path.resolve(
+    root,
+    'packages/@juspay-tech/react-native-hyperswitch-scancard'
+  ),
 };
 
 module.exports = config;
