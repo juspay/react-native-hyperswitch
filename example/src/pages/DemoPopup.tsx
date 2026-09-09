@@ -98,6 +98,7 @@ export default function DemoPopup({
             paymentElementReady={false}
             cvcReady={false}
             walletReady={false}
+            walletsCheckLoading={true}
           />
         ) : (
           <HyperElements hyper={hyperPromise} options={{ sdkAuthorization }}>
@@ -123,7 +124,6 @@ const styles = StyleSheet.create({
   },
   sheet: {
     width: "100%",
-    maxWidth: 420,
     maxHeight: "90%",
     backgroundColor: "#fff",
     borderTopLeftRadius: 24,

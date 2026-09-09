@@ -287,6 +287,27 @@ class HyperFragment : ReactFragment() {
     }
   }
 
+  /**
+   * Invokes and clears every pending callback with the given result. Used when
+   * the fragment is about to be torn down (deinitWidget / destroy) so the
+   * matching JS promises resolve instead of hanging forever.
+   */
+  fun flushPendingCallbacks(result: String) {
+    try {
+      callbacks.values.toList().forEach { callback ->
+        when (callback) {
+          is HyperCallback.Payment -> callback.fn(result)
+          is HyperCallback.UpdateIntentComplete -> callback.fn(result)
+          is HyperCallback.UpdateIntentInit -> callback.fn?.invoke()
+          is HyperCallback.ConfirmButtonTriggered -> Unit
+        }
+      }
+    } catch (_: Exception) {
+    } finally {
+      callbacks.clear()
+    }
+  }
+
   fun notifyResult(type: CallbackType, result: String) {
     try {
       when (type) {
@@ -527,7 +548,12 @@ class HyperFragment : ReactFragment() {
 
   override fun onDestroyView() {
     try {
-      callbacks.clear()
+      flushPendingCallbacks(
+        StandardResult.Failed(
+          code = "WIDGET_TORN_DOWN",
+          message = "Widget view was destroyed"
+        ).toJSONString()
+      )
       onExit = null
       paymentEventListener = null
     } finally {
@@ -537,8 +563,13 @@ class HyperFragment : ReactFragment() {
 
   override fun onDestroy() {
     try {
+      flushPendingCallbacks(
+        StandardResult.Failed(
+          code = "WIDGET_TORN_DOWN",
+          message = "Widget was destroyed"
+        ).toJSONString()
+      )
       unRegisterEventBus()
-      callbacks.clear()
       onExit = null
       paymentEventListener = null
     } finally {

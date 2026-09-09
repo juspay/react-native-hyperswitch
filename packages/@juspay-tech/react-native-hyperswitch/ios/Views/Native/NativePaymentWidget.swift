@@ -114,7 +114,16 @@ public class NativePaymentWidgetView: UIView {
     private var responseSenderCallback: RCTResponseSenderBlock?
     private var updateIntentInitCallback: RCTResponseSenderBlock?
     private var updateIntentCompleteCallback: RCTResponseSenderBlock?
-    private var appliedConfigKey: String?
+    /// Config key ("widgetType:publishableKey:profileId:sdkAuthorization") the
+    /// currently-hosted widget is bound to. updateIntent re-binds this to the
+    /// new authorization, so re-created sdkAuthorization props reuse the widget.
+    private var boundConfigKey: String?
+    /// Authorization awaiting confirmation from the embedded bundle
+    /// (updateIntentComplete round-trip in flight).
+    private var pendingUpdateAuthorization: String?
+    /// Set after deinitWidget() destroyed the hosted widget — the next window
+    /// attach re-creates it on demand.
+    private var needsRecreate = false
 
     internal var rctRootTag: NSNumber?
 
@@ -199,13 +208,111 @@ public class NativePaymentWidgetView: UIView {
         return options?["subscribedEvents"] as? [String] ?? []
     }
 
-    private func clearWidget() {
-        paymentWidget?.removeFromSuperview()
-        cvcWidget?.removeFromSuperview()
+    /// Detaches the currently-hosted widget WITHOUT destroying it: the widget
+    /// stays alive in NativeWidgetInstanceCache (keyed by its own bound config),
+    /// ready to be adopted again by a future view with the same sdkAuthorization.
+    private func stashHostedWidget() {
+        flushPendingCallbacks(code: "WIDGET_DETACHED", message: "Widget detached from view")
+
+        if let hosted = paymentWidget {
+            hosted.removeFromSuperview()
+        }
+        if let hosted = cvcWidget {
+            hosted.removeFromSuperview()
+        }
         paymentWidget = nil
         cvcWidget = nil
         rctRootTag = nil
-        responseSenderCallback = nil
+
+        if let key = boundConfigKey {
+            NativeWidgetInstanceCache.shared.markDetached(forKey: key)
+        }
+        boundConfigKey = nil
+    }
+
+    /// Resolves every pending RN callback (confirm / updateIntent) with a failed
+    /// result so JS promises never hang across a widget teardown.
+    private func flushPendingCallbacks(code: String, message: String) {
+        pendingUpdateAuthorization = nil
+        let payload: [String: Any] = ["status": "failed", "code": code, "message": message]
+        if let callback = responseSenderCallback {
+            responseSenderCallback = nil
+            callback([payload])
+        }
+        if let callback = updateIntentInitCallback {
+            updateIntentInitCallback = nil
+            callback([payload])
+        }
+        if let callback = updateIntentCompleteCallback {
+            updateIntentCompleteCallback = nil
+            callback([payload])
+        }
+    }
+
+    /// Called by NativeWidgetInstanceCache when the hosted widget is destroyed
+    /// via deinitWidget(sdkAuthorization:). The view stays mounted; the widget
+    /// is re-created on demand at the next didSetProps()/window attach.
+    internal func hostedWidgetWasDestroyed(_ widget: UIView) {
+        if paymentWidget === widget { paymentWidget = nil }
+        if cvcWidget === widget { cvcWidget = nil }
+        boundConfigKey = nil
+        rctRootTag = nil
+        needsRecreate = true
+        flushPendingCallbacks(code: "WIDGET_DEINIT", message: "Widget was deinitialised")
+    }
+
+    private static func isWidgetAlive(_ widget: UIView) -> Bool {
+        if let payment = widget as? PaymentWidget { return payment.rootReactTag != nil }
+        if let cvc = widget as? CVCWidget { return cvc.rootReactTag != nil }
+        return false
+    }
+
+    private func makeEventListener() -> PaymentEventListener {
+        return PaymentEventListener { [weak self] event in
+            self?.onPaymentEvent?([
+                "eventName": event.type,
+                "payload": event.payload,
+            ])
+        }
+    }
+
+    /// Adds the widget to the hierarchy and binds its callbacks/listeners to
+    /// THIS host. Shared by create and adopt paths — a cached widget may have
+    /// been created by another (now deallocated) host view, so its completion
+    /// and event listener must be rewired.
+    private func attachWidget(_ widget: UIView) {
+        if widget.superview !== self {
+            addSubview(widget)
+            widget.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                widget.topAnchor.constraint(equalTo: topAnchor),
+                widget.bottomAnchor.constraint(equalTo: bottomAnchor),
+                widget.leadingAnchor.constraint(equalTo: leadingAnchor),
+                widget.trailingAnchor.constraint(equalTo: trailingAnchor),
+            ])
+        }
+
+        let listener = makeEventListener()
+
+        if let paymentWidget = widget as? PaymentWidget {
+            paymentWidget.setCompletionHandler { [weak self] result in
+                self?.handlePaymentResult(result)
+            }
+            paymentWidget.setPaymentEventListener(listener)
+            self.paymentWidget = paymentWidget
+            rctRootTag = paymentWidget.rootReactTag
+            if let embeddedTag = paymentWidget.rootReactTag, let outerTag = reactTag {
+                NativePaymentWidgetRegistry.shared.updateEmbeddedTag(embeddedTag, forOuterTag: outerTag)
+            }
+        } else if let cvcWidget = widget as? CVCWidget {
+            cvcWidget.setPaymentEventListener(listener)
+            self.cvcWidget = cvcWidget
+            rctRootTag = cvcWidget.rootReactTag
+            if let embeddedTag = cvcWidget.rootReactTag, let outerTag = reactTag {
+                NativePaymentWidgetRegistry.shared.updateEmbeddedTag(embeddedTag, forOuterTag: outerTag)
+            }
+        }
+        needsRecreate = false
     }
 
     // MARK: - Payment Result Handling
@@ -253,25 +360,39 @@ public class NativePaymentWidgetView: UIView {
         }
 
         let configKey = [widgetType ?? "", effectivePublishableKey() ?? "", effectiveProfileId() ?? "", sdkAuthorization].joined(separator: ":")
-        if paymentWidget != nil || cvcWidget != nil, appliedConfigKey == configKey {
+
+        // Reuse: the hosted widget is already bound to this exact config. This
+        // covers both an unchanged sdkAuthorization and one that was re-created
+        // (e.g. after updateIntent re-keyed the widget) — no widget reload.
+        if paymentWidget != nil || cvcWidget != nil, boundConfigKey == configKey {
             return
         }
 
-        clearWidget()
-        appliedConfigKey = configKey
+        // Whatever we host now is parked in the instance cache under its own
+        // key — stored for its sdkAuthorization, never destroyed here.
+        stashHostedWidget()
+
+        // Reuse a live widget instance previously stored for this config.
+        if let cached = NativeWidgetInstanceCache.shared.entry(forKey: configKey) {
+            if NativePaymentWidgetView.isWidgetAlive(cached.widget) {
+                boundConfigKey = configKey
+                attachWidget(cached.widget)
+                NativeWidgetInstanceCache.shared.markHosted(forKey: configKey, host: self)
+                return
+            }
+            // Dead entry (e.g. its payment already completed) — drop and rebuild.
+            NativeWidgetInstanceCache.shared.removeValue(forKey: configKey)
+        }
+
+        boundConfigKey = configKey
 
         // putAll(widgetConfig) + put("type", widgetType)
         var configuration = options ?? [:]
         configuration["type"] = widgetType
 
-        let listener = PaymentEventListener { [weak self] event in
-            self?.onPaymentEvent?([
-                "eventName": event.type,
-                "payload": event.payload,
-            ])
-        }
+        let listener = makeEventListener()
 
-        let widget: UIView?
+        let newWidget: UIView
         if widgetType == "cvcWidget" {
             guard let hyperswitch = activeOrNewHyperswitch() else {
                 return
@@ -282,8 +403,7 @@ public class NativePaymentWidgetView: UIView {
                 subscribe: nil
             )
             cvc.setPaymentEventListener(listener)
-            cvcWidget = cvc
-            widget = cvc
+            newWidget = cvc
         } else {
             guard let session = activeOrNewPaymentSession(sdkAuthorization: sdkAuthorization) else {
                 return
@@ -297,37 +417,18 @@ public class NativePaymentWidgetView: UIView {
                 subscribe: nil
             )
             payment.setPaymentEventListener(listener)
-            paymentWidget = payment
-            widget = payment
+            newWidget = payment
         }
 
-        guard let widget = widget else {
-            return
-        }
-        addSubview(widget)
-        widget.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            widget.topAnchor.constraint(equalTo: topAnchor),
-            widget.bottomAnchor.constraint(equalTo: bottomAnchor),
-            widget.leadingAnchor.constraint(equalTo: leadingAnchor),
-            widget.trailingAnchor.constraint(equalTo: trailingAnchor),
-        ])
-
-        if let paymentWidget = widget as? PaymentWidget {
-            rctRootTag = paymentWidget.rootReactTag
-            
-            // Update registry mapping: embedded tag -> outer tag
-            if let embeddedTag = paymentWidget.rootReactTag, let outerTag = reactTag {
-                NativePaymentWidgetRegistry.shared.updateEmbeddedTag(embeddedTag, forOuterTag: outerTag)
-            }
-        } else if let cvcWidget = widget as? CVCWidget {
-            rctRootTag = cvcWidget.rootReactTag
-            
-            // Update registry mapping: embedded tag -> outer tag
-            if let embeddedTag = cvcWidget.rootReactTag, let outerTag = reactTag {
-                NativePaymentWidgetRegistry.shared.updateEmbeddedTag(embeddedTag, forOuterTag: outerTag)
-            }
-        }
+        attachWidget(newWidget)
+        NativeWidgetInstanceCache.shared.store(
+            NativeWidgetInstanceCache.Entry(
+                configKey: configKey,
+                sdkAuthorization: sdkAuthorization,
+                widget: newWidget,
+                host: self
+            )
+        )
     }
 
     public override func didSetProps(_ changedProps: [String]) {
@@ -340,8 +441,13 @@ public class NativePaymentWidgetView: UIView {
         if window != nil, let tag = reactTag {
             NativePaymentWidgetRegistry.shared.register(view: self, tag: tag)
         }
+        // On-demand recreation: a deinitWidget() tore down the hosted widget —
+        // rebuild from the current props when the view (re-)enters a window.
+        if window != nil, needsRecreate, paymentWidget == nil, cvcWidget == nil {
+            didSetProps()
+        }
     }
-    
+
     public override func willMove(toWindow newWindow: UIWindow?) {
         super.willMove(toWindow: newWindow)
         // Unregister when view is removed from window hierarchy
@@ -349,13 +455,14 @@ public class NativePaymentWidgetView: UIView {
             NativePaymentWidgetRegistry.shared.unregister(tag: tag)
         }
     }
-    
+
     deinit {
-        // Final cleanup on dealloc
+        // Final cleanup on dealloc. The widget itself is NOT destroyed — it
+        // stays cached under its sdkAuthorization for a future view to reuse.
         if let tag = reactTag {
             NativePaymentWidgetRegistry.shared.unregister(tag: tag)
         }
-        clearWidget()
+        stashHostedWidget()
     }
 
     public override init(frame: CGRect) {
@@ -427,6 +534,7 @@ public class NativePaymentWidgetView: UIView {
 
         // Store callback to be invoked when embedded bundle responds
         updateIntentCompleteCallback = resolve
+        pendingUpdateAuthorization = nonEmptyString(sdkAuthorization)
 
         let eventData: [String: Any] = [
             "rootTag": tag,
@@ -435,7 +543,32 @@ public class NativePaymentWidgetView: UIView {
         // Bridgeless: route to the embedded bundle via the codegen typed emitter.
         HyperModuleImpl.shared.updateIntentComplete(data: eventData)
     }
-    
+
+    /// Moves the hosted widget's cache entry to the new authorization after a
+    /// successful updateIntent — future props carrying the re-created
+    /// sdkAuthorization then hit the reuse path instead of a widget reload.
+    private func rekeyBoundWidget(to newAuthorization: String) {
+        let newConfigKey = [widgetType ?? "", effectivePublishableKey() ?? "", effectiveProfileId() ?? "", newAuthorization].joined(separator: ":")
+        if let oldKey = boundConfigKey, oldKey != newConfigKey {
+            NativeWidgetInstanceCache.shared.rekey(
+                fromKey: oldKey,
+                toKey: newConfigKey,
+                sdkAuthorization: newAuthorization
+            )
+        }
+        boundConfigKey = newConfigKey
+    }
+
+    private static func isSuccessResult(_ result: String) -> Bool {
+        guard let data = result.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let status = (json["status"] as? String)?.lowercased() else {
+            return false
+        }
+        return status == "success" || status == "succeeded"
+            || status == "completed" || status == "requires_capture"
+    }
+
     // Called by PaymentWidget when embedded bundle responds
     internal func handleUpdateIntentInitResponse(_ result: String) {
         if let callback = updateIntentInitCallback {
@@ -443,12 +576,18 @@ public class NativePaymentWidgetView: UIView {
             updateIntentInitCallback = nil
         }
     }
-    
+
     internal func handleUpdateIntentCompleteResponse(_ result: String) {
         if let callback = updateIntentCompleteCallback {
             callback([callbackPayload(result)])
             updateIntentCompleteCallback = nil
         }
+        // Re-key only when the embedded bundle actually accepted the new intent.
+        if NativePaymentWidgetView.isSuccessResult(result),
+           let newAuthorization = pendingUpdateAuthorization {
+            rekeyBoundWidget(to: newAuthorization)
+        }
+        pendingUpdateAuthorization = nil
     }
 
     internal func confirmCVCPayment(paymentToken: String, paymentMethodId: String, resolve: @escaping RCTResponseSenderBlock) {

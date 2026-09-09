@@ -10,6 +10,7 @@ import com.facebook.react.uimanager.UIManagerHelper
 import com.facebook.react.uimanager.common.UIManagerType
 import com.hyperswitchsdkreactnative.BuildConfig
 import com.hyperswitchsdkreactnative.NativeWidgetHelperModuleSpec
+import io.hyperswitch.utils.StandardResult
 import io.hyperswitch.view.PaymentWidgetView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -116,6 +117,40 @@ class NativeWidgetHelperModule(private val reactContext: ReactApplicationContext
         }
       } catch (e: Exception) {
         callback.invoke("ERROR", "View not found: ${e.message}")
+      }
+    }
+  }
+
+
+  /**
+   * Destroys the native widget instance(s) cached for the given
+   * sdkAuthorization (the key widgets are stored under). Hosting views stay
+   * mounted and re-create a fresh widget on demand (next prop update / attach).
+   */
+  override fun deinitWidget(
+    sdkAuthorization: String,
+    callback: Callback
+  ) {
+    UiThreadUtil.runOnUiThread {
+      try {
+        val count = PaymentWidgetView.deinitWidgetsForSdkAuthorization(sdkAuthorization)
+        callback.invoke(
+          if (count > 0) {
+            StandardResult.Success(message = "Deinitialised $count widget(s)").toJSONString()
+          } else {
+            StandardResult.Failed(
+              code = "WIDGET_NOT_FOUND",
+              message = "No widget found for the given sdkAuthorization"
+            ).toJSONString()
+          }
+        )
+      } catch (e: Exception) {
+        callback.invoke(
+          StandardResult.Failed(
+            code = "DEINIT_FAILED",
+            message = e.message ?: "deinitWidget failed"
+          ).toJSONString()
+        )
       }
     }
   }

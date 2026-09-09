@@ -59,8 +59,16 @@ RCT_EXPORT_METHOD(updateIntentCompleteForWidget:(double)reactTag
                   callback:(RCTResponseSenderBlock)callback) {
     dispatch_async(dispatch_get_main_queue(), ^{
         [NativeWidgetHelperModuleImpl.shared updateIntentCompleteWithReactTag:@(reactTag)
-                                                              sdkAuthorization:sdkAuthorization
-                                                                      callback:callback];
+                                                                sdkAuthorization:sdkAuthorization
+                                                                       callback:callback];
+    });
+}
+
+RCT_EXPORT_METHOD(deinitWidget:(NSString *)sdkAuthorization
+                  callback:(RCTResponseSenderBlock)callback) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [NativeWidgetHelperModuleImpl.shared deinitWidgetWithSdkAuthorization:sdkAuthorization
+                                                                     callback:callback];
     });
 }
 

@@ -10,6 +10,7 @@ export type * from './types/elements';
 export type * from './types/NativeEventTypes';
 export type * from './types/PaymentSheetConfiguration';
 export type * from './types/paymentresult';
+export type * from './types/wallets';
 import NativeHyperswitchModule from './codegen/modules/NativeHyperswitchModule';
 import { createPaymentSession } from './session/PaymentSession';
 import { Elements } from './types/elements';
@@ -63,6 +64,8 @@ export {
   useElements as useWidgets,
 } from './context/HyperElements';
 
+export { deinitWidget } from './widget/WidgetRegistry';
+
 export { CVCElement as CardCVCElement } from './views/CVCElement';
 
 export { PaymentElement } from './views/PaymentElement';
@@ -70,3 +73,7 @@ export { PaymentElement } from './views/PaymentElement';
 export { ApplePayButton } from './views/ApplePayButton';
 
 export { GooglePayButton } from './views/GooglePayButton';
+
+export { useHyperswitchWallets } from './hooks/useHyperswitchWallets';
+
+export { useHyperswitchDeviceCapability } from './hooks/useHyperswitchDeviceCapability';

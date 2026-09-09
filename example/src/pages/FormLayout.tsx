@@ -59,6 +59,9 @@ export type FormLayoutProps = {
 
   walletReady: boolean;
 
+  /** True while useHyperswitchWallets() is still checking eligibility. */
+  walletsCheckLoading: boolean;
+
   cvcReady: boolean;
 
   requiresCvc: boolean;
@@ -102,6 +105,7 @@ export function FormLayout({
   setMessage,
   paymentElementReady,
   walletReady,
+  walletsCheckLoading,
   requiresCvc,
 }: FormLayoutProps) {
   const [amountVal, setAmountVal] = useState(amount);
@@ -269,7 +273,15 @@ export function FormLayout({
         <>
           {isAmountScreen && (
             <View style={styles.savedSection}>
-              {buttonSlot ? (
+              {walletsCheckLoading ? (
+                // useHyperswitchWallets() hasn't resolved yet — we don't
+                // know if a wallet button will render at all, so show a
+                // skeleton instead of nothing (avoids a layout pop once it
+                // resolves) and instead of guessing which button to render.
+                <View style={styles.walletContainer}>
+                  <View pointerEvents="none" style={styles.walletSkeleton} />
+                </View>
+              ) : buttonSlot ? (
                 <View style={styles.walletContainer}>
                   <View
                     style={[
@@ -359,7 +371,10 @@ export function FormLayout({
                   return (
                     <TouchableOpacity
                       key={value}
-                      onPress={() => setAmount(value)}
+                      onPress={() => {
+                        setAmount(value); 
+                        updateAmount?.()}
+                      }
                       style={[styles.chip, selected && styles.chipSelected]}
                     >
                       <Text
@@ -420,6 +435,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     maxHeight: 600,
     minHeight: 400,
+    width: "100%"
   },
 
   header: {

@@ -38,6 +38,24 @@ export function confirmPayment(widgetId: string): Promise<string> {
   });
 }
 
+/**
+ * Destroys the native widget instance(s) cached for the given
+ * `sdkAuthorization` (the key the widget is stored under). Live widgets
+ * bound to any other authorization keep running untouched.
+ *
+ * After deinit, a fresh widget is created on demand — on the next
+ * `sdkAuthorization` prop application or on the next mount. Pending
+ * confirm/updateIntent promises for the destroyed widget are resolved with
+ * a failed result instead of hanging.
+ */
+export function deinitWidget(sdkAuthorization: string): Promise<PaymentResult> {
+  return new Promise((resolve) => {
+    NativeWidgetHelperModule.deinitWidget(sdkAuthorization, (raw: string) =>
+      resolve(mapNativeResponseToPaymentResult(raw))
+    );
+  });
+}
+
 export function updateIntentInitForAllWidgets(): Promise<PaymentResult[]> {
   const promises = [...widgetTags.values()].map(
     (tag) =>

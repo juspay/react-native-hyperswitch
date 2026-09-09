@@ -7,6 +7,7 @@ import {
   GooglePayButton,
   PaymentElement,
   SubscriptionEvent,
+  useHyperswitchDeviceCapability,
   usePaymentSession,
   useWidgets,
   type CustomerLastUsedPaymentMethod,
@@ -17,7 +18,7 @@ import {
 } from "@juspay-tech/react-native-hyperswitch";
 
 import { FormLayout } from "./FormLayout";
-import { initialBaseUrl } from "../utils";
+import { initialBaseUrl, secretKey, serverURL } from "../utils";
 
 export type {
   CustomerLastUsedPaymentMethod,
@@ -47,7 +48,6 @@ const WALLET_BUTTON_APPEARANCE = {
 
 const CVC_APPEARANCE = {
   theme: "Light" as const,
-
   shapes: {
     borderRadius: 0,
     borderWidth: 0,
@@ -151,7 +151,7 @@ const PAYMENT_ELEMENT_OPTIONS = {
     "PAYMENT_METHOD_STATUS",
     "PAYMENT_METHOD_INFO_BILLING_ADDRESS",
     "PAYMENT_METHOD_INFO_CARD",
-    'FORM_STATUS',
+    "FORM_STATUS",
   ] as SubscriptionEvent[],
 };
 
@@ -161,6 +161,21 @@ export function HyperContent(props: SharedProps) {
 
   const paymentSession = usePaymentSession();
   const widgets = useWidgets();
+  
+
+  /**
+   * useHyperswitchWallets() (session/merchant-accurate eligibility) always
+   * resolves {} until the PreFetch embedded-module resolver is wired up
+   * (see session/WalletEligibilityBridge.ts) — using it here would hide
+   * the wallet buttons this demo exists to exercise. The example therefore
+   * gates on device capability only, same as production apps should until
+   * that lands.
+   */
+  const {
+    isLoading: walletsSupportLoading,
+    isGooglePayCapable,
+    isApplePayCapable,
+  } = useHyperswitchDeviceCapability();
 
   const paymentRef = useRef<PaymentElementHandle>(null);
 
@@ -333,7 +348,7 @@ export function HyperContent(props: SharedProps) {
       return;
     }
 
-    setOverlayLoading(true);
+    // setOverlayLoading(true);
     setMessage("");
 
     try {
@@ -343,33 +358,38 @@ export function HyperContent(props: SharedProps) {
         const timeoutId = setTimeout(() => controller.abort(), 3000);
 
         try {
-          const response = await fetch(`${initialBaseUrl}/update-payment`, {
-            method: "POST",
+          const serverUrl = serverURL;
+          const url = initialBaseUrl
+            ? `${initialBaseUrl}/update-payment`
+            : undefined;
+          const response = await fetch(
+            `${serverUrl ? `${serverUrl}/${paymentId}` : url}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Api-Key": secretKey,
+              },
 
-            headers: {
-              "Content-Type": "application/json",
+              body: JSON.stringify({
+                payment_id: paymentId,
+                amount: amount * 100,
+              }),
+
+              signal: controller.signal,
             },
-
-            body: JSON.stringify({
-              payment_id: paymentId,
-
-              amount: amount * 100,
-            }),
-
-            signal: controller.signal,
-          });
+          );
 
           const data = await response.json();
 
           if (!response.ok) {
             throw new Error(data?.error ?? "Update failed");
           }
-
-          setSdkAuthorization(data.sdkAuthorization);
-
           return {
-            sdkAuthorization: data.sdkAuthorization,
+            sdkAuthorization: data.sdkAuthorization || "",
           };
+        } catch (e: any) {
+          console.log(e.message);
         } finally {
           clearTimeout(timeoutId);
         }
@@ -386,38 +406,51 @@ export function HyperContent(props: SharedProps) {
 
       throw error;
     } finally {
-      setOverlayLoading(false);
+      // setOverlayLoading(false);
     }
   }, [paymentSession, paymentId, amount, setSdkAuthorization]);
 
-  const walletButton =
-    Platform.OS === "ios" ? (
-      <ApplePayButton
-        widgetId="apple-pay-button"
-        options={{
-          merchantDisplayName: "Hyperswitch Example",
-          appearance: {
-            ...WALLET_BUTTON_APPEARANCE,
-          },
-          subscribedEvents: ["PAYMENT_METHOD_STATUS"],
-        }}
-        onChange={handleWalletChange}
-        onPaymentResult={handlePaymentResult}
-      />
-    ) : (
-      <GooglePayButton
-        widgetId="google-pay-button"
-        options={{
-          merchantDisplayName: "Hyperswitch Example",
-          appearance: {
-            ...WALLET_BUTTON_APPEARANCE,
-          },
-          subscribedEvents: ["PAYMENT_METHOD_STATUS"],
-        }}
-        onChange={handleWalletChange}
-        onPaymentResult={handlePaymentResult}
-      />
-    );
+  /**
+   * useHyperswitchDeviceCapability() decides *whether* to render a wallet
+   * button at all (device capability only — see the note above on why the
+   * demo doesn't also gate on useHyperswitchWallets()' session-based
+   * eligibility yet). walletReady (via handleWalletChange) separately
+   * tracks whether the already-mounted native widget has become
+   * interactive — the two are intentionally independent.
+   */
+  const walletButton = walletsSupportLoading
+    ? null
+    : Platform.OS === "ios" && isApplePayCapable
+      ? (
+          <ApplePayButton
+            widgetId="apple-pay-button"
+            options={{
+              merchantDisplayName: "Hyperswitch Example",
+              appearance: {
+                ...WALLET_BUTTON_APPEARANCE,
+              },
+              subscribedEvents: ["PAYMENT_METHOD_STATUS"],
+            }}
+            onChange={handleWalletChange}
+            onPaymentResult={handlePaymentResult}
+          />
+        )
+      : Platform.OS === "android" && isGooglePayCapable
+        ? (
+            <GooglePayButton
+              widgetId="google-pay-button"
+              options={{
+                merchantDisplayName: "Hyperswitch Example",
+                appearance: {
+                  ...WALLET_BUTTON_APPEARANCE,
+                },
+                subscribedEvents: ["PAYMENT_METHOD_STATUS"],
+              }}
+              onChange={handleWalletChange}
+              onPaymentResult={handlePaymentResult}
+            />
+          )
+        : null;
 
   const requiresCvc = lastUsed?.payment_method === "card";
 
@@ -507,6 +540,7 @@ export function HyperContent(props: SharedProps) {
       {...props}
       buttonSlot={walletButton}
       walletReady={walletReady}
+      walletsCheckLoading={walletsSupportLoading}
       message={message}
       setMessage={setMessage}
       loading={overlayLoading}

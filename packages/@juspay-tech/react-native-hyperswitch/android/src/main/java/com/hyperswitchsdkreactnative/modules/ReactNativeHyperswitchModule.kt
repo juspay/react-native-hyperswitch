@@ -6,6 +6,10 @@ import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.uimanager.UIManagerHelper
 import com.facebook.react.uimanager.common.UIManagerType
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.wallet.IsReadyToPayRequest
+import com.google.android.gms.wallet.Wallet
+import com.google.android.gms.wallet.WalletConstants
 import com.hyperswitchsdkreactnative.BuildConfig
 import com.hyperswitchsdkreactnative.NativeHyperswitchModuleSpec
 import io.hyperswitch.model.CustomEndpointConfiguration
@@ -339,6 +343,54 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
 //  override fun updateIntent(sdkAuthorization: String?, promise: Promise?) {
 //
 //  }
+
+  /**
+   * Device-level Google Pay readiness check (Play Services `PaymentsClient.isReadyToPay`).
+   * Reflects device capability only, not merchant/connector configuration.
+   */
+  override fun checkGooglePayReadiness(
+    isReadyToPayRequestJson: String?,
+    promise: Promise?
+  ) {
+    if (isReadyToPayRequestJson.isNullOrBlank()) {
+      promise?.resolve(false)
+      return
+    }
+    try {
+      val walletEnvironment =
+        if (hyperswitchConfig?.environment == HyperswitchEnvironment.PROD) {
+          WalletConstants.ENVIRONMENT_PRODUCTION
+        } else {
+          WalletConstants.ENVIRONMENT_TEST
+        }
+      val walletOptions = Wallet.WalletOptions.Builder()
+        .setEnvironment(walletEnvironment)
+        .build()
+      val paymentsClient = Wallet.getPaymentsClient(reactApplicationContext, walletOptions)
+      val request = IsReadyToPayRequest.fromJson(isReadyToPayRequestJson)
+
+      paymentsClient.isReadyToPay(request).addOnCompleteListener { task ->
+        val isReady = try {
+          task.getResult(ApiException::class.java) ?: false
+        } catch (_: ApiException) {
+          false
+        }
+        promise?.resolve(isReady)
+      }
+    } catch (e: Exception) {
+      promise?.resolve(false)
+    }
+  }
+
+  /**
+   * Apple Pay is not available on Android; always resolves `false`.
+   */
+  override fun checkApplePayReadiness(
+    supportedNetworksJson: String?,
+    promise: Promise?
+  ) {
+    promise?.resolve(false)
+  }
 
 
   private fun confirmViaWidgetView(

@@ -6,6 +6,7 @@ import type {
 import {
   updateIntentInitForAllWidgets,
   updateIntentCompleteForAllWidgets,
+  deinitWidget,
 } from '../widget/WidgetRegistry';
 import {
   bindGetCustomerSavedPaymentMethods,
@@ -36,5 +37,6 @@ export function createPaymentSession(
     getCustomerSavedPaymentMethods:
       bindGetCustomerSavedPaymentMethods(bindings),
     updateIntent,
+    deinitWidget,
   };
 }

@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import PassKit
 import React
 
 @objc(NativeHyperswitchModuleImpl)
@@ -419,6 +420,48 @@ public class NativeHyperswitchModuleImpl: NSObject {
         }
     }
     
+    // MARK: - checkApplePayReadiness
+
+    /// PassKit network name (as used in the JS-side default request) → PKPaymentNetwork.
+    private static let supportedNetworksByName: [String: PKPaymentNetwork] = [
+        "visa": .visa,
+        "masterCard": .masterCard,
+        "amex": .amex,
+        "discover": .discover,
+        "jcb": .JCB,
+        "chinaUnionPay": .chinaUnionPay,
+        "interac": .interac,
+        "maestro": .maestro,
+        "mada": .mada,
+        "elo": .elo,
+        "cartesBancaires": .cartesBancaires,
+    ]
+
+    /// Device-level Apple Pay readiness check (`PKPaymentAuthorizationController.canMakePayments`).
+    /// Reflects device capability only, not merchant/connector configuration.
+    @objc(checkApplePayReadiness:resolve:reject:)
+    public func checkApplePayReadiness(
+        supportedNetworksJson: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        guard
+            let data = supportedNetworksJson.data(using: .utf8),
+            let names = try? JSONDecoder().decode([String].self, from: data)
+        else {
+            resolve(PKPaymentAuthorizationController.canMakePayments())
+            return
+        }
+
+        let networks = names.compactMap { NativeHyperswitchModuleImpl.supportedNetworksByName[$0] }
+
+        if networks.isEmpty {
+            resolve(PKPaymentAuthorizationController.canMakePayments())
+        } else {
+            resolve(PKPaymentAuthorizationController.canMakePayments(usingNetworks: networks))
+        }
+    }
+
     // MARK: - Private Helper: paymentResultToString
     
     private func paymentResultToString(_ result: PaymentResult) -> String {

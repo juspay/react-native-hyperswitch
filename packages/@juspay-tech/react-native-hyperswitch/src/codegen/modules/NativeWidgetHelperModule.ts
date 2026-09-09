@@ -12,6 +12,10 @@ export interface Spec extends TurboModule {
     sdkAuthorization: string,
     callback: (result: string) => void
   ): void;
+  deinitWidget(
+    sdkAuthorization: string,
+    callback: (result: string) => void
+  ): void;
 }
 
 const NativeWidgetHelperModule =

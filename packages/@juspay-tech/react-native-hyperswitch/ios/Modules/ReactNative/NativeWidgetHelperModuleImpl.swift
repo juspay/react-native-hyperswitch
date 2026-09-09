@@ -62,5 +62,27 @@ public class NativeWidgetHelperModuleImpl: NSObject {
             view.updateIntentComplete(sdkAuthorization: sdkAuthorization, resolve: callback)
         }
     }
+
+    /// Destroys every cached widget instance filed under the given
+    /// sdkAuthorization (the key widgets are stored under). Attached host views
+    /// stay mounted and re-create a fresh widget on demand.
+    @objc public func deinitWidget(
+        sdkAuthorization: String,
+        callback: @escaping RCTResponseSenderBlock
+    ) {
+        DispatchQueue.main.async {
+            let removed = NativeWidgetInstanceCache.shared.removeAll(
+                matchingSdkAuthorization: sdkAuthorization
+            )
+            NativeWidgetInstanceCache.destroy(removed)
+            if removed.isEmpty {
+                callback([["status": "failed", "code": "WIDGET_NOT_FOUND",
+                           "message": "No widget found for the given sdkAuthorization"]])
+            } else {
+                callback([["status": "success",
+                           "message": "Deinitialised \(removed.count) widget(s)"]])
+            }
+        }
+    }
 }
 

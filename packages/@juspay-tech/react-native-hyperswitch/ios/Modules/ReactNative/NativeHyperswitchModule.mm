@@ -153,6 +153,31 @@ RCT_EXPORT_METHOD(confirmWithCustomerPaymentToken:(double)reactTag
 }
 
 // ---------------------------------------------------------------------------
+// checkGooglePayReadiness
+// Google Pay is not available on iOS; always resolves false.
+// JS / Android: checkGooglePayReadiness(isReadyToPayRequestJson: string): Promise<boolean>
+// ---------------------------------------------------------------------------
+RCT_EXPORT_METHOD(checkGooglePayReadiness:(nonnull NSString *)isReadyToPayRequestJson
+                  resolve:(nonnull RCTPromiseResolveBlock)resolve
+                  reject:(nonnull RCTPromiseRejectBlock)reject)
+{
+    resolve(@(NO));
+}
+
+// ---------------------------------------------------------------------------
+// checkApplePayReadiness
+// JS / Android: checkApplePayReadiness(supportedNetworksJson: string): Promise<boolean>
+// ---------------------------------------------------------------------------
+RCT_EXPORT_METHOD(checkApplePayReadiness:(nonnull NSString *)supportedNetworksJson
+                  resolve:(nonnull RCTPromiseResolveBlock)resolve
+                  reject:(nonnull RCTPromiseRejectBlock)reject)
+{
+    [[self moduleImpl] checkApplePayReadiness:supportedNetworksJson
+                                       resolve:resolve
+                                        reject:reject];
+}
+
+// ---------------------------------------------------------------------------
 // TurboModule (New Architecture) — JSI spec wiring
 // The generated spec class name follows codegen convention:
 //   NativeHyperswitchModuleSpec  →  NativeHyperswitchModuleSpecJSI

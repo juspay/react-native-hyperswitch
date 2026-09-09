@@ -6,7 +6,10 @@ import type {
 import type { PaymentResult } from '../types/paymentresult';
 import type { Elements } from '../types/elements';
 import { mapNativeResponseToPaymentResult } from '../native/NativeResponseMapper';
-import { confirmPayment as confirmWidgetPayment } from '../widget/WidgetRegistry';
+import {
+  confirmPayment as confirmWidgetPayment,
+  deinitWidget,
+} from '../widget/WidgetRegistry';
 import { updateIntent } from './PaymentSession';
 import {
   bindGetCustomerSavedPaymentMethods,
@@ -19,6 +22,7 @@ type ElementsNativeActions = Pick<
   | 'presentPaymentSheet'
   | 'getCustomerSavedPaymentMethods'
   | 'updateIntent'
+  | 'deinitWidget'
 >;
 
 export function createElementsNativeActions(
@@ -49,6 +53,8 @@ export function createElementsNativeActions(
       bindGetCustomerSavedPaymentMethods(bindings),
 
     updateIntent,
+
+    deinitWidget,
   };
 }
 

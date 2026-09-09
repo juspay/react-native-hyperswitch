@@ -144,6 +144,13 @@ public class PaymentWidget: UIControl {
         self.paymentEventListener = listener
     }
 
+    /// Rebinds the completion to a new host — required when a cached widget
+    /// instance is re-adopted by a different NativePaymentWidgetView, since the
+    /// original host may have been deallocated.
+    internal func setCompletionHandler(_ completion: @escaping ((PaymentResult) -> Void)) {
+        self.initCallback = completion
+    }
+
     internal func handleShouldProceedWithPayment(payload: String, callback: @escaping (Bool) -> Void) {
         if shouldProceedWithPaymentCallback == nil {
             callback(true)

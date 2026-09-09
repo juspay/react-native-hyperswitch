@@ -15,10 +15,10 @@ enum SDKEnvironment {
     }
 
     static func baseURL(for publishableKey: String) -> String {
-        return getEnvironment(publishableKey) == .PROD ? "https://api.hyperswitch.io" : "https://sandbox.hyperswitch.io"
+        return getEnvironment(publishableKey) == .PROD ? "https://live.hyperswitch.io" : "https://app.hyperswitch.io"
     }
 
     static func loggingURL(for publishableKey: String) -> String {
-        return "\(baseURL(for: publishableKey))/logs/sdk"
+        return "\(baseURL(for: publishableKey))/api/logs/sdk"
     }
 }

@@ -22,6 +22,12 @@ export interface Elements {
   updateIntent(
     intentResolver: () => Promise<PaymentSessionConfiguration>
   ): Promise<void>;
+  /**
+   * Destroys the native widget instance cached for the given
+   * `sdkAuthorization`. Widgets for other authorizations keep running.
+   * A fresh widget is re-created on demand on the next mount/prop update.
+   */
+  deinitWidget(sdkAuthorization: string): Promise<PaymentResult>;
   getCustomerSavedPaymentMethods(
     options?: SavedPaymentMethodsConfiguration
   ): Promise<CustomerSavedPaymentMethodsSession>;
@@ -39,5 +45,6 @@ export interface ElementsActions {
   updateIntent: (
     intentResolver: () => Promise<PaymentSessionConfiguration>
   ) => Promise<void>;
+  deinitWidget: (sdkAuthorization: string) => Promise<PaymentResult>;
   getCustomerSavedPaymentMethods(): Promise<CustomerSavedPaymentMethodsSession>;
 }

@@ -20,6 +20,9 @@ import io.hyperswitch.paymentsession.LaunchOptions
 import io.hyperswitch.react.HyperFragment
 import io.hyperswitch.react.HyperFragmentManager
 import io.hyperswitch.react.ReactNativeController
+import io.hyperswitch.utils.StandardResult
+import java.lang.ref.WeakReference
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.collections.orEmpty
 
 import kotlin.math.abs
@@ -205,6 +208,8 @@ open class PaymentWidgetView : FrameLayout {
     if (isEligibleForUpdateIntent()) {
       sdkAuthorization.takeIf { it.isNotEmpty() }?.let {
         this.sdkAuthorization = it
+        // updateIntent re-keys the widget: it now serves the new authorization.
+        syncInstanceRegistration()
       }
       this.fragment?.updatePaymentIntentComplete(sdkAuthorization, callback)
         ?: callback(
@@ -250,6 +255,7 @@ open class PaymentWidgetView : FrameLayout {
 
   fun setSdkAuthorization(sdkAuthorization: String) {
     this.sdkAuthorization = sdkAuthorization
+    syncInstanceRegistration()
     if (isAttachedToWindow && !isSdkAuthorizationEmpty()) {
       post { showWidgetInternal() }
     }
@@ -259,7 +265,11 @@ open class PaymentWidgetView : FrameLayout {
     if (this.isSdkAuthorizationEmpty()) return  // callers already guard; no need to retry
     if (widgetShown) return
     widgetShown = true
-    val activity = context as? FragmentActivity ?: return
+    val activity = context as? FragmentActivity ?: run {
+      widgetShown = false
+      return
+    }
+    syncInstanceRegistration()
 
     if (activity.isFinishing || activity.isDestroyed) return
 
@@ -332,6 +342,7 @@ open class PaymentWidgetView : FrameLayout {
   }
 
   fun removeWidget() {
+    unregisterInstance()
     try {
       this.cancelPendingInputEvents()
       stopLayout()
@@ -346,6 +357,53 @@ open class PaymentWidgetView : FrameLayout {
       // Handle the errors
     }
   }
+
+  /**
+   * Destroys this view's live widget instance (fragment + embedded React
+   * surface). Pending confirm/updateIntent callbacks are flushed with a failed
+   * result so the matching JS promises resolve instead of hanging. The view
+   * itself stays mounted — a fresh widget is created on demand on the next
+   * setSdkAuthorization()/attach.
+   */
+  fun deinitWidgetInstance() {
+    try {
+      val tag = "HyperPaymentSheet_${this.id}"
+      // Cancel a pending debounced add first — otherwise the scheduled runnable
+      // could re-add the fragment right after removal (race).
+      HyperFragmentManager.cancelPending(tag)
+      fragment?.flushPendingCallbacks(WIDGET_DEINIT_RESULT)
+      fragment = null
+      removeWidget()
+    } catch (_: Exception) {
+      // Best effort; removal failures must not crash the host app.
+    }
+  }
+
+  /** Mirrors the widget's current identity (widgetType + sdkAuthorization) in
+   *  the instance index so deinitWidget(sdkAuthorization) can locate it. */
+  private fun syncInstanceRegistration() {
+    if (sdkAuthorization.isEmpty()) return
+    val key = instanceKey(widgetType, sdkAuthorization)
+    if (key == registeredIndexKey) return
+    registeredIndexKey?.let { old ->
+      if (instanceIndex[old]?.get() === this) {
+        instanceIndex.remove(old)
+      }
+    }
+    instanceIndex[key] = WeakReference(this)
+    registeredIndexKey = key
+  }
+
+  private fun unregisterInstance() {
+    registeredIndexKey?.let { key ->
+      if (instanceIndex[key]?.get() === this) {
+        instanceIndex.remove(key)
+      }
+    }
+    registeredIndexKey = null
+  }
+
+  private var registeredIndexKey: String? = null
 
   private fun manuallyLayoutChildren(view: View, width: Int, height: Int) {
     view.measure(
@@ -395,5 +453,46 @@ open class PaymentWidgetView : FrameLayout {
       }
     }
     return super.dispatchTouchEvent(ev)
+  }
+
+  companion object {
+    /** "widgetType|sdkAuthorization" → hosting view (weak). Lets
+     *  deinitWidget(sdkAuthorization) find live widgets without a React tag.
+     *  Weak values so dead views do not leak; stale keys are pruned on use. */
+    private val instanceIndex = ConcurrentHashMap<String, WeakReference<PaymentWidgetView>>()
+
+    private val WIDGET_DEINIT_RESULT = StandardResult.Failed(
+      code = "WIDGET_DEINIT",
+      message = "Widget was deinitialised"
+    ).toJSONString()
+
+    private fun instanceKey(widgetType: String?, sdkAuthorization: String): String =
+      "${widgetType ?: "widgetPaymentSheet"}|$sdkAuthorization"
+
+    /**
+     * Destroys every live widget instance filed under [sdkAuthorization]
+     * (any widget type). Views stay mounted and re-create on demand.
+     * Returns the number of instances actually destroyed.
+     */
+    @JvmStatic
+    fun deinitWidgetsForSdkAuthorization(sdkAuthorization: String): Int {
+      var deinitialised = 0
+      // Prune stale entries while scanning (keys outlive dead views otherwise).
+      val iterator = instanceIndex.entries.iterator()
+      while (iterator.hasNext()) {
+        val (key, ref) = iterator.next()
+        val view = ref.get()
+        if (view == null) {
+          iterator.remove()
+          continue
+        }
+        if (key.substringAfterLast('|') == sdkAuthorization) {
+          view.deinitWidgetInstance()
+          iterator.remove()
+          deinitialised++
+        }
+      }
+      return deinitialised
+    }
   }
 }
