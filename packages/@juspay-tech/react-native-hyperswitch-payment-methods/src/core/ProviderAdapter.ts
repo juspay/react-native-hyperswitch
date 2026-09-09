@@ -1,10 +1,12 @@
 import type { ComponentType, ReactNode, Ref } from 'react';
 import type {
+  AppearanceVariables,
   CardDetails,
   ElementType,
   FieldChange,
   FieldEvent,
   FieldHandle,
+  FieldOptions,
   FieldStyles,
   SavedCard,
   TokenizeResult,
@@ -18,6 +20,9 @@ export interface ProviderHostProps<Collector = unknown, Data = unknown> {
 
   onCardDetails?: (details: Partial<CardDetails>) => void;
   children: ReactNode;
+
+  /** Flat theming primitives — only the `hyperswitch` adapter currently honors these. */
+  appearanceVariables?: AppearanceVariables;
 }
 
 export interface ProviderFieldProps<Collector = unknown> {
@@ -26,6 +31,12 @@ export interface ProviderFieldProps<Collector = unknown> {
   styles?: FieldStyles;
   placeholder?: string;
   testID?: string;
+
+  /** Non-style per-field configuration — only the `hyperswitch` adapter currently honors these. */
+  options?: FieldOptions;
+
+  /** Flat theming primitives — only the `hyperswitch` adapter currently honors these. */
+  appearanceVariables?: AppearanceVariables;
 
   savedCard?: SavedCard;
   onChange?: (change: FieldChange) => void;

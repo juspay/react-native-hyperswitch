@@ -99,6 +99,7 @@ const Host: ProviderAdapter['Host'] = ({
   onError,
   onCardDetails,
   children,
+  appearanceVariables,
 }) => {
   const data = vaultData as HyperswitchVaultData;
   const formRef = useRef<any>(null);
@@ -108,6 +109,11 @@ const Host: ProviderAdapter['Host'] = ({
     else onError(new Error('The Hyperswitch vault form did not mount.'));
   }, [onReady, onError]);
 
+  const vaultAppearance = useMemo(
+    () => (appearanceVariables ? { variables: appearanceVariables } : undefined),
+    [appearanceVariables]
+  );
+
   return (
     <VaultCardForm
       ref={formRef}
@@ -116,6 +122,7 @@ const Host: ProviderAdapter['Host'] = ({
         vaultData: { sdkAuthorization: data.sdkAuthorization },
       }}
       environment={data.environment ?? 'SANDBOX'}
+      appearance={vaultAppearance}
       onChange={(event: any) => {
         const payload = event?.payload ?? {};
         const details: Partial<CardDetails> = {
@@ -139,7 +146,8 @@ const Field: ProviderAdapter['Field'] = ({
   styles,
   placeholder,
   testID,
-  savedCard,
+  options,
+  appearanceVariables,
   onChange,
   onFocus,
   onBlur,
@@ -168,6 +176,11 @@ const Field: ProviderAdapter['Field'] = ({
     [sdkAuthorization]
   );
 
+  const vaultAppearance = useMemo(
+    () => (appearanceVariables ? { variables: appearanceVariables } : undefined),
+    [appearanceVariables]
+  );
+
   const handleContext = useCallback((contextValue: unknown) => {
     const current = sessionRef.current;
     if (!current) return;
@@ -190,6 +203,7 @@ const Field: ProviderAdapter['Field'] = ({
         ref={formRef}
         vaultDetails={vaultDetails}
         environment={environment ?? 'SANDBOX'}
+        appearance={vaultAppearance}
         onContext={handleContext}
       />
     ) : null;
@@ -211,7 +225,14 @@ const Field: ProviderAdapter['Field'] = ({
         styles={styles}
         placeholder={placeholder}
         testID={testID}
-        options={savedCard ? { savedCard } : undefined}
+        label={options?.label}
+        labelBehavior={options?.labelBehavior}
+        errorDisplay={options?.errorDisplay}
+        unstyled={options?.unstyled}
+        accessibilityLabel={options?.accessibilityLabel}
+        accessibilityHint={options?.accessibilityHint}
+        cardBrandIcon={elementType === 'cardNumber' ? options?.cardBrandIcon : undefined}
+        cvcIcon={elementType === 'cardCvc' ? options?.cvcIcon : undefined}
         onChange={(event: any) =>
           onChange?.(
             fieldChange(elementType, {

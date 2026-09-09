@@ -7,7 +7,7 @@ import {
   useRef,
 } from 'react';
 import { useFormBinding } from './useFormBinding';
-import { resolveFieldStyles } from '../core/appearance';
+import { resolveAppearanceVariables, resolveFieldStyles } from '../core/appearance';
 import { coreOf } from '../core/formRegistry';
 import type { ElementType, FieldChange, FieldHandle } from '../core/types';
 import { Placeholder } from './Placeholder';
@@ -90,6 +90,10 @@ export function createCardField(elementType: ElementType, displayName: string) {
       () => resolveFieldStyles(ctx?.appearances, elementType, ownStyles),
       [ctx?.appearances, ownStyles]
     );
+    const appearanceVariables = useMemo(
+      () => resolveAppearanceVariables(ctx?.appearances),
+      [ctx?.appearances]
+    );
 
     const mounted = ctx !== null && ctx.collector !== undefined;
     useEffect(() => {
@@ -115,6 +119,8 @@ export function createCardField(elementType: ElementType, displayName: string) {
         collector={ctx.collector}
         fieldRef={fieldRef}
         styles={styles}
+        options={options}
+        appearanceVariables={appearanceVariables}
         savedCard={savedCard}
         onChange={handleChange}
         onFocus={onFocus}
