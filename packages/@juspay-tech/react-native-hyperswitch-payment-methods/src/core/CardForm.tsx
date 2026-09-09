@@ -18,6 +18,7 @@ import { registerForm } from './formRegistry';
 import { resolveAdapter } from '../providers/registry';
 import { SessionContext } from '../session/SessionContext';
 import type { ProviderAdapter } from './ProviderAdapter';
+import { resolveAppearanceVariables } from './appearance';
 import { errorResult, tokenizedCardOf } from './results';
 import {
   checkConfiguration,
@@ -338,6 +339,7 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
             onReady={handleReady}
             onError={handleError}
             onCardDetails={handleCardDetails}
+            appearanceVariables={resolveAppearanceVariables(appearances)}
           >
             {children}
           </Host>

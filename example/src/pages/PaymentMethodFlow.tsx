@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -8,13 +8,12 @@ import {
 } from "react-native";
 import {
   Hyperswitch as HyperswitchPaymentMethods,
-  HyperPaymentMethodsSession,
-  CardForm,
   CardNumberField,
   CardExpiryField,
   CardCVCField,
   CardholderNameField,
-  type CardFormHandle,
+  type CardFormInstance,
+  type FieldChange,
 } from "@juspay-tech/react-native-hyperswitch-payment-methods";
 
 import { initialBaseUrl, intentData, publishableKey } from "../utils";
@@ -37,12 +36,31 @@ const appearance = {
   input: { color: "#111827", fontSize: 16 },
 };
 
+const REQUIRED_FIELDS: FieldChange["elementType"][] = [
+  "cardNumber",
+  "cardExpiry",
+  "cardCvc",
+  "cardholderName",
+];
+
 export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
-  const vaultRef = useRef<CardFormHandle>(null);
-  const [sdkAuthorization, setSdkAuthorization] = useState<string | null>(null);
   const [status, setStatus] = useState("Not started");
-  const [canPay, setCanPay] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [cardForm, setCardForm] = useState<CardFormInstance | null>(null);
+  const [fieldStates, setFieldStates] = useState<
+    Partial<Record<FieldChange["elementType"], { complete: boolean; valid: boolean }>>
+  >({});
+
+  const canPay = REQUIRED_FIELDS.every(
+    (field) => fieldStates[field]?.complete && fieldStates[field]?.valid
+  );
+
+  const handleFieldChange = useCallback((change: FieldChange) => {
+    setFieldStates((prev) => ({
+      ...prev,
+      [change.elementType]: { complete: change.complete, valid: change.valid },
+    }));
+  }, []);
 
   const start = useCallback(async () => {
     setBusy(true);
@@ -53,8 +71,10 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ customer_id: '12345_cus_019d109101b07911be86fc8bab029d45' }),
-        }
+          body: JSON.stringify({
+            customer_id: "12345_cus_019d109101b07911be86fc8bab029d45",
+          }),
+        },
       );
       const data = await response.json();
       if (!response.ok) {
@@ -65,10 +85,15 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
         throw new Error("Server returned no sdk_authorization");
       }
       const vaults = Object.keys(data.external_vault_details ?? {});
-      setSdkAuthorization(authorization);
+      const hyperswitchInstance = await hyper;
+      const pms = await hyperswitchInstance.initPaymentMethodSession({
+        sdkAuthorization: authorization,
+      });
+      const nextCardForm = pms.createCardForm({ appearance });
+      setCardForm(nextCardForm);
       setStatus(`Session created - vault: ${vaults.join(", ") || "none"}`);
     } catch (error) {
-      console.log(error)
+      console.log(error);
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
@@ -78,16 +103,16 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
   const pay = useCallback(async () => {
     setBusy(true);
     try {
-      const result = await vaultRef.current?.tokenize();
+      const result = await cardForm?.tokenize();
       if (result?.status === "success") {
         setStatus(`Tokenized: ${JSON.stringify(result.data?.tokens)}`);
-      } else if (result?.error) {
+      } else if (result?.status !== "success" && result?.error) {
         setStatus(`${result.error.code}: ${result.error.message}`);
       }
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [cardForm]);
 
   return (
     <View style={styles.container}>
@@ -95,28 +120,34 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
         <Text style={styles.statusText}>{status}</Text>
       </View>
 
-      {sdkAuthorization ? (
-        <HyperPaymentMethodsSession
-          hyper={hyper}
-          options={{ sdkAuthorization, appearance }}
-          onError={(error) => setStatus(error.message)}
-        >
-          <CardForm
-            ref={vaultRef}
-            onChange={(event) => setCanPay(event.complete && event.valid)}
-            onError={(error) => setStatus(String(error))}
-          >
-            <CardNumberField placeholder="1234 5678 9012 3456" />
-            <View style={styles.row}>
-              <View style={styles.half}>
-                <CardExpiryField placeholder="MM / YY" />
-              </View>
-              <View style={styles.half}>
-                <CardCVCField placeholder="CVC" />
-              </View>
+      {cardForm ? (
+        <>
+          <CardNumberField
+            placeholder="1234 5678 9012 3456"
+            form={cardForm}
+            onChange={handleFieldChange}
+          />
+          <View style={styles.row}>
+            <View style={styles.half}>
+              <CardExpiryField
+                placeholder="MM / YY"
+                form={cardForm}
+                onChange={handleFieldChange}
+              />
             </View>
-            <CardholderNameField placeholder="Name on card" />
-          </CardForm>
+            <View style={styles.half}>
+              <CardCVCField
+                placeholder="CVC"
+                form={cardForm}
+                onChange={handleFieldChange}
+              />
+            </View>
+          </View>
+          <CardholderNameField
+            placeholder="Name on card"
+            form={cardForm}
+            onChange={handleFieldChange}
+          />
 
           <TouchableOpacity
             style={[styles.button, { marginTop: 20 }]}
@@ -125,7 +156,7 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
           >
             <Text style={styles.buttonText}>Tokenize</Text>
           </TouchableOpacity>
-        </HyperPaymentMethodsSession>
+        </>
       ) : (
         <TouchableOpacity style={styles.button} onPress={start} disabled={busy}>
           <Text style={styles.buttonText}>Start payment method session</Text>

@@ -52,7 +52,7 @@ const HYPERSWITCH_SECRET_KEY = process.env.HYPERSWITCH_SECRET_KEY;
 const HYPERSWITCH_PUBLISHABLE_KEY = process.env.HYPERSWITCH_PUBLISHABLE_KEY;
 const PROFILE_ID = process.env.PROFILE_ID;
 const HYPERSWITCH_BASE_URL =
-  process.env.HYPERSWITCH_SANDBOX_URL || 'https://sandbox.hyperswitch.io';
+  process.env.HYPERSWITCH_SANDBOX_URL || 'https://api.hyperswitch.io/api';
 
 // Validate required environment variables
 if (!HYPERSWITCH_SECRET_KEY || !HYPERSWITCH_PUBLISHABLE_KEY) {

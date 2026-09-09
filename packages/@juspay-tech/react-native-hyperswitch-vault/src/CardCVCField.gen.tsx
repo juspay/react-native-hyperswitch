@@ -7,6 +7,8 @@ import * as React from 'react';
 
 import * as CardCVCFieldJS from './CardCVCField.bs.js';
 
+import type {contextValue as VaultWidgetContext_contextValue} from './VaultWidgetContext.gen';
+
 import type {cvcIconDisplay as CardFieldOptions_cvcIconDisplay} from './CardFieldOptions.gen';
 
 import type {cvcOptions as CardFieldOptions_cvcOptions} from './CardFieldOptions.gen';
@@ -26,6 +28,7 @@ export type Props = {
   readonly accessibilityLabel?: string; 
   readonly cvcIcon?: CardFieldOptions_cvcIconDisplay; 
   readonly errorDisplay?: CardFieldOptions_errorDisplay; 
+  readonly form?: VaultWidgetContext_contextValue; 
   readonly label?: string; 
   readonly labelBehavior?: CardFieldOptions_labelBehavior; 
   readonly onBlur?: (_1:VaultPublicState_fieldEvent) => void; 
@@ -44,6 +47,7 @@ export const make: React.ComponentType<{
   readonly accessibilityLabel?: string; 
   readonly cvcIcon?: CardFieldOptions_cvcIconDisplay; 
   readonly errorDisplay?: CardFieldOptions_errorDisplay; 
+  readonly form?: VaultWidgetContext_contextValue; 
   readonly label?: string; 
   readonly labelBehavior?: CardFieldOptions_labelBehavior; 
   readonly onBlur?: (_1:VaultPublicState_fieldEvent) => void; 

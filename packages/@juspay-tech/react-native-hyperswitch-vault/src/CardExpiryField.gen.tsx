@@ -7,6 +7,8 @@ import * as React from 'react';
 
 import * as CardExpiryFieldJS from './CardExpiryField.bs.js';
 
+import type {contextValue as VaultWidgetContext_contextValue} from './VaultWidgetContext.gen';
+
 import type {errorDisplay as CardFieldOptions_errorDisplay} from './CardFieldOptions.gen';
 
 import type {expiryStyles as CardFieldStyles_expiryStyles} from './CardFieldStyles.gen';
@@ -21,6 +23,7 @@ export type Props = {
   readonly accessibilityHint?: string; 
   readonly accessibilityLabel?: string; 
   readonly errorDisplay?: CardFieldOptions_errorDisplay; 
+  readonly form?: VaultWidgetContext_contextValue; 
   readonly label?: string; 
   readonly labelBehavior?: CardFieldOptions_labelBehavior; 
   readonly onBlur?: (_1:VaultPublicState_fieldEvent) => void; 
@@ -37,6 +40,7 @@ export const make: React.ComponentType<{
   readonly accessibilityHint?: string; 
   readonly accessibilityLabel?: string; 
   readonly errorDisplay?: CardFieldOptions_errorDisplay; 
+  readonly form?: VaultWidgetContext_contextValue; 
   readonly label?: string; 
   readonly labelBehavior?: CardFieldOptions_labelBehavior; 
   readonly onBlur?: (_1:VaultPublicState_fieldEvent) => void; 

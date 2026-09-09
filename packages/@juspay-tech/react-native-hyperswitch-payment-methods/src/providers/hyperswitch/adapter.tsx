@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { fieldChange } from '../../core/fieldChange';
 import type { ProviderAdapter } from '../../core/ProviderAdapter';
@@ -9,6 +9,7 @@ import type {
   TokenizeErrorCode,
   TokenizeResult,
 } from '../../core/types';
+import { Placeholder } from '../../fields/Placeholder';
 import type { HyperswitchVaultData } from './types';
 
 declare const require: (moduleId: string) => unknown;
@@ -31,6 +32,17 @@ const {
   CardCVCField: VaultCardCVCField,
   CardholderNameField: VaultCardholderNameField,
 } = vaultSdk ?? ({} as VaultSdk);
+
+/*
+ * `CardForm.res` rebuilds its `contextValue` fresh on every render (unmemoized), so its
+ * `onContext` effect refires on every re-render regardless of whether anything meaningful
+ * changed. Since publishing that value calls `core.notify()`, which re-renders this activator's
+ * own parent, an unmemoized activator would re-render → refire the effect → notify → re-render,
+ * forever. Memoizing it means it only ever re-renders when its own props genuinely change
+ * (vaultDetails/environment are memoized below, onContext is a stable ref-backed callback), so
+ * once mounted it renders exactly once more per real change instead of looping.
+ */
+const MemoizedVaultCardForm: any = VaultCardForm ? memo(VaultCardForm) : undefined;
 
 const VAULT_TYPE = 'hyperswitch' as const;
 
@@ -59,12 +71,35 @@ function validateVaultData(raw: unknown): HyperswitchVaultData {
   return raw as unknown as HyperswitchVaultData;
 }
 
+/*
+ * Hyperswitch's own vault SDK coordinates its native fields through a React context
+ * (`VaultWidgetContext`) rather than a plain client object, so — unlike VGS/Skyflow/BasisTheory/
+ * Evervault — there's no collector you can build before any field mounts. Something has to stay
+ * mounted for the session's lifetime to hold that context value.
+ *
+ * `createCollector` resolves immediately to this pending session; `contextValue`/`handle` fill in
+ * once the "anchor" field (see `Field` below) has actually mounted and run the session hook.
+ */
+interface HyperswitchSession {
+  vaultData: HyperswitchVaultData;
+  contextValue?: unknown;
+  handle?: { tokenize(): Promise<unknown> };
+}
+
+const createCollector = async (
+  vaultData: unknown
+): Promise<HyperswitchSession> => ({
+  vaultData: vaultData as HyperswitchVaultData,
+  contextValue: undefined,
+});
+
 const Host: ProviderAdapter['Host'] = ({
   vaultData,
   onReady,
   onError,
   onCardDetails,
   children,
+  appearanceVariables,
 }) => {
   const data = vaultData as HyperswitchVaultData;
   const formRef = useRef<any>(null);
@@ -74,6 +109,11 @@ const Host: ProviderAdapter['Host'] = ({
     else onError(new Error('The Hyperswitch vault form did not mount.'));
   }, [onReady, onError]);
 
+  const vaultAppearance = useMemo(
+    () => (appearanceVariables ? { variables: appearanceVariables } : undefined),
+    [appearanceVariables]
+  );
+
   return (
     <VaultCardForm
       ref={formRef}
@@ -82,6 +122,7 @@ const Host: ProviderAdapter['Host'] = ({
         vaultData: { sdkAuthorization: data.sdkAuthorization },
       }}
       environment={data.environment ?? 'SANDBOX'}
+      appearance={vaultAppearance}
       onChange={(event: any) => {
         const payload = event?.payload ?? {};
         const details: Partial<CardDetails> = {
@@ -101,37 +142,112 @@ const Host: ProviderAdapter['Host'] = ({
 
 const Field: ProviderAdapter['Field'] = ({
   elementType,
+  collector,
   styles,
   placeholder,
   testID,
-  savedCard,
+  options,
+  appearanceVariables,
   onChange,
   onFocus,
   onBlur,
+  onCollectorReady,
 }) => {
   const Component = FIELD_COMPONENT[elementType] as any;
   if (!Component) return null;
 
+  const session = collector as HyperswitchSession | undefined;
+  const sdkAuthorization = session?.vaultData.sdkAuthorization;
+  const environment = session?.vaultData.environment;
+  const formRef = useRef<any>(null);
+
+  // Read by the (identity-stable) handleContext below, so its own identity never depends on
+  // `session` — see the note on MemoizedVaultCardForm for why that matters.
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const onCollectorReadyRef = useRef(onCollectorReady);
+  onCollectorReadyRef.current = onCollectorReady;
+
+  const vaultDetails = useMemo(
+    () =>
+      sdkAuthorization
+        ? { vaultType: 'hyperswitch' as const, vaultData: { sdkAuthorization } }
+        : undefined,
+    [sdkAuthorization]
+  );
+
+  const vaultAppearance = useMemo(
+    () => (appearanceVariables ? { variables: appearanceVariables } : undefined),
+    [appearanceVariables]
+  );
+
+  const handleContext = useCallback((contextValue: unknown) => {
+    const current = sessionRef.current;
+    if (!current) return;
+    onCollectorReadyRef.current?.({
+      ...current,
+      contextValue,
+      handle: formRef.current ?? current.handle,
+    });
+  }, []);
+
+  /*
+   * `cardNumber` doubles as this form's anchor: it's the field that stays mounted and quietly
+   * carries the shared session for every other field on the same `form`, invisibly (renders no
+   * children of its own — nothing to see). Don't unmount CardNumberField while the form is in
+   * use — its session, and whatever the user has typed, goes with it.
+   */
+  const activator =
+    elementType === 'cardNumber' && vaultDetails && MemoizedVaultCardForm ? (
+      <MemoizedVaultCardForm
+        ref={formRef}
+        vaultDetails={vaultDetails}
+        environment={environment ?? 'SANDBOX'}
+        appearance={vaultAppearance}
+        onContext={handleContext}
+      />
+    ) : null;
+
+  if (!session || session.contextValue === undefined) {
+    return (
+      <>
+        {activator}
+        <Placeholder elementType={elementType} styles={styles} testID={testID} />
+      </>
+    );
+  }
+
   return (
-    <Component
-      styles={styles}
-      placeholder={placeholder}
-      testID={testID}
-      options={savedCard ? { savedCard } : undefined}
-      onChange={(event: any) =>
-        onChange?.(
-          fieldChange(elementType, {
-            empty: Boolean(event?.empty),
-            valid: Boolean(event?.valid),
-            touched: Boolean(event?.touched),
-            brand: event?.brand,
-            error: event?.error,
-          })
-        )
-      }
-      onFocus={() => onFocus?.({ elementType })}
-      onBlur={() => onBlur?.({ elementType })}
-    />
+    <>
+      {activator}
+      <Component
+        form={session.contextValue}
+        styles={styles}
+        placeholder={placeholder}
+        testID={testID}
+        label={options?.label}
+        labelBehavior={options?.labelBehavior}
+        errorDisplay={options?.errorDisplay}
+        unstyled={options?.unstyled}
+        accessibilityLabel={options?.accessibilityLabel}
+        accessibilityHint={options?.accessibilityHint}
+        cardBrandIcon={elementType === 'cardNumber' ? options?.cardBrandIcon : undefined}
+        cvcIcon={elementType === 'cardCvc' ? options?.cvcIcon : undefined}
+        onChange={(event: any) =>
+          onChange?.(
+            fieldChange(elementType, {
+              empty: Boolean(event?.empty),
+              valid: Boolean(event?.valid),
+              touched: Boolean(event?.touched),
+              brand: event?.brand,
+              error: event?.error,
+            })
+          )
+        }
+        onFocus={() => onFocus?.({ elementType })}
+        onBlur={() => onBlur?.({ elementType })}
+      />
+    </>
   );
 };
 
@@ -149,8 +265,27 @@ const SHARED_CODES = new Set<string>([
 const tokenize: ProviderAdapter['tokenize'] = async (
   collector
 ): Promise<TokenizeResult> => {
+  /*
+   * Two shapes reach here: context mode's collector IS the form's imperative handle
+   * (`{tokenize, confirmPayment, reset, focus}`, from `Host`'s onReady). Headless mode's
+   * collector is the `HyperswitchSession` wrapper — the handle lives at `.handle` and is only
+   * set once the anchor field has actually mounted.
+   */
+  const handle =
+    collector && typeof (collector as any).tokenize === 'function'
+      ? collector
+      : (collector as HyperswitchSession | undefined)?.handle;
+
+  if (!handle) {
+    return errorResult(
+      VAULT_TYPE,
+      'sdk_not_ready',
+      'The hyperswitch card fields are not ready yet. Make sure CardNumberField is mounted.'
+    );
+  }
+
   try {
-    const result = await (collector as any).tokenize();
+    const result = await (handle as any).tokenize();
 
     if (result?.status === 'success') {
       const success: TokenizeResult = {
@@ -180,6 +315,7 @@ const tokenize: ProviderAdapter['tokenize'] = async (
 export const hyperswitchVaultAdapter: ProviderAdapter = {
   vaultType: VAULT_TYPE,
   validateVaultData,
+  createCollector,
   Host,
   Field,
   tokenize,
