@@ -10,6 +10,7 @@ import { confirmPayment as confirmWidgetPayment } from '../widget/WidgetRegistry
 import { updateIntent } from './PaymentSession';
 import {
   bindGetCustomerSavedPaymentMethods,
+  bindGetWalletSession,
   bindPresentPaymentSheet,
 } from './binders';
 
@@ -18,6 +19,7 @@ type ElementsNativeActions = Pick<
   | 'confirmPayment'
   | 'presentPaymentSheet'
   | 'getCustomerSavedPaymentMethods'
+  | 'getWalletSession'
   | 'updateIntent'
 >;
 
@@ -47,6 +49,8 @@ export function createElementsNativeActions(
 
     getCustomerSavedPaymentMethods:
       bindGetCustomerSavedPaymentMethods(bindings),
+
+    getWalletSession: bindGetWalletSession(bindings),
 
     updateIntent,
   };

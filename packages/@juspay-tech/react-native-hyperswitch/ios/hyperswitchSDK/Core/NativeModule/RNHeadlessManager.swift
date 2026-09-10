@@ -49,6 +49,8 @@ internal class RNHeadlessManager: RCTDefaultReactNativeFactoryDelegate {
 
     // MARK: - View creation
     internal func viewForModule(_ moduleName: String, initialProperties: [String: Any]?) -> UIView {
+        teardownRunningSurface()
+
         let makeView = {
             self.factoryOrCreate().rootViewFactory.view(
                 withModuleName: moduleName,
@@ -66,7 +68,32 @@ internal class RNHeadlessManager: RCTDefaultReactNativeFactoryDelegate {
     }
 
     internal func reinvalidateBridge() {
-        rootView = nil
+        teardownRunningSurface()
+    }
+
+    /// Stops any surface left over from a previous headless flow.
+    ///
+    /// Dropping `rootView` is not enough on the new architecture: the surface
+    /// stays in `Status::Running`, and the next `viewForModule` re-points a
+    /// live surface, which trips the `SurfaceHandler::setUIManager` assertion.
+    /// Releasing the factory alongside the view retires the old surface with
+    /// its runtime, so each flow starts from a clean one.
+    internal func teardownRunningSurface() {
+        guard rootView != nil || factory != nil else {
+            return
+        }
+
+        let drop = {
+            self.rootView?.removeFromSuperview()
+            self.rootView = nil
+            self.factory = nil
+        }
+
+        if Thread.isMainThread {
+            drop()
+        } else {
+            DispatchQueue.main.sync(execute: drop)
+        }
     }
 
     // MARK: - RCTTurboModuleManagerDelegate

@@ -45,6 +45,14 @@ RCT_EXPORT_METHOD(getPaymentSession:(double)rootTag
                                                       callback:callback];
 }
 
+RCT_EXPORT_METHOD(getWalletSession:(double)rootTag
+                  wallets:(NSArray *)wallets
+                  callback:(RCTResponseSenderBlock)callback) {
+    [HyperHeadlessModuleImpl.shared getWalletSessionWithRootTag:@(rootTag)
+                                                        wallets:wallets
+                                                       callback:callback];
+}
+
 RCT_EXPORT_METHOD(exitHeadless:(double)rootTag
                   status:(NSString *)status) {
     [HyperHeadlessModuleImpl.shared exitHeadlessWithRootTag:@(rootTag)

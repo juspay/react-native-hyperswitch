@@ -1,3 +1,4 @@
+import type { WalletSessionHandle } from '../walletSession';
 import { PaymentResult } from '../paymentresult';
 import type {
   HyperswitchConfiguration,
@@ -25,6 +26,7 @@ export interface Elements {
   getCustomerSavedPaymentMethods(
     options?: SavedPaymentMethodsConfiguration
   ): Promise<CustomerSavedPaymentMethodsSession>;
+  getWalletSession(): Promise<WalletSessionHandle>;
 }
 
 /**

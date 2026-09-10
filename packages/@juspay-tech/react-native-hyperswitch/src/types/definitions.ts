@@ -1,4 +1,5 @@
 import type { PaymentResult } from './paymentresult';
+import type { WalletSessionHandle } from './walletSession';
 export interface OverrideEndpointConfiguration {
   customBackendEndpoint?: string;
   customLoggingEndpoint?: string;
@@ -66,6 +67,7 @@ export interface PaymentSession {
   getCustomerSavedPaymentMethods(
     options?: SavedPaymentMethodsConfiguration
   ): Promise<CustomerSavedPaymentMethodsSession>;
+  getWalletSession(): Promise<WalletSessionHandle>;
   updateIntent(
     intentResolver: () => Promise<PaymentSessionConfiguration | null>
   ): Promise<void>;

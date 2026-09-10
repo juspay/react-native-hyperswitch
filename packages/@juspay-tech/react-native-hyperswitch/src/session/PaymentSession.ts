@@ -9,6 +9,7 @@ import {
 } from '../widget/WidgetRegistry';
 import {
   bindGetCustomerSavedPaymentMethods,
+  bindGetWalletSession,
   bindPresentPaymentSheet,
 } from './binders';
 
@@ -35,6 +36,7 @@ export function createPaymentSession(
     presentPaymentSheet: bindPresentPaymentSheet(bindings),
     getCustomerSavedPaymentMethods:
       bindGetCustomerSavedPaymentMethods(bindings),
+    getWalletSession: bindGetWalletSession(bindings),
     updateIntent,
   };
 }

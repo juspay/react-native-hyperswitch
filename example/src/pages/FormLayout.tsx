@@ -227,7 +227,9 @@ export function FormLayout({
   }, [amount, amountVal]);
 
   const handleAmountBlur = () => {
-    void updateAmount?.();
+    if (amountVal !== amount) {
+      setAmount(amountVal);
+    }
   };
 
   const buttonDisabled = !canSubmit || isLoading || loading;

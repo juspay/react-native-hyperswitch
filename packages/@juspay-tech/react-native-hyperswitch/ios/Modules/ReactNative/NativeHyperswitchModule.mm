@@ -152,6 +152,39 @@ RCT_EXPORT_METHOD(confirmWithCustomerPaymentToken:(double)reactTag
                                                 reject:reject];
 }
 
+RCT_EXPORT_METHOD(isGooglePaySupported:(nonnull RCTPromiseResolveBlock)resolve
+                  reject:(nonnull RCTPromiseRejectBlock)reject)
+{
+    [[self moduleImpl] isGooglePaySupportedWithResolve:resolve reject:reject];
+}
+
+RCT_EXPORT_METHOD(isApplePaySupported:(nonnull RCTPromiseResolveBlock)resolve
+                  reject:(nonnull RCTPromiseRejectBlock)reject)
+{
+    [[self moduleImpl] isApplePaySupportedWithResolve:resolve reject:reject];
+}
+
+RCT_EXPORT_METHOD(getWalletSession:(nonnull NSDictionary *)params
+                  resolve:(nonnull RCTPromiseResolveBlock)resolve
+                  reject:(nonnull RCTPromiseRejectBlock)reject)
+{
+    [[self moduleImpl] getWalletSessionWithParams:params resolve:resolve reject:reject];
+}
+
+RCT_EXPORT_METHOD(isWalletEligible:(nonnull NSString *)wallet
+                  resolve:(nonnull RCTPromiseResolveBlock)resolve
+                  reject:(nonnull RCTPromiseRejectBlock)reject)
+{
+    [[self moduleImpl] isWalletEligibleWithWallet:wallet resolve:resolve reject:reject];
+}
+
+RCT_EXPORT_METHOD(launchWallet:(nonnull NSString *)wallet
+                  resolve:(nonnull RCTPromiseResolveBlock)resolve
+                  reject:(nonnull RCTPromiseRejectBlock)reject)
+{
+    [[self moduleImpl] launchWalletWithWallet:wallet resolve:resolve reject:reject];
+}
+
 // ---------------------------------------------------------------------------
 // TurboModule (New Architecture) — JSI spec wiring
 // The generated spec class name follows codegen convention:

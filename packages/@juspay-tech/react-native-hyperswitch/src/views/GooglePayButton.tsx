@@ -1,111 +1,91 @@
-import { forwardRef, useEffect, useRef } from 'react';
-import { UIManager, type ViewStyle, Platform } from 'react-native';
-import NativePaymentWidgetImpl from './PaymentWidgetBridge';
-import { registerWidget, unregisterWidget } from '../widget/WidgetRegistry';
-import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfiguration';
-import { useHyperElementsContext } from '../context/HyperElements';
 import {
-  makeUnknownEventWarningPayload,
-  validateSubscribedEventStrings,
-} from '../utils/EventValidator';
-import type {
-  NativeEventEnvelope,
-  PaymentEventNative,
-  PaymentEventResult
-} from '../types/NativeEventTypes';
-import type { GooglePayElementHandle } from '../types/definitions';
+  Platform,
+  Pressable,
+  StyleSheet,
+  requireNativeComponent,
+  useColorScheme,
+} from 'react-native';
+import type { ViewProps, ViewStyle } from 'react-native';
+import { useWalletLaunch } from './useWalletLaunch';
+import { resolveGooglePayProps } from './walletButtonConfig';
+import type { PaymentSession } from '../types/definitions';
 import type { PaymentResult } from '../types/paymentresult';
-import { mapNativeResponseToPaymentResult } from '../native/NativeResponseMapper';
-import { useNativeViewTag } from './useNativeViewTag';
+import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfiguration';
 
-type GooglePayProps = {
-  widgetId: string;
+declare global {
+  var nativeFabricUIManager: unknown | null | undefined;
+}
+
+type NativeProps = ViewProps & {
+  type?: number;
+  appearance: number;
+  borderRadius?: number;
+};
+
+function resolveNativeComponent(): React.ComponentType<NativeProps> | null {
+  if (Platform.OS !== 'android') {
+    return null;
+  }
+  try {
+    if (globalThis.nativeFabricUIManager != null) {
+      return require('../codegen/components/HyperGooglePayNativeComponent')
+        .default as React.ComponentType<NativeProps>;
+    }
+    return requireNativeComponent(
+      'HyperGooglePayButton'
+    ) as unknown as React.ComponentType<NativeProps>;
+  } catch {
+    return null;
+  }
+}
+
+const NativeHyperGooglePayButton = resolveNativeComponent();
+
+export type GooglePayButtonProps = {
   options?: PaymentSheetConfiguration;
-  onPaymentResult: (result: PaymentResult) => void;
-  onChange?: (event: PaymentEventResult) => void;
-  onReady?: () => void;
+  session?: PaymentSession;
+  onPaymentResult?: (result: PaymentResult) => void;
   style?: ViewStyle;
 };
 
-export const GooglePayButton = forwardRef<
-  GooglePayElementHandle,
-  GooglePayProps
->((props: GooglePayProps, _: React.Ref<GooglePayElementHandle>) => {
-  const { widgetId, options, onPaymentResult, onChange, onReady, style } =
-    props;
-  const { paymentSessionConfig, hyperswitchConfig } = useHyperElementsContext();
-  const viewRef = useRef(null);
-  const viewTag = useNativeViewTag(viewRef, onReady);
+export function GooglePayButton({
+  options,
+  session,
+  onPaymentResult,
+  style,
+}: GooglePayButtonProps) {
+  const colorScheme = useColorScheme();
+  const launch = useWalletLaunch({
+    wallet: 'google_pay',
+    label: 'Google Pay',
+    session,
+    onPaymentResult,
+  });
 
-  useEffect(() => {
-    if (viewTag === undefined) return undefined;
-    registerWidget(widgetId, viewTag);
-    return () => unregisterWidget(widgetId);
-  }, [viewTag, widgetId]);
-
-  // Old-arch view manager command "1": tells the native view to attach itself
-  // to the active payment session. Without it the widget mounts but renders
-  // an empty container on Paper.
-  useEffect(() => {
-    if (viewTag !== undefined) {
-      UIManager.dispatchViewManagerCommand(viewTag, 1, []);
-    }
-  }, [viewTag]);
-
-
-  const warningEmitted = useRef(false);
-
-  useEffect(() => {
-    if (!options || !onChange || warningEmitted.current) {
-      return;
-    }
-    const subscribedEvents = options.subscribedEvents as string[] | undefined;
-
-    const invalidEvents = validateSubscribedEventStrings(subscribedEvents);
-    if (invalidEvents.length > 0) {
-      warningEmitted.current = true;
-      const warningPayload = makeUnknownEventWarningPayload(invalidEvents);
-      onChange({
-        eventName: 'UNKNOWN_EVENT_SUBSCRIBED',
-        payload: JSON.stringify({
-          message: warningPayload.message,
-          invalidEvents: warningPayload.invalidEvents,
-          validEvents: warningPayload.validEvents,
-        }),
-      });
-    }
-  }, [options, onChange]);
-
-  const onPaymentResultInternal = (event: NativeEventEnvelope & { nativeEvent: {
-  eventName: string;
-  payload: string;
-  target: number;
-}}) => {
-   onPaymentResult && onPaymentResult(
-      mapNativeResponseToPaymentResult(
-        Platform.OS === 'ios'
-          ? event.nativeEvent.result ?? ""
-          : event.nativeEvent.payload ?? ""
-      )
-    );
-  };
-
-  const onPaymentEventInternal = (event: PaymentEventNative) => {
-    onChange && onChange?.(event.nativeEvent as PaymentEventResult);
-  };
-  return (
-    <NativePaymentWidgetImpl
-      ref={viewRef}
-      sdkAuthorization={paymentSessionConfig?.sdkAuthorization ?? ''}
-      widgetType="google_pay"
-      onPaymentEvent={onPaymentEventInternal}
-      onPaymentResult={onPaymentResultInternal}
-      options={{
-        hyperswitchConfig: hyperswitchConfig || undefined,
-        paymentSessionConfig: paymentSessionConfig || undefined,
-        configuration: options as Record<string, unknown> | undefined,
-      }}
-      style={{ ...style, flex: 1, height: '100%' }}
-    />
+  const { hidden, type, appearance, borderRadius } = resolveGooglePayProps(
+    options,
+    colorScheme === 'dark' ? 'dark' : 'light'
   );
-});
+
+  if (hidden || NativeHyperGooglePayButton == null) {
+    return null;
+  }
+
+  return (
+    <Pressable
+      focusable
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel="Google Pay"
+      onPress={launch}
+      style={style}
+    >
+      <NativeHyperGooglePayButton
+        type={type}
+        appearance={appearance}
+        borderRadius={borderRadius}
+        style={StyleSheet.absoluteFill}
+      />
+    </Pressable>
+  );
+}

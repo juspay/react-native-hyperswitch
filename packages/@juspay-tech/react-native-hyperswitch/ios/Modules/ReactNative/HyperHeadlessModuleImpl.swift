@@ -35,6 +35,17 @@ public class HyperHeadlessModuleImpl: NSObject {
         )
     }
     
+    @objc public func getWalletSession(
+        rootTag: NSNumber,
+        wallets: NSArray,
+        callback: @escaping RCTResponseSenderBlock
+    ) {
+        PaymentSession.getWalletSession(
+            wallets: wallets,
+            callback: callback
+        )
+    }
+    
     @objc public func exitHeadless(
         rootTag: NSNumber,
         status: String

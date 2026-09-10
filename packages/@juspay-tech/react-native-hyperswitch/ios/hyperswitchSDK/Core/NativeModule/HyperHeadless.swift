@@ -55,6 +55,18 @@ internal class HyperHeadless: RCTEventEmitter {
     }
 
     @objc
+    private func getWalletSession(
+        _ rootTag: NSNumber,
+        _ rnMessage: NSArray,
+        _ rnCallback: @escaping RCTResponseSenderBlock
+    ) {
+        PaymentSession.getWalletSession(
+            wallets: rnMessage,
+            callback: rnCallback
+        )
+    }
+
+    @objc
     private func exitHeadless(_ rootTag: NSNumber, _ rnMessage: String) {
         PaymentSession.exitHeadless(rnMessage: rnMessage)
     }

@@ -320,7 +320,7 @@ export type Locale =
 
 export interface PaymentSheetConfiguration {
   appearance?: Appearance;
-  merchantDisplayName: string;
+  merchantDisplayName?: string;
   allowsDelayedPaymentMethods?: boolean;
   allowsPaymentMethodsRequiringShippingAddress?: boolean;
   displaySavedPaymentMethodsCheckbox?: boolean;

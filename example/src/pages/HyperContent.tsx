@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Platform } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  StyleSheet,
+  View,
+} from "react-native";
 
 import {
   ApplePayButton,
@@ -7,7 +13,9 @@ import {
   GooglePayButton,
   PaymentElement,
   SubscriptionEvent,
+  isPlatformPaySupported,
   usePaymentSession,
+  useWalletSession,
   useWidgets,
   type CustomerLastUsedPaymentMethod,
   type CustomerSavedPaymentMethodsSession,
@@ -37,13 +45,6 @@ export type SharedProps = {
 };
 
 const HIDDEN_PAYMENT_METHODS = ["paypal", "google_pay", "apple_pay"] as const;
-
-const WALLET_BUTTON_APPEARANCE = {
-  primaryButton: {
-    height: 58,
-    borderRadius: 12,
-  },
-};
 
 const CVC_APPEARANCE = {
   theme: "Light" as const,
@@ -160,6 +161,34 @@ export function HyperContent(props: SharedProps) {
     props;
 
   const paymentSession = usePaymentSession();
+
+  const {
+    isGooglePayEligible,
+    isApplePayEligible,
+    loading: walletLoading,
+    load: loadWalletSession,
+  } = useWalletSession();
+
+  const [deviceSupportsWallet, setDeviceSupportsWallet] = useState<
+    boolean | null
+  >(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const probeDeviceSupport = async () => {
+      const supported = await isPlatformPaySupported();
+      if (!cancelled) {
+        setDeviceSupportsWallet(supported);
+      }
+    };
+
+    probeDeviceSupport();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const widgets = useWidgets();
 
   const paymentRef = useRef<PaymentElementHandle>(null);
@@ -178,7 +207,6 @@ export function HyperContent(props: SharedProps) {
    */
   const [paymentElementReady, setPaymentElementReady] = useState(false);
 
-  const [walletReady, setWalletReady] = useState(false);
 
   const [cvcReady, setCvcReady] = useState(false);
 
@@ -215,7 +243,6 @@ export function HyperContent(props: SharedProps) {
 
   useEffect(() => {
     setPaymentElementReady(false);
-    setWalletReady(false);
     setCvcReady(false);
   }, [paymentSession]);
 
@@ -267,6 +294,10 @@ export function HyperContent(props: SharedProps) {
           setLoadingSaved(false);
         }
       }
+
+      if (!cancelled) {
+        await loadWalletSession();
+      }
     };
 
     void loadSavedPaymentMethods();
@@ -298,25 +329,16 @@ export function HyperContent(props: SharedProps) {
     [],
   );
 
-  const handleWalletChange = useCallback((event: PaymentEventResult) => {
-    console.log(
-      `[Example] ${
-        Platform.OS === "ios" ? "ApplePayButton" : "GooglePayButton"
-      } onChange:`,
-      JSON.stringify(event),
-    );
+  const walletEligible =
+    Platform.OS === "ios" ? isApplePayEligible : isGooglePayEligible;
 
-    if (event.eventName !== "PAYMENT_METHOD_STATUS") {
-      return;
-    }
+  const walletSupported = deviceSupportsWallet === true;
 
-    console.log(
-      "[Example] Wallet button ready from PAYMENT_METHOD_STATUS",
-      JSON.stringify(event.payload),
-    );
+  const walletResolving =
+    walletSupported && (deviceSupportsWallet === null || walletLoading);
 
-    setWalletReady(true);
-  }, []);
+  const walletReady = walletSupported && walletEligible;
+
 
   const handleCvcReady = useCallback(() => {
     console.log("[Example] CvcWidget ready");
@@ -390,34 +412,66 @@ export function HyperContent(props: SharedProps) {
     }
   }, [paymentSession, paymentId, amount, setSdkAuthorization]);
 
-  const walletButton =
-    Platform.OS === "ios" ? (
-      <ApplePayButton
-        widgetId="apple-pay-button"
-        options={{
-          merchantDisplayName: "Hyperswitch Example",
-          appearance: {
-            ...WALLET_BUTTON_APPEARANCE,
-          },
-          subscribedEvents: ["PAYMENT_METHOD_STATUS"],
-        }}
-        onChange={handleWalletChange}
-        onPaymentResult={handlePaymentResult}
-      />
-    ) : (
-      <GooglePayButton
-        widgetId="google-pay-button"
-        options={{
-          merchantDisplayName: "Hyperswitch Example",
-          appearance: {
-            ...WALLET_BUTTON_APPEARANCE,
-          },
-          subscribedEvents: ["PAYMENT_METHOD_STATUS"],
-        }}
-        onChange={handleWalletChange}
-        onPaymentResult={handlePaymentResult}
-      />
-    );
+  const lastSyncedAmount = useRef(amount);
+
+  useEffect(() => {
+    if (lastSyncedAmount.current === amount) {
+      return;
+    }
+    lastSyncedAmount.current = amount;
+
+    const syncIntent = async () => {
+      try {
+        await updateAmount();
+      } catch {
+        console.log("[Example] updateIntent failed for amount", amount);
+      }
+    };
+
+    syncIntent();
+  }, [amount, updateAmount]);
+
+  const walletButton = !walletSupported ? null : (
+    <View style={styles.walletWrapper}>
+      {Platform.OS === "ios" ? (
+        <ApplePayButton
+          options={{
+            appearance: { shapes: { borderRadius: 8 } },
+            walletButtonsConfiguration: {
+              applePay: {
+                visibility: "shown",
+                buttonType: "buy",
+                buttonStyle: { light: "black", dark: "white" },
+              },
+            },
+          }}
+          style={{ width: "100%", height: 48 }}
+          onPaymentResult={handlePaymentResult}
+        />
+      ) : (
+        <GooglePayButton
+          options={{
+            appearance: { shapes: { borderRadius: 8 } },
+            walletButtonsConfiguration: {
+              googlePay: {
+                visibility: "shown",
+                buttonType: "BUY",
+                buttonStyle: { light: "light", dark: "dark" },
+              },
+            },
+          }}
+          style={{ width: "100%", height: 48 }}
+          onPaymentResult={handlePaymentResult}
+        />
+      )}
+
+      {!walletReady ? (
+        <View style={styles.walletOverlay}>
+          {walletResolving ? <ActivityIndicator /> : null}
+        </View>
+      ) : null}
+    </View>
+  );
 
   const requiresCvc = lastUsed?.payment_method === "card";
 
@@ -506,7 +560,7 @@ export function HyperContent(props: SharedProps) {
     <FormLayout
       {...props}
       buttonSlot={walletButton}
-      walletReady={walletReady}
+      walletReady={true}
       message={message}
       setMessage={setMessage}
       loading={overlayLoading}
@@ -547,3 +601,18 @@ export function HyperContent(props: SharedProps) {
     />
   );
 }
+
+const styles = StyleSheet.create({
+  walletWrapper: {
+    width: "100%",
+    height: 48,
+  },
+
+  walletOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.65)",
+    borderRadius: 8,
+  },
+});

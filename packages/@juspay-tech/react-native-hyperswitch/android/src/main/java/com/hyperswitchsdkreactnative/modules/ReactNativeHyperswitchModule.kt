@@ -12,7 +12,15 @@ import io.hyperswitch.model.CustomEndpointConfiguration
 import io.hyperswitch.model.HyperswitchConfiguration
 import io.hyperswitch.model.HyperswitchEnvironment
 import io.hyperswitch.model.OverrideEndpoints
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
+import com.google.android.gms.wallet.IsReadyToPayRequest
+import com.google.android.gms.wallet.Wallet
+import com.google.android.gms.wallet.WalletConstants
 import io.hyperswitch.paymentsession.GetPaymentSessionCallBackManager
+import io.hyperswitch.paymentsession.GetWalletSessionCallBackManager
+import io.hyperswitch.paymentsession.WalletSessionHandler
 import io.hyperswitch.paymentsession.LaunchOptions
 import io.hyperswitch.paymentsession.PMError
 import io.hyperswitch.paymentsession.PaymentMethodType
@@ -35,6 +43,8 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
   private var paymentSessionReactLauncher: PaymentSessionReactLauncher? = null
   private var launchOptions: LaunchOptions? = null
   private var handler: PaymentSessionHandler? = null
+  private var walletHandler: WalletSessionHandler? = null
+  private var walletSdkAuthorization: String? = null
 
   private val uiManagerType = if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
     UIManagerType.FABRIC
@@ -336,6 +346,132 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     }
   }
 
+  override fun isGooglePaySupported(promise: Promise) {
+    try {
+      val available = GoogleApiAvailability.getInstance()
+        .isGooglePlayServicesAvailable(reactApplicationContext)
+      if (available != ConnectionResult.SUCCESS) {
+        promise.resolve(false)
+        return
+      }
+
+      val environment = when (hyperswitchConfig?.environment?.name) {
+        "PROD" -> WalletConstants.ENVIRONMENT_PRODUCTION
+        else -> WalletConstants.ENVIRONMENT_TEST
+      }
+
+      val paymentsClient = Wallet.getPaymentsClient(
+        reactApplicationContext,
+        Wallet.WalletOptions.Builder().setEnvironment(environment).build()
+      )
+
+      val request = IsReadyToPayRequest.fromJson(IS_READY_TO_PAY_REQUEST)
+
+      paymentsClient.isReadyToPay(request).addOnCompleteListener { task ->
+        promise.resolve(runCatching { task.getResult(ApiException::class.java) }.getOrDefault(false))
+      }
+    } catch (e: Exception) {
+      promise.resolve(false)
+    }
+  }
+
+  override fun isApplePaySupported(promise: Promise) {
+    promise.resolve(false)
+  }
+
+  override fun getWalletSession(params: ReadableMap?, promise: Promise) {
+    val sdkAuthorization =
+      params?.getMap("paymentSessionConfig")?.getString("sdkAuthorization")
+
+    if (sdkAuthorization.isNullOrEmpty()) {
+      promise.resolve(
+        StandardResult.Failed(
+          code = "INVALID_ARGUMENT",
+          message = "paymentSessionConfig.sdkAuthorization is required",
+          error = Throwable("paymentSessionConfig.sdkAuthorization is required")
+        ).toJSONString()
+      )
+      return
+    }
+
+    // Reuse only while the intent is unchanged. A new sdkAuthorization means
+    // updateIntent replaced the intent, so the handler is rebuilt against it.
+    if (walletHandler != null && walletSdkAuthorization == sdkAuthorization) {
+      promise.resolve(
+        JSONObject().apply {
+          put("code", "success")
+          put("message", "Wallet session already initialized")
+        }.toString()
+      )
+      return
+    }
+
+    walletHandler = null
+    walletSdkAuthorization = sdkAuthorization
+
+    val props = mutableMapOf<String, Any?>().apply {
+      putAll(params?.toHashMap().orEmpty())
+      put("type", "walletWidget")
+    }
+
+    val map: Map<String, Any?> = mapOf("props" to props)
+    val bundle = launchOptions?.toBundle(map)
+
+    if (bundle == null) {
+      promise.resolve(
+        StandardResult.Failed(
+          code = "NOT_INITIALISED",
+          message = "SDK is not initialised",
+          error = Throwable("SDK is not initialised")
+        ).toJSONString()
+      )
+      return
+    }
+
+    var resolved = false
+    val walletSessionCallback: (WalletSessionHandler) -> Unit = {
+      walletHandler = it
+      if (!resolved) {
+        resolved = true
+        promise.resolve(
+          JSONObject().apply {
+            put("code", "success")
+            put("message", "Wallet session is initialized")
+          }.toString()
+        )
+      }
+    }
+
+    GetWalletSessionCallBackManager.setCallback(sdkAuthorization, walletSessionCallback)
+    paymentSessionReactLauncher?.recreateReactContext(bundle)
+  }
+
+  override fun isWalletEligible(wallet: String, promise: Promise) {
+    val current = walletHandler
+    if (current == null) {
+      promise.resolve(false)
+      return
+    }
+    promise.resolve(current.isWalletEligible(wallet))
+  }
+
+  override fun launchWallet(wallet: String, promise: Promise) {
+    val current = walletHandler
+    if (current == null) {
+      promise.resolve(
+        StandardResult.Failed(
+          code = "NO_HANDLER",
+          message = "Wallet session handler not initialized.",
+          error = Throwable("Wallet session handler not initialized.")
+        ).toJSONString()
+      )
+      return
+    }
+    current.launchWallet(wallet) { result ->
+      promise.resolve(result.toJSONString())
+    }
+  }
+
 //  override fun updateIntent(sdkAuthorization: String?, promise: Promise?) {
 //
 //  }
@@ -391,6 +527,8 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
 
   companion object {
     const val NAME = "NativeHyperswitchModule"
+    private const val IS_READY_TO_PAY_REQUEST =
+      """{"apiVersion":2,"apiVersionMinor":0,"allowedPaymentMethods":[{"type":"CARD","parameters":{"allowedAuthMethods":["PAN_ONLY","CRYPTOGRAM_3DS"],"allowedCardNetworks":["AMEX","DISCOVER","JCB","MASTERCARD","VISA"]}}]}"""
     private var hyperswitchConfig: HyperswitchConfiguration? = null
   }
 }

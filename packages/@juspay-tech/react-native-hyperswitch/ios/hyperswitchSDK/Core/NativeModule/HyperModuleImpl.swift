@@ -31,17 +31,27 @@ public class HyperModuleImpl: NSObject {
     /// `updateIntent*`) are called through this singleton.
     @objc public static let shared = HyperModuleImpl()
 
-    /// The ObjC++ HyperModule TurboModule this impl is bound to (the "hyperSwitch"
-    /// host's instance, attached by RNViewManager's `getModuleInstanceFromClass:`).
-    /// Weak to avoid a retain cycle with the TurboModule.
-    private weak var shim: HyperModuleShim?
+    /// Every ObjC++ HyperModule TurboModule attached to this impl, held weakly to
+    /// avoid a retain cycle. This is a set rather than a single reference because
+    /// on RN < 0.81 the TurboModuleManagerDelegate attach point is unavailable, so
+    /// each host's module self-attaches to `shared` in `init` (HyperModule.mm) —
+    /// the embedded headless runtime included. With a single reference the most
+    /// recently created host silently steals the emit channel from the widget
+    /// host, and events like `updateIntentInit` are delivered to a bundle that
+    /// has no listener for them.
+    private let shims = NSHashTable<AnyObject>.weakObjects()
+
+    /// Live shims, in no particular order. Deallocated hosts drop out on their own.
+    private var attachedShims: [HyperModuleShim] {
+        return shims.allObjects.compactMap { $0 as? HyperModuleShim }
+    }
 
     /// Called by the host's TurboModuleManagerDelegate when the ObjC++ HyperModule
     /// is created. Attaches the bidirectional link: module -> impl, impl -> module.
     @objc public func attach(to shim: HyperModuleShim) {
         shim.attach(impl: self)
         DispatchQueue.main.async {
-            self.shim = shim
+            self.shims.add(shim as AnyObject)
         }
     }
 
@@ -82,7 +92,9 @@ public class HyperModuleImpl: NSObject {
 
     @objc public func emit(_ name: String, _ payload: [String: Any]) {
         onMain {
-            self.shim?.emitEvent(name: name, payload: payload)
+            for shim in self.attachedShims {
+                shim.emitEvent(name: name, payload: payload)
+            }
         }
     }
 
@@ -411,8 +423,18 @@ public class HyperModuleImpl: NSObject {
 
     // MARK: - View lookup helpers (surface-based, New Architecture)
     //
-    // Views are resolved through the attached shim's `view(forRootTag:)` — which uses
-    // the Fabric surface presenter — instead of the bridge's `uiManager`.
+    // Views are resolved through the attached shims' `view(forRootTag:)` — which uses
+    // the Fabric surface presenter — instead of the bridge's `uiManager`. A tag only
+    // resolves on the host that owns the surface, so the first hit is the right one.
+
+    private func resolveView(forRootTag rootTag: NSNumber) -> UIView? {
+        for shim in attachedShims {
+            if let view = shim.view(forRootTag: rootTag) {
+                return view
+            }
+        }
+        return nil
+    }
 
     private func withWidget(_ rootTag: NSNumber, _ block: @escaping (PaymentWidget) -> Void) {
         DispatchQueue.main.async {
@@ -423,7 +445,7 @@ public class HyperModuleImpl: NSObject {
                 return
             }
             // Fall back to surface-based lookup.
-            if let widget = self.shim?.view(forRootTag: rootTag)?
+            if let widget = self.resolveView(forRootTag: rootTag)?
                 .nearestAncestor(ofType: PaymentWidget.self) {
                 block(widget)
             }
@@ -453,7 +475,7 @@ public class HyperModuleImpl: NSObject {
             }
 
             // Surface-based lookup (payment sheets / modal presentations).
-            guard let view = self.shim?.view(forRootTag: rootTag) else {
+            guard let view = self.resolveView(forRootTag: rootTag) else {
                 block(nil)
                 return
             }
@@ -467,7 +489,7 @@ public class HyperModuleImpl: NSObject {
 
     private func withPaymentSheet(_ rootTag: NSNumber, _ block: @escaping (UIViewController?, PaymentSheet?) -> Void) {
         DispatchQueue.main.async {
-            let view = self.shim?.view(forRootTag: rootTag)
+            let view = self.resolveView(forRootTag: rootTag)
             let vc = view?.reactViewController() as? HyperUIViewController
             let sheet = vc?.paymentSheet
             block(vc, sheet)

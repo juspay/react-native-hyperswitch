@@ -11,6 +11,8 @@ import type {
 import { buildPresentPaymentSheetPayload } from '../utils/LaunchOptions';
 import { presentPaymentSheetWithPayload } from './presentPaymentSheet';
 import { getCustomerSavedPaymentMethods } from './SavedPaymentMethods';
+import { getWalletSession } from './WalletSession';
+import type { WalletSessionHandle } from '../types/walletSession';
 
 /** Options captured by every session-style factory (PaymentSession + Elements). */
 type SessionBindings = {
@@ -48,6 +50,15 @@ export function bindGetCustomerSavedPaymentMethods(bindings: SessionBindings) {
       bindings.hyperswitchConfig,
       bindings.paymentSessionConfig,
       configuration
+    );
+  };
+}
+
+export function bindGetWalletSession(bindings: SessionBindings) {
+  return function getWallets(): Promise<WalletSessionHandle> {
+    return getWalletSession(
+      bindings.hyperswitchConfig,
+      bindings.paymentSessionConfig
     );
   };
 }

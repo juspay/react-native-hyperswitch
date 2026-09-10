@@ -1,0 +1,29 @@
+package com.facebook.react.viewmanagers;
+
+import android.view.View;
+import androidx.annotation.Nullable;
+import com.facebook.react.uimanager.BaseViewManager;
+import com.facebook.react.uimanager.BaseViewManagerDelegate;
+import com.facebook.react.uimanager.LayoutShadowNode;
+
+public class HyperGooglePayButtonManagerDelegate<T extends View, U extends BaseViewManager<T, ? extends LayoutShadowNode> & HyperGooglePayButtonManagerInterface<T>> extends BaseViewManagerDelegate<T, U> {
+  public HyperGooglePayButtonManagerDelegate(U viewManager) {
+    super(viewManager);
+  }
+  @Override
+  public void setProperty(T view, String propName, @Nullable Object value) {
+    switch (propName) {
+      case "type":
+        mViewManager.setType(view, value == null ? -1 : ((Double) value).intValue());
+        break;
+      case "appearance":
+        mViewManager.setAppearance(view, value == null ? 0 : ((Double) value).intValue());
+        break;
+      case "borderRadius":
+        mViewManager.setBorderRadius(view, value == null ? 4 : ((Double) value).intValue());
+        break;
+      default:
+        super.setProperty(view, propName, value);
+    }
+  }
+}

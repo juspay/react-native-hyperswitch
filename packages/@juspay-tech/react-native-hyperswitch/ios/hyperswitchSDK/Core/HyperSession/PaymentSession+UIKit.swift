@@ -12,6 +12,7 @@ extension PaymentSession {
 
     private static var hasResponded: Bool = false
     internal static var headlessCompletion: ((PaymentSessionHandler) -> Void)?
+    internal static var walletCompletion: ((WalletSessionHandler) -> Void)?
     private static var completion: ((PaymentResult) -> Void)?
     internal static weak var activeSession: PaymentSession?  // NEW
 
@@ -113,6 +114,91 @@ extension PaymentSession {
         ]
 
         let _ = RNHeadlessManager.sharedInstance.viewForModule("HyperHeadless", initialProperties: ["props": props])
+    }
+
+    public func getWalletSession(_ func_: @escaping (WalletSessionHandler) -> Void) {
+        PaymentSession.hasResponded = false
+        PaymentSession.walletCompletion = func_
+        PaymentSession.activeSession = self
+        RNHeadlessManager.sharedInstance.reinvalidateBridge()
+        let hyperswitchConfiguration = try? hyperswitchConfiguration?.toDictionary()
+        let paymentSessionConfiguration = try? paymentSessionConfiguration.toDictionary()
+        let sdkParams = SDKParams.getSDKParams()
+
+        let props: [String: Any] = [
+            "hyperswitchConfig": hyperswitchConfiguration as Any,
+            "paymentSessionConfig": paymentSessionConfiguration as Any,
+            "sdkParams": sdkParams,
+            "type": "walletWidget",
+        ]
+
+        let _ = RNHeadlessManager.sharedInstance.viewForModule(
+            "HyperHeadless",
+            initialProperties: ["props": props]
+        )
+    }
+
+    internal static func getWalletSession(
+        wallets: NSArray,
+        callback: @escaping RCTResponseSenderBlock
+    ) {
+        DispatchQueue.main.async {
+            PaymentSession.hasResponded = false
+
+            func eligibility(_ wallet: String) -> Bool {
+                for i in 0..<wallets.count {
+                    if let map = wallets[i] as? NSDictionary,
+                       map["wallet"] as? String == wallet {
+                        return map["isEligible"] as? Bool ?? false
+                    }
+                }
+                return false
+            }
+
+            let handler = WalletSessionHandler(
+                isWalletEligible: { wallet in
+                    return eligibility(wallet)
+                },
+                getEligibleWallets: {
+                    var names = [String]()
+                    for i in 0..<wallets.count {
+                        if let map = wallets[i] as? NSDictionary,
+                           let name = map["wallet"] as? String,
+                           map["isEligible"] as? Bool == true {
+                            names.append(name)
+                        }
+                    }
+                    return names
+                },
+                launchWallet: { wallet, resultHandler in
+                    var settled = false
+                    let settleOnce: (PaymentResult) -> Void = { result in
+                        guard !settled else { return }
+                        settled = true
+                        resultHandler(result)
+                    }
+
+                    guard eligibility(wallet) else {
+                        settleOnce(
+                            .failed(
+                                error: NSError(
+                                    domain: "NOT_ELIGIBLE",
+                                    code: 0,
+                                    userInfo: ["message": "\(wallet) is not eligible for this payment"]
+                                )
+                            )
+                        )
+                        return
+                    }
+                    self.completion = settleOnce
+                    var map = [String: Any]()
+                    map["wallet"] = wallet
+                    self.safeResolve(callback, [map], settleOnce)
+                }
+            )
+
+            self.walletCompletion?(handler)
+        }
     }
 
     internal static func getPaymentSession(

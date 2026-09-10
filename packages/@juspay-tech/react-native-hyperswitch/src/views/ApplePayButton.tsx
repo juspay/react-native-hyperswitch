@@ -1,111 +1,96 @@
-import { forwardRef, useEffect, useRef } from 'react';
-import { UIManager, type ViewStyle, Platform } from 'react-native';
-import NativePaymentWidgetImpl from './PaymentWidgetBridge';
-import { registerWidget, unregisterWidget } from '../widget/WidgetRegistry';
-import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfiguration';
-import { useHyperElementsContext } from '../context/HyperElements';
 import {
-  makeUnknownEventWarningPayload,
-  validateSubscribedEventStrings,
-} from '../utils/EventValidator';
-import type {
-  NativeEventEnvelope,
-  PaymentEventNative,
-  PaymentEventResult
-} from '../types/NativeEventTypes';
-import type { ApplePayElementHandle } from '../types/definitions';
+  Platform,
+  Pressable,
+  StyleSheet,
+  requireNativeComponent,
+  useColorScheme,
+} from 'react-native';
+import type { ViewProps, ViewStyle } from 'react-native';
+import { useWalletLaunch } from './useWalletLaunch';
+import { resolveApplePayProps } from './walletButtonConfig';
+import type { PaymentSession } from '../types/definitions';
 import type { PaymentResult } from '../types/paymentresult';
-import { mapNativeResponseToPaymentResult } from '../native/NativeResponseMapper';
-import { useNativeViewTag } from './useNativeViewTag';
+import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfiguration';
 
-type ApplePayProps = {
-  widgetId: string;
+declare global {
+  var nativeFabricUIManager: unknown | null | undefined;
+}
+
+type NativeProps = ViewProps & {
+  type?: number;
+  buttonStyle?: number;
+  buttonBorderRadius?: number;
+  disabled?: boolean;
+};
+
+function resolveNativeComponent(): React.ComponentType<NativeProps> | null {
+  if (Platform.OS !== 'ios') {
+    return null;
+  }
+  try {
+    if (globalThis.nativeFabricUIManager != null) {
+      return require('../codegen/components/HyperApplePayNativeComponent')
+        .default as React.ComponentType<NativeProps>;
+    }
+    return requireNativeComponent(
+      'HyperApplePayButton'
+    ) as unknown as React.ComponentType<NativeProps>;
+  } catch {
+    return null;
+  }
+}
+
+const NativeHyperApplePayButton = resolveNativeComponent();
+
+export type ApplePayButtonProps = {
   options?: PaymentSheetConfiguration;
-  onPaymentResult: (result: PaymentResult) => void;
-  onChange?: (event: PaymentEventResult) => void;
-  onReady?: () => void;
+  session?: PaymentSession;
+  onPaymentResult?: (result: PaymentResult) => void;
+  disabled?: boolean;
   style?: ViewStyle;
 };
 
-export const ApplePayButton = forwardRef<
-  ApplePayElementHandle,
-  ApplePayProps
->((props: ApplePayProps, _: React.Ref<ApplePayElementHandle>) => {
-  const { widgetId, options, onPaymentResult, onChange, onReady, style } =
-    props;
-  const { paymentSessionConfig, hyperswitchConfig } = useHyperElementsContext();
-  const viewRef = useRef(null);
-  const viewTag = useNativeViewTag(viewRef, onReady);
+export function ApplePayButton({
+  options,
+  session,
+  onPaymentResult,
+  disabled = false,
+  style,
+}: ApplePayButtonProps) {
+  const colorScheme = useColorScheme();
+  const launch = useWalletLaunch({
+    wallet: 'apple_pay',
+    label: 'Apple Pay',
+    session,
+    onPaymentResult,
+  });
 
-  useEffect(() => {
-    if (viewTag === undefined) return undefined;
-    registerWidget(widgetId, viewTag);
-    return () => unregisterWidget(widgetId);
-  }, [viewTag, widgetId]);
+  const { hidden, type, buttonStyle, borderRadius } = resolveApplePayProps(
+    options,
+    colorScheme === 'dark' ? 'dark' : 'light'
+  );
 
-  // Old-arch view manager command "1": tells the native view to attach itself
-  // to the active payment session. Without it the widget mounts but renders
-  // an empty container on Paper.
-  useEffect(() => {
-    if (viewTag !== undefined) {
-      UIManager.dispatchViewManagerCommand(viewTag, 1, []);
-    }
-  }, [viewTag]);
-
-  const warningEmitted = useRef(false);
-
-  useEffect(() => {
-    if (!options || !onChange || warningEmitted.current) {
-      return;
-    }
-    const subscribedEvents = options.subscribedEvents as string[] | undefined;
-
-    const invalidEvents = validateSubscribedEventStrings(subscribedEvents);
-    if (invalidEvents.length > 0) {
-      warningEmitted.current = true;
-      const warningPayload = makeUnknownEventWarningPayload(invalidEvents);
-      onChange({
-        eventName: 'UNKNOWN_EVENT_SUBSCRIBED',
-        payload: JSON.stringify({
-          message: warningPayload.message,
-          invalidEvents: warningPayload.invalidEvents,
-          validEvents: warningPayload.validEvents,
-        }),
-      });
-    }
-  }, [options, onChange]);
-
-  const onPaymentResultInternal = (event: NativeEventEnvelope & { nativeEvent: {
-  eventName: string;
-  payload: string;
-  target: number;
-}}) => {
-    onPaymentResult(
-      mapNativeResponseToPaymentResult(
-        Platform.OS === 'ios'
-          ? event.nativeEvent.result ?? ""
-          : event.nativeEvent.payload ?? ""
-      )
-    );
-  };
-
-  const onPaymentEventInternal = (event: PaymentEventNative) => {
-    onChange?.(event.nativeEvent as PaymentEventResult);
-  };
+  if (hidden || NativeHyperApplePayButton == null) {
+    return null;
+  }
 
   return (
-    <NativePaymentWidgetImpl
-      ref={viewRef}
-      sdkAuthorization={paymentSessionConfig?.sdkAuthorization ?? ''}
-      widgetType="apple_pay"
-      onPaymentEvent={onPaymentEventInternal}
-      onPaymentResult={onPaymentResultInternal}
-      options={{
-        hyperswitchConfig: hyperswitchConfig || undefined,
-        paymentSessionConfig: paymentSessionConfig || undefined,
-        configuration: options as Record<string, unknown> | undefined,
-      }}
-      style={{ ...style, flex: 1 }}
-    />
+    <Pressable
+      focusable
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel="Apple Pay"
+      onPress={launch}
+      disabled={disabled}
+      style={style}
+    >
+      <NativeHyperApplePayButton
+        type={type}
+        buttonStyle={buttonStyle}
+        buttonBorderRadius={borderRadius}
+        disabled={disabled}
+        style={StyleSheet.absoluteFill}
+      />
+    </Pressable>
   );
-});
+}

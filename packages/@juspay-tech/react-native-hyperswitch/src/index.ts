@@ -5,6 +5,7 @@ import type {
   HyperswitchSession,
 } from './types/definitions';
 export type * from './types/savedPaymentMethods';
+export type * from './types/walletSession';
 export type * from './types/definitions';
 export type * from './types/elements';
 export type * from './types/NativeEventTypes';
@@ -59,6 +60,7 @@ export default Hyperswitch;
 export {
   HyperElements,
   usePaymentSession,
+  useWalletSession,
   useElements,
   useElements as useWidgets,
 } from './context/HyperElements';
@@ -67,6 +69,15 @@ export { CVCElement as CardCVCElement } from './views/CVCElement';
 
 export { PaymentElement } from './views/PaymentElement';
 
-export { ApplePayButton } from './views/ApplePayButton';
+export {
+  isPlatformPaySupported,
+  isGooglePaySupported,
+  isApplePaySupported,
+  isWalletSupported,
+} from './session/PlatformPaySupport';
 
 export { GooglePayButton } from './views/GooglePayButton';
+export type { GooglePayButtonProps } from './views/GooglePayButton';
+
+export { ApplePayButton } from './views/ApplePayButton';
+export type { ApplePayButtonProps } from './views/ApplePayButton';

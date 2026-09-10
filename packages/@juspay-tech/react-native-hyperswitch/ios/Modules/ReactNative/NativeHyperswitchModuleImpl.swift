@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import PassKit
 import React
 
 @objc(NativeHyperswitchModuleImpl)
@@ -14,6 +15,99 @@ public class NativeHyperswitchModuleImpl: NSObject {
     private var hyperswitchConfiguration: HyperswitchConfiguration?
     private var activePaymentSession: PaymentSession?
     private var activePaymentSessionHandler: PaymentSessionHandler?
+
+    private var activeWalletSessionHandler: WalletSessionHandler?
+    private var activeWalletSdkAuthorization: String?
+
+    @objc(isGooglePaySupportedWithResolve:reject:)
+    public func isGooglePaySupported(
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        resolve(false)
+    }
+
+    @objc(isApplePaySupportedWithResolve:reject:)
+    public func isApplePaySupported(
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        resolve(PKPaymentAuthorizationController.canMakePayments())
+    }
+
+    @objc(getWalletSessionWithParams:resolve:reject:)
+    public func getWalletSession(
+        params: NSDictionary,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        guard let hyperswitchConfig = hyperswitchConfiguration else {
+            resolve("{\"code\":\"error\",\"message\":\"SDK not initialized. Call initialise first.\"}")
+            return
+        }
+
+        guard
+            let sessionConfig = params["paymentSessionConfig"] as? [String: Any],
+            let sdkAuthorization = sessionConfig["sdkAuthorization"] as? String,
+            !sdkAuthorization.isEmpty
+        else {
+            resolve("{\"code\":\"error\",\"message\":\"paymentSessionConfig.sdkAuthorization is required\"}")
+            return
+        }
+
+        // Reuse only while the intent is unchanged. A new sdkAuthorization means
+        // updateIntent replaced the intent, so the handler is rebuilt against it.
+        if activeWalletSessionHandler != nil,
+           activeWalletSdkAuthorization == sdkAuthorization {
+            resolve("{\"code\":\"success\",\"message\":\"Wallet session already initialized\"}")
+            return
+        }
+
+        let session = PaymentSession(
+            paymentSessionConfiguration: PaymentSessionConfiguration(sdkAuthorization: sdkAuthorization),
+            hyperswitchConfiguration: hyperswitchConfig
+        )
+        activePaymentSession = session
+        activeWalletSessionHandler = nil
+        activeWalletSdkAuthorization = sdkAuthorization
+
+        var resolved = false
+        session.getWalletSession { [weak self] handler in
+            self?.activeWalletSessionHandler = handler
+            if !resolved {
+                resolved = true
+                resolve("{\"code\":\"success\",\"message\":\"Wallet session is initialized\"}")
+            }
+        }
+    }
+
+    @objc(isWalletEligibleWithWallet:resolve:reject:)
+    public func isWalletEligible(
+        wallet: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        guard let handler = activeWalletSessionHandler else {
+            resolve(false)
+            return
+        }
+        resolve(handler.isWalletEligible(wallet))
+    }
+
+    @objc(launchWalletWithWallet:resolve:reject:)
+    public func launchWallet(
+        wallet: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        guard let handler = activeWalletSessionHandler else {
+            resolve("{\"status\":\"failed\",\"message\":\"Wallet session handler not initialized.\"}")
+            return
+        }
+        handler.launchWallet(wallet) { paymentResult in
+            resolve(self.paymentResultToString(paymentResult))
+        }
+    }
 
     // MARK: - initialise
     @objc(initialiseWithPublishableKey:platformPublishableKey:profileId:environment:customEndpoints:resolve:reject:)
@@ -98,6 +192,7 @@ public class NativeHyperswitchModuleImpl: NSObject {
             hyperswitchConfiguration: hyperswitchConfig
         )
         activePaymentSession = session
+        activeWalletSessionHandler = nil
         activePaymentSessionHandler = nil
 
         DispatchQueue.main.async {
@@ -163,6 +258,8 @@ public class NativeHyperswitchModuleImpl: NSObject {
             hyperswitchConfiguration: hyperswitchConfig
         )
         activePaymentSession = session
+        activeWalletSessionHandler = nil
+        activeWalletSdkAuthorization = nil
 
         // Extract configuration (hiddenPaymentMethods, etc.) from params
         let configuration: SavedPaymentMethodsConfiguration?

@@ -9,6 +9,7 @@ import com.facebook.react.uimanager.ViewManager
 import com.hyperswitchsdkreactnative.modules.NativeWidgetHelperModule
 import com.hyperswitchsdkreactnative.modules.ReactNativeHyperswitchModule
 import com.hyperswitchsdkreactnative.views.PaymentElementViewManager
+import io.hyperswitch.googlepay.HyperGooglePayButtonManager
 import io.hyperswitch.react.GooglePayButtonManager
 import io.hyperswitch.react.HyperHeadlessModule
 import io.hyperswitch.react.HyperModule
@@ -28,6 +29,7 @@ class HyperswitchSdkReactNativePackage : BaseReactPackage() {
   override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> {
     val viewManagers: MutableList<ViewManager<*, *>> = ArrayList()
     viewManagers.add(GooglePayButtonManager())
+    viewManagers.add(HyperGooglePayButtonManager())
     viewManagers.add(PaymentElementViewManager())
     return viewManagers
   }

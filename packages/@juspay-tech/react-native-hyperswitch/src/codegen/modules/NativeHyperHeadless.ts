@@ -16,6 +16,12 @@ export interface Spec extends TurboModule {
     callback: (result: Object) => void
   ): void;
 
+  getWalletSession(
+    rootTag: number,
+    wallets: Array<Object>,
+    callback: (result: Object) => void
+  ): void;
+
   exitHeadless(rootTag: number, status: string): void;
 }
 

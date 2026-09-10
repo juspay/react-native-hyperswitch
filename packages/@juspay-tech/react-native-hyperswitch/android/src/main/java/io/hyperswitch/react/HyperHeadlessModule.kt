@@ -9,7 +9,9 @@ import com.facebook.react.bridge.ReadableMap
 import com.hyperswitchsdkreactnative.NativeHyperHeadlessSpec
 import io.hyperswitch.paymentsession.ExitHeadlessCallBackManager
 import io.hyperswitch.paymentsession.GetPaymentSessionCallBackManager
+import io.hyperswitch.paymentsession.GetWalletSessionCallBackManager
 import io.hyperswitch.paymentsession.PaymentSessionHandlerImpl
+import io.hyperswitch.paymentsession.WalletSessionHandlerImpl
 
 class HyperHeadlessModule internal constructor(private val rct: ReactApplicationContext) :
     NativeHyperHeadlessSpec(rct) {
@@ -31,6 +33,19 @@ class HyperHeadlessModule internal constructor(private val rct: ReactApplication
             jsCallback = callback,
         )
       GetPaymentSessionCallBackManager.executeCallback(handler)
+    }
+
+    @ReactMethod
+    override fun getWalletSession(
+        rootTag: Double,
+        wallets: ReadableArray,
+        callback: Callback
+    ) {
+        val handler = WalletSessionHandlerImpl(
+            walletsData = wallets,
+            jsCallback = callback,
+        )
+        GetWalletSessionCallBackManager.executeCallback(handler)
     }
 
     @ReactMethod

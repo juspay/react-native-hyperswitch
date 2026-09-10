@@ -30,6 +30,16 @@ export interface Spec extends TurboModule {
     reactTag: number,
     token: string
   ): Promise<string>;
+
+  isGooglePaySupported(): Promise<boolean>;
+
+  isApplePaySupported(): Promise<boolean>;
+
+  getWalletSession(params?: Object): Promise<string>;
+
+  isWalletEligible(wallet: string): Promise<boolean>;
+
+  launchWallet(wallet: string): Promise<string>;
 }
 
 /**
