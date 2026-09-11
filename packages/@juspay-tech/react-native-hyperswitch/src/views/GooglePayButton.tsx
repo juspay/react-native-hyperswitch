@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import type { ViewProps, ViewStyle } from 'react-native';
 import { useWalletLaunch } from './useWalletLaunch';
+import { useWalletReady } from './useWalletReady';
 import { resolveGooglePayProps } from './walletButtonConfig';
 import type { PaymentSession } from '../types/definitions';
 import type { PaymentResult } from '../types/paymentresult';
@@ -45,6 +46,8 @@ export type GooglePayButtonProps = {
   options?: PaymentSheetConfiguration;
   session?: PaymentSession;
   onPaymentResult?: (result: PaymentResult) => void;
+  onReady?: () => void;
+  onLoadError?: (error: PaymentResult) => void;
   style?: ViewStyle;
 };
 
@@ -52,6 +55,8 @@ export function GooglePayButton({
   options,
   session,
   onPaymentResult,
+  onReady,
+  onLoadError,
   style,
 }: GooglePayButtonProps) {
   const colorScheme = useColorScheme();
@@ -60,6 +65,14 @@ export function GooglePayButton({
     label: 'Google Pay',
     session,
     onPaymentResult,
+  });
+
+  useWalletReady({
+    wallet: 'google_pay',
+    label: 'Google Pay',
+    session,
+    onReady,
+    onLoadError,
   });
 
   const { hidden, type, appearance, borderRadius } = resolveGooglePayProps(

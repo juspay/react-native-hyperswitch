@@ -15,7 +15,6 @@ import {
   SubscriptionEvent,
   isPlatformPaySupported,
   usePaymentSession,
-  useWalletSession,
   useWidgets,
   type CustomerLastUsedPaymentMethod,
   type CustomerSavedPaymentMethodsSession,
@@ -162,12 +161,7 @@ export function HyperContent(props: SharedProps) {
 
   const paymentSession = usePaymentSession();
 
-  const {
-    isGooglePayEligible,
-    isApplePayEligible,
-    loading: walletLoading,
-    load: loadWalletSession,
-  } = useWalletSession();
+  const [walletEligible, setWalletEligible] = useState<boolean | null>(null);
 
   const [deviceSupportsWallet, setDeviceSupportsWallet] = useState<
     boolean | null
@@ -294,13 +288,11 @@ export function HyperContent(props: SharedProps) {
           setLoadingSaved(false);
         }
       }
-
-      if (!cancelled) {
-        await loadWalletSession();
-      }
     };
 
-    void loadSavedPaymentMethods();
+    // TEMP: disabled while the wallet flow and the saved-methods flow contend
+    // for the shared headless surface on iOS. Uncomment to restore last-used.
+    // void loadSavedPaymentMethods();
 
     return () => {
       cancelled = true;
@@ -329,15 +321,11 @@ export function HyperContent(props: SharedProps) {
     [],
   );
 
-  const walletEligible =
-    Platform.OS === "ios" ? isApplePayEligible : isGooglePayEligible;
-
   const walletSupported = deviceSupportsWallet === true;
 
-  const walletResolving =
-    walletSupported && (deviceSupportsWallet === null || walletLoading);
+  const walletResolving = walletSupported && walletEligible === null;
 
-  const walletReady = walletSupported && walletEligible;
+  const walletReady = walletSupported && walletEligible === true;
 
 
   const handleCvcReady = useCallback(() => {
@@ -357,6 +345,7 @@ export function HyperContent(props: SharedProps) {
 
     setOverlayLoading(true);
     setMessage("");
+    setWalletEligible(null);
 
     try {
       await paymentSession.updateIntent(async () => {
@@ -446,6 +435,11 @@ export function HyperContent(props: SharedProps) {
             },
           }}
           style={{ width: "100%", height: 48 }}
+          onReady={() => setWalletEligible(true)}
+          onLoadError={(error) => {
+            console.log("[Example] Apple Pay unavailable", error.type);
+            setWalletEligible(false);
+          }}
           onPaymentResult={handlePaymentResult}
         />
       ) : (
@@ -461,6 +455,11 @@ export function HyperContent(props: SharedProps) {
             },
           }}
           style={{ width: "100%", height: 48 }}
+          onReady={() => setWalletEligible(true)}
+          onLoadError={(error) => {
+            console.log("[Example] Google Pay unavailable", error.type);
+            setWalletEligible(false);
+          }}
           onPaymentResult={handlePaymentResult}
         />
       )}

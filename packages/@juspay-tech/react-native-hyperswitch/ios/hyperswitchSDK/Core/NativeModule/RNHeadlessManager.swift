@@ -73,20 +73,26 @@ internal class RNHeadlessManager: RCTDefaultReactNativeFactoryDelegate {
 
     /// Stops any surface left over from a previous headless flow.
     ///
-    /// Dropping `rootView` is not enough on the new architecture: the surface
-    /// stays in `Status::Running`, and the next `viewForModule` re-points a
-    /// live surface, which trips the `SurfaceHandler::setUIManager` assertion.
-    /// Releasing the factory alongside the view retires the old surface with
-    /// its runtime, so each flow starts from a clean one.
+    /// Dropping `rootView` alone is not enough on the new architecture: the
+    /// surface stays in `Status::Running`, and the next `viewForModule`
+    /// re-points a live surface, which trips the `SurfaceHandler::setUIManager`
+    /// assertion. Stopping the surface retires it properly.
+    ///
+    /// The factory is deliberately kept. Releasing it tears down the whole
+    /// React instance, and the headless flows share this manager — so a flow
+    /// starting up would free the runtime another flow is still executing in,
+    /// crashing its JS thread with EXC_BAD_ACCESS.
     internal func teardownRunningSurface() {
-        guard rootView != nil || factory != nil else {
+        guard rootView != nil else {
             return
         }
 
         let drop = {
+            if let hosting = self.rootView as? RCTSurfaceHostingView {
+                hosting.surface.stop()
+            }
             self.rootView?.removeFromSuperview()
             self.rootView = nil
-            self.factory = nil
         }
 
         if Thread.isMainThread {

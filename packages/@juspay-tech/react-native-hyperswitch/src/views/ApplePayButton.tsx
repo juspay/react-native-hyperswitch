@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import type { ViewProps, ViewStyle } from 'react-native';
 import { useWalletLaunch } from './useWalletLaunch';
+import { useWalletReady } from './useWalletReady';
 import { resolveApplePayProps } from './walletButtonConfig';
 import type { PaymentSession } from '../types/definitions';
 import type { PaymentResult } from '../types/paymentresult';
@@ -46,6 +47,8 @@ export type ApplePayButtonProps = {
   options?: PaymentSheetConfiguration;
   session?: PaymentSession;
   onPaymentResult?: (result: PaymentResult) => void;
+  onReady?: () => void;
+  onLoadError?: (error: PaymentResult) => void;
   disabled?: boolean;
   style?: ViewStyle;
 };
@@ -54,6 +57,8 @@ export function ApplePayButton({
   options,
   session,
   onPaymentResult,
+  onReady,
+  onLoadError,
   disabled = false,
   style,
 }: ApplePayButtonProps) {
@@ -63,6 +68,14 @@ export function ApplePayButton({
     label: 'Apple Pay',
     session,
     onPaymentResult,
+  });
+
+  useWalletReady({
+    wallet: 'apple_pay',
+    label: 'Apple Pay',
+    session,
+    onReady,
+    onLoadError,
   });
 
   const { hidden, type, buttonStyle, borderRadius } = resolveApplePayProps(
