@@ -51,6 +51,8 @@ let forbiddenKeys = [
   "bin",
   "bin_number",
   "binNumber",
+  "extendedBin",
+  "extended_bin",
   "last4",
   "last_four",
   "last4_digits",

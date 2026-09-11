@@ -17,6 +17,7 @@ module SvgXml = {
     ~width: float=?,
     ~height: float=?,
     ~color: string=?,
+    ~fill: string=?,
   ) => React.element = "SvgXml"
 }
 
@@ -193,13 +194,15 @@ module Camera = {
   let make = (~size: float=20., ~color: string) =>
     cameraSvg->String.length === 0
       ? React.null
-      : <SvgXml xml=cameraSvg width=size height=size color />
+      : <SvgXml xml=cameraSvg width=size height=size fill=color />
 }
 
 module Cvc = {
+  let restingColor = "#858F97"
+
   @react.component
-  let make = (~size: float=32.) =>
+  let make = (~size: float=32., ~color: string=restingColor) =>
     cvvSvg->String.length === 0
       ? React.null
-      : <SvgXml xml=cvvSvg width=size height=size />
+      : <SvgXml xml=cvvSvg width=size height=size fill=color />
 }
