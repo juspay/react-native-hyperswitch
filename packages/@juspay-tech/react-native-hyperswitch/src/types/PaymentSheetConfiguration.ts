@@ -62,11 +62,13 @@ export interface Font {
 }
 
 export type SubscriptionEvent =
-  | 'PAYMENT_METHOD_INFO_CARD'
-  | 'PAYMENT_METHOD_STATUS'
-  | 'FORM_STATUS'
-  | 'PAYMENT_METHOD_INFO_BILLING_ADDRESS'
-  | 'CVC_STATUS';
+  | 'cardDetailsChange'
+  | 'paymentMethodChange'
+  | 'formStatusChange'
+  | 'billingDetailsChange'
+  | 'cvcStatusChange'
+  | 'surchargeInfo'
+  | 'appliedOffersInfo';
 
 export type Theme =
   | 'Default'

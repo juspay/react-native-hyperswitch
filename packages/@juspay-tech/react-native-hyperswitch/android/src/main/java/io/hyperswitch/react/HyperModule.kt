@@ -143,7 +143,7 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
   // Method to launch Google Pay payment
   @ReactMethod
   override fun launchGPay(googlePayRequest: String, callBack: Callback) {
-    currentActivity?.let {
+    reactApplicationContext.currentActivity?.let {
       GooglePayCallbackManager.setCallback(
         it,
         googlePayRequest,
@@ -199,13 +199,23 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
   @ReactMethod
   override fun exitPaymentsheet(rootTag: Double, paymentResult: String, reset: Boolean) {
     val isFragment = PaymentSheetCallbackManager.executeCallback(paymentResult)
-    (currentActivity as? FragmentActivity)?.let {
-      if (isFragment) it.supportFragmentManager.findFragmentByTag("paymentSheet")
-        ?.let { fragment ->
-          it.supportFragmentManager.beginTransaction().hide(fragment)
-            .commitAllowingStateLoss()
-        }
-      else it.finish()
+    // Teardown touches views (clearFocus) and commits a fragment transaction, both
+    // main-thread only, and this arrives on the JS thread like every other
+    // @ReactMethod. Mirrors findViewWithRootTag below.
+    UiThreadUtil.runOnUiThread {
+      (reactApplicationContext.currentActivity as? FragmentActivity)?.let {
+        if (isFragment) it.supportFragmentManager.findFragmentByTag("paymentSheet")
+          ?.let { fragment ->
+            // remove(), not hide(): nothing ever shows this fragment again — the next
+            // presentSheet() removes and rebuilds it. hide() only marks the view GONE,
+            // leaving the surface attached to android.R.id.content still holding input
+            // focus, which makes the host app untouchable until it is restarted.
+            it.currentFocus?.clearFocus()
+            it.supportFragmentManager.beginTransaction().remove(fragment)
+              .commitAllowingStateLoss()
+          }
+        else it.finish()
+      }
     }
   }
 
@@ -339,7 +349,7 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
     }
 
     mainHandler.post {
-      val activity = currentActivity ?: run {
+      val activity = reactApplicationContext.currentActivity ?: run {
         invokeCallback("")
         return@post
       }

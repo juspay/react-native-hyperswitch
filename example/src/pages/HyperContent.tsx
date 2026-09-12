@@ -148,10 +148,10 @@ const PAYMENT_ELEMENT_OPTIONS = {
   splitCardFields: true,
 
   subscribedEvents: [
-    "PAYMENT_METHOD_STATUS",
-    "PAYMENT_METHOD_INFO_BILLING_ADDRESS",
-    "PAYMENT_METHOD_INFO_CARD",
-    'FORM_STATUS',
+    "paymentMethodChange",
+    "billingDetailsChange",
+    "cardDetailsChange",
+    'formStatusChange',
   ] as SubscriptionEvent[],
 };
 
@@ -307,12 +307,12 @@ export function HyperContent(props: SharedProps) {
     (event: PaymentEventResult) => {
       console.log("[Example] PaymentElement onChange:", JSON.stringify(event));
 
-      if (event.eventName !== "PAYMENT_METHOD_STATUS") {
+      if (event.eventName !== "paymentMethodChange") {
         return;
       }
 
       console.log(
-        "[Example] PaymentElement ready from PAYMENT_METHOD_STATUS",
+        "[Example] PaymentElement ready from paymentMethodChange",
         JSON.stringify(event.payload),
       );
 
@@ -321,12 +321,25 @@ export function HyperContent(props: SharedProps) {
     [],
   );
 
-  const walletSupported = deviceSupportsWallet === true;
+  const handleWalletChange = useCallback((event: PaymentEventResult) => {
+    console.log(
+      `[Example] ${
+        Platform.OS === "ios" ? "ApplePayButton" : "GooglePayButton"
+      } onChange:`,
+      JSON.stringify(event),
+    );
 
-  const walletResolving = walletSupported && walletEligible === null;
+    if (event.eventName !== "paymentMethodChange") {
+      return;
+    }
 
-  const walletReady = walletSupported && walletEligible === true;
+    console.log(
+      "[Example] Wallet button ready from paymentMethodChange",
+      JSON.stringify(event.payload),
+    );
 
+    setWalletReady(true);
+  }, []);
 
   const handleCvcReady = useCallback(() => {
     console.log("[Example] CvcWidget ready");
@@ -401,76 +414,34 @@ export function HyperContent(props: SharedProps) {
     }
   }, [paymentSession, paymentId, amount, setSdkAuthorization]);
 
-  const lastSyncedAmount = useRef(amount);
-
-  useEffect(() => {
-    if (lastSyncedAmount.current === amount) {
-      return;
-    }
-    lastSyncedAmount.current = amount;
-
-    const syncIntent = async () => {
-      try {
-        await updateAmount();
-      } catch {
-        console.log("[Example] updateIntent failed for amount", amount);
-      }
-    };
-
-    syncIntent();
-  }, [amount, updateAmount]);
-
-  const walletButton = !walletSupported ? null : (
-    <View style={styles.walletWrapper}>
-      {Platform.OS === "ios" ? (
-        <ApplePayButton
-          options={{
-            appearance: { shapes: { borderRadius: 8 } },
-            walletButtonsConfiguration: {
-              applePay: {
-                visibility: "shown",
-                buttonType: "buy",
-                buttonStyle: { light: "black", dark: "white" },
-              },
-            },
-          }}
-          style={{ width: "100%", height: 48 }}
-          onReady={() => setWalletEligible(true)}
-          onLoadError={(error) => {
-            console.log("[Example] Apple Pay unavailable", error.type);
-            setWalletEligible(false);
-          }}
-          onPaymentResult={handlePaymentResult}
-        />
-      ) : (
-        <GooglePayButton
-          options={{
-            appearance: { shapes: { borderRadius: 8 } },
-            walletButtonsConfiguration: {
-              googlePay: {
-                visibility: "shown",
-                buttonType: "BUY",
-                buttonStyle: { light: "light", dark: "dark" },
-              },
-            },
-          }}
-          style={{ width: "100%", height: 48 }}
-          onReady={() => setWalletEligible(true)}
-          onLoadError={(error) => {
-            console.log("[Example] Google Pay unavailable", error.type);
-            setWalletEligible(false);
-          }}
-          onPaymentResult={handlePaymentResult}
-        />
-      )}
-
-      {!walletReady ? (
-        <View style={styles.walletOverlay}>
-          {walletResolving ? <ActivityIndicator /> : null}
-        </View>
-      ) : null}
-    </View>
-  );
+  const walletButton =
+    Platform.OS === "ios" ? (
+      <ApplePayButton
+        widgetId="apple-pay-button"
+        options={{
+          merchantDisplayName: "Hyperswitch Example",
+          appearance: {
+            ...WALLET_BUTTON_APPEARANCE,
+          },
+          subscribedEvents: ["paymentMethodChange"],
+        }}
+        onChange={handleWalletChange}
+        onPaymentResult={handlePaymentResult}
+      />
+    ) : (
+      <GooglePayButton
+        widgetId="google-pay-button"
+        options={{
+          merchantDisplayName: "Hyperswitch Example",
+          appearance: {
+            ...WALLET_BUTTON_APPEARANCE,
+          },
+          subscribedEvents: ["paymentMethodChange"],
+        }}
+        onChange={handleWalletChange}
+        onPaymentResult={handlePaymentResult}
+      />
+    );
 
   const requiresCvc = lastUsed?.payment_method === "card";
 
@@ -481,7 +452,7 @@ export function HyperContent(props: SharedProps) {
         placeholder: "123",
         appearance: CVC_APPEARANCE,
         cvcIcon: "hidden",
-        subscribedEvents: ["CVC_STATUS"],
+        subscribedEvents: ["cvcStatusChange"],
       }}
       onReady={handleCvcReady}
       onFocus={() => console.log("[Example] CvcWidget focused")}
@@ -498,7 +469,7 @@ export function HyperContent(props: SharedProps) {
    * PAYMENT SCREEN
    * ----------------
    * User cannot confirm until PaymentElement emits
-   * PAYMENT_METHOD_STATUS.
+   * paymentMethodChange.
    *
    * AMOUNT / SAVED METHOD SCREEN
    * ----------------------------
@@ -579,7 +550,7 @@ export function HyperContent(props: SharedProps) {
              * but we intentionally DO NOT enable confirm here.
              *
              * Confirm is enabled only after
-             * PAYMENT_METHOD_STATUS.
+             * paymentMethodChange.
              */
             console.log("[Example] PaymentElement onReady");
           }}

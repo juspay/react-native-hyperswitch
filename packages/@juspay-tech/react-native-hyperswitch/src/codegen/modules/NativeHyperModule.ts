@@ -1,6 +1,6 @@
 import type { TurboModule } from 'react-native';
 import { TurboModuleRegistry } from 'react-native';
-import { EventEmitter } from 'react-native/Libraries/Types/CodegenTypes';
+import type { EventEmitter } from 'react-native/Libraries/Types/CodegenTypes';
 
 /**
  * Codegen spec for the HyperModule TurboModule.
