@@ -82,7 +82,7 @@ export const CVCElement = forwardRef<CVCWidgetRef, CVCElementProps>(
     const onPaymentEventInternal = (event: PaymentEventNative) => {
       onChange?.(event.nativeEvent);
 
-      if (event.nativeEvent.eventName === 'CVC_STATUS') {
+      if (event.nativeEvent.eventName === 'cvcStatusChange') {
         try {
           const payloadString = event.nativeEvent.payload;
           const outerDict = (

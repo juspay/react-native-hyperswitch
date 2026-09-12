@@ -172,7 +172,7 @@ class PaymentSessionReactLauncher(
             .remove(existingFragment)
             .commitNowAllowingStateLoss()
         }
-      }catch(e:Exception){
+      } catch (e: Exception) {
       }
 
       val newReactNativeFragmentSheet =
@@ -182,8 +182,16 @@ class PaymentSessionReactLauncher(
           .setFabricEnabled(BuildConfig.IS_NEW_ARCHITECTURE_ENABLED)
           .build()
 
-      fragmentActivity.onBackPressedDispatcher.addCallback {
-        newReactNativeFragmentSheet.onBackPressed()
+      // Scope the callback to the fragment's lifecycle — without an owner every
+      // presentSheet() leaks another callback onto the host activity's dispatcher.
+      // addCallback(owner) registers a LifecycleObserver, and LifecycleRegistry
+      // enforces the main thread, so only THIS is posted. The transaction below
+      // stays synchronous, exactly as it was before, so the surface mounts on the
+      // same frame it always did.
+      UiThreadUtil.runOnUiThread {
+        fragmentActivity.onBackPressedDispatcher.addCallback(newReactNativeFragmentSheet) {
+          newReactNativeFragmentSheet.onBackPressed()
+        }
       }
 
       fragmentManager.beginTransaction()

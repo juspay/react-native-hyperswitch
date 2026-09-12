@@ -14,7 +14,7 @@ class HyperswitchNetcetera3dsModule(reactContext: ReactApplicationContext) :
   val hsNetceteraUtils = HsNetceteraUtils()
   val applicationContext = reactApplicationContext.applicationContext as Application
   private fun getActivity(): Activity? {
-    return currentActivity ?: reactApplicationContext.currentActivity
+    return reactApplicationContext.currentActivity
   }
   override fun getName(): String {
     return "HyperswitchNetcetera3ds"
