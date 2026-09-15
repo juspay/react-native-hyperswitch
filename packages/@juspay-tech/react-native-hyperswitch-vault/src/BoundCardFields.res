@@ -294,7 +294,12 @@ module Cvc = {
               justifyContent: #center,
               alignItems: #center,
             })}>
-            <CardIcons.Cvc size=32. />
+            <CardIcons.Cvc
+              size=32.
+              color={Validation.checkCardCVC(controller.values.cvc, controller.values.brand)
+                ? ctx.theme.primaryColor
+                : CardIcons.Cvc.restingColor}
+            />
           </View>,
         )
       }}

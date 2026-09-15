@@ -294,6 +294,35 @@ describe('CardForm', () => {
     ]);
   });
 
+  it('carries the eight-digit extendedBin a provider reports through to the payload', async () => {
+    useMock({
+      vaultType: 'vgs',
+      readyDelayMs: 0,
+      fieldState: { empty: false, valid: true, brand: 'visa' },
+      /* What a host reports once eight digits are typed — six for `bin`, eight for `extendedBin`. */
+      cardDetails: { bin: '424242', extendedBin: '42424242', last4: '4242' },
+    });
+    const formChanges: CardFormChange[] = [];
+    render(
+      <CardForm
+        vaultDetails={details('vgs')}
+        onChange={(e) => formChanges.push(e)}
+      >
+        <CardNumberField />
+        <CardExpiryField />
+        <CardCVCField />
+      </CardForm>
+    );
+    await waitFor(() =>
+      expect(formChanges.at(-1)?.payload.extendedBin).toBe('42424242')
+    );
+    expect(formChanges.at(-1)!.payload).toMatchObject({
+      bin: '424242',
+      extendedBin: '42424242',
+      last4: '4242',
+    });
+  });
+
   it('emits the cardDetailsChange envelope on the form and the web change on each field', async () => {
     useMock({
       vaultType: 'vgs',
@@ -328,6 +357,8 @@ describe('CardForm', () => {
     expect(last.eventName).toBe('cardDetailsChange');
     expect(last.payload).toEqual({
       bin: null,
+      /* Eight digits are only reported once eight have been typed; this fixture types none. */
+      extendedBin: null,
       last4: null,
       brand: 'Visa',
       expiryMonth: null,

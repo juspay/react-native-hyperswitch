@@ -86,6 +86,7 @@ const Host: ProviderAdapter['Host'] = ({
         const payload = event?.payload ?? {};
         const details: Partial<CardDetails> = {
           bin: payload.bin ?? null,
+          extendedBin: payload.extendedBin ?? null,
           last4: payload.last4 ?? null,
           brand: payload.brand ?? null,
           expiryMonth: payload.expiryMonth ?? null,
