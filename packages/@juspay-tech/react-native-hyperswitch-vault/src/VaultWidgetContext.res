@@ -1,5 +1,12 @@
 open ReactNative
 
+/*
+ * Opaque on the TS side (genType emits it as an unknown-shaped handle): a headless caller
+ * (payment-methods' `hyperswitch` provider adapter) can hold this value and hand it to each
+ * field's `~form` prop without knowing its shape — it never inspects it, only threads it from
+ * wherever the session was established through to each field.
+ */
+@genType.opaque
 type contextValue = {
   controller: VaultCardController.controller,
   theme: CardFormTypes.cardTheme,
@@ -34,6 +41,28 @@ let useRequired = (widgetName: string): contextValue =>
   | None =>
     Js.Exn.raiseError(widgetName ++ " must be rendered inside a <CardForm>.")
   }
+
+/*
+ * A headless caller (payment-methods' `hyperswitch` provider adapter) can hold this value and
+ * hand it to each field's `~form` prop without knowing its shape — it never inspects it, only
+ * threads it from wherever the session was established through to each field. `useContext` is
+ * still called unconditionally on every render (Rules of Hooks), its result is just ignored when
+ * `override` is present.
+ */
+let useResolved = (widgetName: string, ~override: option<contextValue>=?): contextValue => {
+  let fromContext = React.useContext(context)
+  switch override {
+  | Some(value) => value
+  | None =>
+    switch fromContext {
+    | Some(value) => value
+    | None =>
+      Js.Exn.raiseError(
+        widgetName ++ " must be rendered inside a <CardForm>, or receive a `form` prop.",
+      )
+    }
+  }
+}
 
 module ErrorText = {
   @react.component

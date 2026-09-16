@@ -108,6 +108,8 @@ const Field: ProviderAdapter['Field'] = ({
   collector,
   placeholder,
   styles,
+  options,
+  appearanceVariables,
   onChange,
   onFocus,
   onBlur,
@@ -118,7 +120,9 @@ const Field: ProviderAdapter['Field'] = ({
   const flatStyle = StyleSheet.flatten(styles?.container) as
     { height?: number } | undefined;
   const containerHeight =
-    typeof flatStyle?.height === 'number' ? flatStyle.height : undefined;
+    typeof flatStyle?.height === 'number'
+      ? flatStyle.height
+      : appearanceVariables?.inputFieldHeight;
 
   const handleState = (state: unknown) => {
     const s = (state ?? {}) as VgsFieldState;
@@ -144,6 +148,12 @@ const Field: ProviderAdapter['Field'] = ({
     placeholder,
     containerStyle: styles?.container as object | undefined,
     textStyle: styles?.input as object | undefined,
+    // VGS's own SDK has no labelBehavior/errorDisplay/label concept and no theming
+    // variables beyond what `styles` already covers — only this subset has a real
+    // equivalent on its components.
+    placeholderTextColor: appearanceVariables?.colorTextPlaceholder,
+    accessibilityLabel: options?.accessibilityLabel,
+    accessibilityHint: options?.accessibilityHint,
     onStateChange: handleState,
   };
   const Specialized = FIELD_COMPONENT[elementType];

@@ -7,7 +7,8 @@ import {
   useRef,
 } from 'react';
 import { useFormBinding } from './useFormBinding';
-import { resolveFieldStyles } from '../core/appearance';
+import { resolveAppearanceVariables, resolveFieldStyles } from '../core/appearance';
+import { coreOf } from '../core/formRegistry';
 import type { ElementType, FieldChange, FieldHandle } from '../core/types';
 import { Placeholder } from './Placeholder';
 import type { FieldProps } from './types';
@@ -26,6 +27,18 @@ export function createCardField(elementType: ElementType, displayName: string) {
       ...rest
     } = props;
     const ctx = useFormBinding(form);
+    const core = form ? coreOf(form) : undefined;
+
+    const onCollectorReady = useCallback(
+      (next: unknown) => {
+        if (!core) return;
+        core.collector = next;
+        core.session.attachCollector(next);
+        core.status = 'ready';
+        core.notify();
+      },
+      [core]
+    );
 
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
@@ -77,6 +90,10 @@ export function createCardField(elementType: ElementType, displayName: string) {
       () => resolveFieldStyles(ctx?.appearances, elementType, ownStyles),
       [ctx?.appearances, ownStyles]
     );
+    const appearanceVariables = useMemo(
+      () => resolveAppearanceVariables(ctx?.appearances),
+      [ctx?.appearances]
+    );
 
     const mounted = ctx !== null && ctx.collector !== undefined;
     useEffect(() => {
@@ -102,10 +119,13 @@ export function createCardField(elementType: ElementType, displayName: string) {
         collector={ctx.collector}
         fieldRef={fieldRef}
         styles={styles}
+        options={options}
+        appearanceVariables={appearanceVariables}
         savedCard={savedCard}
         onChange={handleChange}
         onFocus={onFocus}
         onBlur={onBlur}
+        onCollectorReady={onCollectorReady}
         {...rest}
       />
     );

@@ -126,9 +126,14 @@ const Field: ProviderAdapter['Field'] = ({
   placeholder,
   styles,
 }) => {
+  // Evervault's Card* components take a single `style` prop (no separate container/input/
+  // label slots), so every FieldStyles layer this SDK can plausibly honor is merged into it.
   const inputStyle = StyleSheet.flatten([
     styles?.container,
     styles?.input,
+    styles?.placeholder,
+    styles?.label,
+    styles?.error,
   ]) as InputStyle;
   switch (elementType) {
     case 'cardNumber':

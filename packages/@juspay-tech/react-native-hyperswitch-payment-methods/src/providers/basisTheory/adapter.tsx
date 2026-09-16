@@ -120,7 +120,13 @@ const Field: ProviderAdapter['Field'] = ({
 }) => {
   const { refs } = collector as BtCollector;
 
-  const mergedStyle = StyleSheet.flatten([styles?.container, styles?.input]);
+  const mergedStyle = StyleSheet.flatten([
+    styles?.container,
+    styles?.input,
+    styles?.placeholder,
+    styles?.label,
+    styles?.error,
+  ]);
   const handleChange = onChange
     ? (event: unknown) => {
         const e = (event ?? {}) as BtChangeEvent;

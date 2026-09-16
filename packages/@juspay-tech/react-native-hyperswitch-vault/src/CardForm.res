@@ -31,8 +31,16 @@ let make = React.forwardRef((
     "onReady": option<VaultPublicState.cardFormEvent => unit>,
     "onChange": option<VaultPublicState.cardFormChange => unit>,
 
+    /*
+     * Lets a headless caller (payment-methods' `hyperswitch` provider adapter) read the session's
+     * `contextValue` out of a form that has no rendered children of its own — see `~form` on the
+     * individual fields. Fires on every render that produces a new `contextValue` (it isn't
+     * memoized), which is fine: the callback is expected to be a cheap store update.
+     */
+    "onContext": option<VaultWidgetContext.contextValue => unit>,
+
     "unstyled": option<bool>,
-    "children": React.element,
+    "children": option<React.element>,
   },
   ref,
 ) => {
@@ -64,7 +72,14 @@ let make = React.forwardRef((
     focus: host.focusField,
   })
 
+  let onContext = props["onContext"]
+  let contextValue = host.contextValue
+  React.useEffect1(() => {
+    onContext->Option.forEach(fn => fn(contextValue))
+    None
+  }, [contextValue])
+
   <VaultWidgetContext.ContextProvider value={Some(host.contextValue)}>
-    {props["children"]}
+    {props["children"]->Option.getOr(React.null)}
   </VaultWidgetContext.ContextProvider>
 })

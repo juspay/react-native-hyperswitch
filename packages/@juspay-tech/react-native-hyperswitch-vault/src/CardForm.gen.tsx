@@ -15,6 +15,8 @@ import type {cardFormEvent as VaultPublicState_cardFormEvent} from './VaultPubli
 
 import type {cardholderNameMode as CardFieldOptions_cardholderNameMode} from './CardFieldOptions.gen';
 
+import type {contextValue as VaultWidgetContext_contextValue} from './VaultWidgetContext.gen';
+
 import type {customEndpoints as VaultEndpoint_customEndpoints} from './VaultEndpoint.gen';
 
 import type {eligibilityConfig as VaultFormOptions_eligibilityConfig} from './VaultFormOptions.gen';
@@ -37,7 +39,7 @@ export type Props = {
   readonly accessible?: boolean; 
   readonly appearance?: VaultFormOptions_appearance; 
   readonly cardholderName?: CardFieldOptions_cardholderNameMode; 
-  readonly children: React.ReactNode; 
+  readonly children?: React.ReactNode; 
   readonly customEndpoints?: VaultEndpoint_customEndpoints; 
   readonly disabled?: boolean; 
   readonly eligibility?: VaultFormOptions_eligibilityConfig; 
@@ -46,6 +48,7 @@ export type Props = {
   readonly locale?: string; 
   readonly localisation?: VaultFormOptions_localisation; 
   readonly onChange?: (_1:VaultPublicState_cardFormChange) => void; 
+  readonly onContext?: (_1:VaultWidgetContext_contextValue) => void; 
   readonly onReady?: (_1:VaultPublicState_cardFormEvent) => void; 
   readonly sdkAuthorization?: string; 
   readonly session?: VaultFormOptions_vaultSession; 
@@ -57,7 +60,7 @@ export const make: React.ComponentType<{
   readonly accessible?: boolean; 
   readonly appearance?: VaultFormOptions_appearance; 
   readonly cardholderName?: CardFieldOptions_cardholderNameMode; 
-  readonly children: React.ReactNode; 
+  readonly children?: React.ReactNode; 
   readonly customEndpoints?: VaultEndpoint_customEndpoints; 
   readonly disabled?: boolean; 
   readonly eligibility?: VaultFormOptions_eligibilityConfig; 
@@ -66,6 +69,7 @@ export const make: React.ComponentType<{
   readonly locale?: string; 
   readonly localisation?: VaultFormOptions_localisation; 
   readonly onChange?: (_1:VaultPublicState_cardFormChange) => void; 
+  readonly onContext?: (_1:VaultWidgetContext_contextValue) => void; 
   readonly onReady?: (_1:VaultPublicState_cardFormEvent) => void; 
   readonly sdkAuthorization?: string; 
   readonly session?: VaultFormOptions_vaultSession; 

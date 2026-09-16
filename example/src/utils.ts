@@ -10,10 +10,10 @@ export const initialBaseUrl =
 
 export const publishableKey =
   process.env.HYPERSWITCH_PUBLISHABLE_KEY ??
-  "";
-export const profileId = process.env.PROFILE_ID ?? "";
+  "pk_snd_0865007b3cf24b60aca85d0d3fca4dc1";
+export const profileId = process.env.PROFILE_ID ?? "pro_7Pwp56VvrSTJWHyco9oV";
 export const secretKey =
-  process.env.HYPERSWITCH_SECRET_KEY ?? "";
+  process.env.HYPERSWITCH_SECRET_KEY ?? "snd_NBcgWnVKlh1RNX7s2zLsv1OAcwEDr7oLlum2DhPuXniHscEzMtxWLtq4xQc2A0da";
 
 export const serverURL = process.env.SERVER_URL ?? "";
 export const getCustomisationOptions = (layout: LayoutType = "tabs") : PaymentSheetConfiguration => ({

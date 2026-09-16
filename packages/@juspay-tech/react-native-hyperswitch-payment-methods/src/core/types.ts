@@ -15,14 +15,58 @@ export interface VaultDetails {
 }
 
 export interface FieldStyles {
+  root?: StyleProp<ViewStyle>;
+
   container?: StyleProp<ViewStyle>;
 
   input?: StyleProp<TextStyle>;
+
+  placeholder?: StyleProp<TextStyle>;
+
+  label?: StyleProp<TextStyle>;
+
+  error?: StyleProp<TextStyle>;
+
+  accessory?: StyleProp<ViewStyle>;
+}
+
+/**
+ * Flat theming primitives forwarded to a vault's own native/webview rendering (as opposed to
+ * `FieldStyles`, which are plain React Native style objects). Currently only the `hyperswitch`
+ * vault adapter honors these — other adapters ignore fields they don't support.
+ */
+export interface AppearanceVariables {
+  colorPrimary?: string;
+  colorText?: string;
+  colorDanger?: string;
+  colorTextPlaceholder?: string;
+  colorBackground?: string;
+  borderColor?: string;
+  borderRadius?: number;
+  borderWidth?: number;
+  fontFamily?: string;
+  fontScale?: number;
+  inputFieldHeight?: number;
+  gap?: number;
+  placeholderTextSizeAdjust?: number;
+  errorTextSizeAdjust?: number;
+  errorMessageSpacing?: number;
+  cardBrandIcon?: BrandIconMode;
 }
 
 export interface Appearance extends FieldStyles {
   fields?: Partial<Record<ElementType, FieldStyles>>;
+
+  variables?: AppearanceVariables;
 }
+
+export type LabelBehavior = 'above' | 'floating' | 'never';
+
+export type ErrorDisplay = 'none' | 'colorOnly' | 'inline';
+
+export type BrandIconMode = 'standard' | 'animated' | 'hidden' | 'hideGeneric';
+
+export type CvcIconDisplay = 'hidden' | 'default';
 
 export interface SavedCardData {
   cardNetwork?: string;
@@ -40,6 +84,24 @@ export interface SavedCard {
 
 export interface FieldOptions {
   savedCard?: SavedCard;
+
+  label?: string;
+
+  labelBehavior?: LabelBehavior;
+
+  errorDisplay?: ErrorDisplay;
+
+  unstyled?: boolean;
+
+  accessibilityLabel?: string;
+
+  accessibilityHint?: string;
+
+  /** Only honored on the `cardNumber` field. */
+  cardBrandIcon?: BrandIconMode;
+
+  /** Only honored on the `cardCvc` field. */
+  cvcIcon?: CvcIconDisplay;
 }
 
 export interface FieldEvent {
