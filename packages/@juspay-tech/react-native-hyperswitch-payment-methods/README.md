@@ -37,7 +37,7 @@ actionable "install X" error via `onError`.
 
 ## Usage
 
-Wrap the checkout in `<HyperPaymentMethodsSession>`. It carries the payment session, the
+Wrap the checkout in `<HyperPaymentMethodSession>`. It carries the payment session, the
 vault configuration and the appearance, so a form below it is just `<CardForm>` and its
 fields — the same code for every provider.
 
@@ -49,7 +49,7 @@ one of the two.
 import { useRef } from 'react';
 import {
   Hyperswitch,
-  HyperPaymentMethodsSession,
+  HyperPaymentMethodSession,
   CardForm,
   CardNumberField,
   CardExpiryField,
@@ -78,7 +78,7 @@ function Checkout({ sdkAuthorization, appearance }) {
   };
 
   return (
-    <HyperPaymentMethodsSession
+    <HyperPaymentMethodSession
       hyper={hyper}
       options={{ sdkAuthorization, appearance }}
     >
@@ -88,7 +88,7 @@ function Checkout({ sdkAuthorization, appearance }) {
         <CardCVCField />
         <CardholderNameField />
       </CardForm>
-    </HyperPaymentMethodsSession>
+    </HyperPaymentMethodSession>
   );
 }
 ```
@@ -196,7 +196,7 @@ Descendant components can also use the `useCardForm()` hook.
 Mount **only** the CVC field and give it the stored card's token:
 
 ```tsx
-<HyperPaymentMethodsSession hyper={hyper} options={{ sdkAuthorization }}>
+<HyperPaymentMethodSession hyper={hyper} options={{ sdkAuthorization }}>
   <CardForm ref={vaultRef}>
     <CardCVCField
     options={{
@@ -207,7 +207,7 @@ Mount **only** the CVC field and give it the stored card's token:
     }}
   />
   </CardForm>
-</HyperPaymentMethodsSession>;
+</HyperPaymentMethodSession>;
 
 const result = await vaultRef.current?.tokenize();
 ```
@@ -354,7 +354,7 @@ A field has the same two slots as the Hyperswitch vault fields:
 `fields` narrowing a default to one element type:
 
 ```tsx
-<HyperPaymentMethodsSession
+<HyperPaymentMethodSession
   hyper={hyper}
   options={{
     sdkAuthorization,

@@ -11,7 +11,7 @@ import {
 } from '@jest/globals';
 import { render, screen, act, waitFor } from '@testing-library/react-native';
 
-import { HyperPaymentMethodsSession } from '../HyperPaymentMethodsSession';
+import { HyperPaymentMethodSession } from '../HyperPaymentMethodSession';
 import { usePaymentMethodsSession } from '../usePaymentMethodsSession';
 import { Hyperswitch } from '../init';
 import { CardForm } from '../../core/CardForm';
@@ -66,13 +66,13 @@ async function tokenizeVia(ref: RefObject<CardFormHandle | null>) {
   return result;
 }
 
-describe('HyperPaymentMethodsSession', () => {
+describe('HyperPaymentMethodSession', () => {
   it('configures a bare <CardForm> from options.vaultDetails', async () => {
     installMock({ vaultType: 'skyflow' });
     const ref = createRef<CardFormHandle>();
 
     render(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={hyper}
         options={{
           sdkAuthorization: 'sdk_auth',
@@ -84,7 +84,7 @@ describe('HyperPaymentMethodsSession', () => {
           <CardExpiryField />
           <CardCVCField />
         </CardForm>
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
 
     await waitFor(() =>
@@ -113,7 +113,7 @@ describe('HyperPaymentMethodsSession', () => {
     }
 
     render(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={hyperPromise}
         options={{
           sdkAuthorization: 'sdk_auth',
@@ -124,7 +124,7 @@ describe('HyperPaymentMethodsSession', () => {
         <CardForm>
           <CardNumberField />
         </CardForm>
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
 
     await waitFor(() =>
@@ -157,7 +157,7 @@ describe('HyperPaymentMethodsSession', () => {
     }
 
     render(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={rejected}
         options={{
           sdkAuthorization: 'sdk_auth',
@@ -166,7 +166,7 @@ describe('HyperPaymentMethodsSession', () => {
         onError={onError}
       >
         <Probe />
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
 
     await waitFor(() =>
@@ -180,7 +180,7 @@ describe('HyperPaymentMethodsSession', () => {
     const ref = createRef<CardFormHandle>();
 
     render(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={hyper}
         options={{
           sdkAuthorization: 'sdk_auth',
@@ -190,7 +190,7 @@ describe('HyperPaymentMethodsSession', () => {
         <CardForm ref={ref} vaultDetails={details('evervault')}>
           <CardNumberField />
         </CardForm>
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
 
     await waitFor(() =>
@@ -228,7 +228,7 @@ describe('appearance', () => {
     installMock();
 
     render(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={hyper}
         options={{
           sdkAuthorization: 'sdk_auth',
@@ -240,7 +240,7 @@ describe('appearance', () => {
           <CardNumberField />
           <CardCVCField styles={{ container: { borderWidth: 4 } }} />
         </CardForm>
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
 
     await waitFor(() =>
@@ -262,7 +262,7 @@ describe('appearance', () => {
     installMock();
 
     render(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={hyper}
         options={{
           sdkAuthorization: 'sdk_auth',
@@ -273,7 +273,7 @@ describe('appearance', () => {
         <CardForm appearance={{ container: { borderColor: '#0f0' } }}>
           <CardNumberField />
         </CardForm>
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
 
     await waitFor(() =>
@@ -295,7 +295,7 @@ describe('saved-card CVC', () => {
     installMock(options);
     const ref = createRef<CardFormHandle>();
     render(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={hyper}
         options={{
           sdkAuthorization: 'sdk_auth',
@@ -306,7 +306,7 @@ describe('saved-card CVC', () => {
           <CardCVCField options={{ savedCard }} />
           {extra}
         </CardForm>
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
     return ref;
   }
@@ -376,7 +376,7 @@ describe('saved-card CVC', () => {
     const ref = createRef<CardFormHandle>();
 
     render(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={hyper}
         options={{
           sdkAuthorization: 'sdk_auth',
@@ -386,7 +386,7 @@ describe('saved-card CVC', () => {
         <CardForm ref={ref}>
           <CardNumberField options={{ savedCard: saved('tok_saved') }} />
         </CardForm>
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
 
     await waitFor(() =>
@@ -404,7 +404,7 @@ describe('saved-card CVC', () => {
     const ref = createRef<CardFormHandle>();
 
     const view = render(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={hyper}
         options={{
           sdkAuthorization: 'sdk_auth',
@@ -414,7 +414,7 @@ describe('saved-card CVC', () => {
         <CardForm ref={ref}>
           <CardCVCField options={{ savedCard: saved('tok_saved') }} />
         </CardForm>
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
 
     await waitFor(() =>
@@ -422,7 +422,7 @@ describe('saved-card CVC', () => {
     );
 
     view.rerender(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={hyper}
         options={{
           sdkAuthorization: 'sdk_auth',
@@ -432,7 +432,7 @@ describe('saved-card CVC', () => {
         <CardForm ref={ref}>
           <CardNumberField />
         </CardForm>
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
 
     await waitFor(() =>
@@ -466,13 +466,13 @@ describe('saved-card CVC', () => {
 });
 
 describe('usePaymentMethodsSession', () => {
-  it('throws outside a <HyperPaymentMethodsSession>', () => {
+  it('throws outside a <HyperPaymentMethodSession>', () => {
     function Probe() {
       usePaymentMethodsSession();
       return null;
     }
     expect(() => render(<Probe />)).toThrow(
-      /must be used inside a <HyperPaymentMethodsSession>/
+      /must be used inside a <HyperPaymentMethodSession>/
     );
   });
 });
@@ -525,7 +525,7 @@ describe('resolving the vault from an sdkAuthorization', () => {
     const ref = createRef<CardFormHandle>();
 
     render(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={hyper}
         options={{ sdkAuthorization: VALID_AUTH }}
       >
@@ -533,7 +533,7 @@ describe('resolving the vault from an sdkAuthorization', () => {
         <CardForm ref={ref}>
           <CardNumberField />
         </CardForm>
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
 
     await waitFor(() =>
@@ -560,12 +560,12 @@ describe('resolving the vault from an sdkAuthorization', () => {
     const checkoutSession = Promise.resolve({ publishableKey: 'pk_test' });
 
     render(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={checkoutSession}
         options={{ sdkAuthorization: VALID_AUTH }}
       >
         <VaultProbe />
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
 
     await waitFor(() =>
@@ -589,7 +589,7 @@ describe('resolving the vault from an sdkAuthorization', () => {
     });
 
     render(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={Hyperswitch.init({
           publishableKey: 'pk_test',
           profileId: 'pro_456',
@@ -598,7 +598,7 @@ describe('resolving the vault from an sdkAuthorization', () => {
         options={{ sdkAuthorization: VALID_AUTH }}
       >
         <VaultProbe />
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
@@ -612,7 +612,7 @@ describe('resolving the vault from an sdkAuthorization', () => {
     const ref = createRef<CardFormHandle>();
 
     render(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={hyper}
         options={{
           sdkAuthorization: VALID_AUTH,
@@ -622,7 +622,7 @@ describe('resolving the vault from an sdkAuthorization', () => {
         <CardForm ref={ref}>
           <CardNumberField />
         </CardForm>
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
 
     await waitFor(() =>
@@ -645,7 +645,7 @@ describe('resolving the vault from an sdkAuthorization', () => {
     const ref = createRef<CardFormHandle>();
 
     render(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={hyper}
         options={{ sdkAuthorization: VALID_AUTH }}
       >
@@ -653,7 +653,7 @@ describe('resolving the vault from an sdkAuthorization', () => {
         <CardForm ref={ref}>
           <CardNumberField />
         </CardForm>
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
 
     await waitFor(() =>
@@ -676,7 +676,7 @@ describe('resolving the vault from an sdkAuthorization', () => {
     const ref = createRef<CardFormHandle>();
 
     render(
-      <HyperPaymentMethodsSession
+      <HyperPaymentMethodSession
         hyper={hyper}
         options={{ sdkAuthorization: VALID_AUTH }}
         onError={onError}
@@ -685,7 +685,7 @@ describe('resolving the vault from an sdkAuthorization', () => {
         <CardForm ref={ref}>
           <CardNumberField />
         </CardForm>
-      </HyperPaymentMethodsSession>
+      </HyperPaymentMethodSession>
     );
 
     await waitFor(() =>

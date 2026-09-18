@@ -62,7 +62,7 @@ export function checkConfiguration(
       'unsupported_configuration',
       unresolved?.reason ??
         'No vault configuration. Pass options.vaultDetails or options.sdkAuthorization on ' +
-          '<HyperPaymentMethodsSession>, or vaultDetails directly on <CardForm>.'
+          '<HyperPaymentMethodSession>, or vaultDetails directly on <CardForm>.'
     );
   }
 

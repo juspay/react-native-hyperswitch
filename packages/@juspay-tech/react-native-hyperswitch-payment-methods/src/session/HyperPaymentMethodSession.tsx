@@ -11,26 +11,26 @@ interface CommonOptions {
   appearance?: Appearance;
 }
 
-export type HyperPaymentMethodsSessionOptions =
+export type HyperPaymentMethodSessionOptions =
   | (CommonOptions & { vaultDetails: VaultDetails; sdkAuthorization?: string })
   | (CommonOptions & { sdkAuthorization: string; vaultDetails?: VaultDetails });
 
-export interface HyperPaymentMethodsSessionProps {
+export interface HyperPaymentMethodSessionProps {
   hyper: HyperswitchConfiguration | Promise<HyperswitchConfiguration>;
 
-  options: HyperPaymentMethodsSessionOptions;
+  options: HyperPaymentMethodSessionOptions;
 
   onError?: (error: Error) => void;
 
   children: ReactNode;
 }
 
-export function HyperPaymentMethodsSession({
+export function HyperPaymentMethodSession({
   hyper,
   options,
   onError,
   children,
-}: HyperPaymentMethodsSessionProps) {
+}: HyperPaymentMethodSessionProps) {
   const {
     appearance,
     vaultDetails: providedVaultDetails,

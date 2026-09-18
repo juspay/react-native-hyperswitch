@@ -1,6 +1,6 @@
 {
   "name": "@juspay-tech/react-native-hyperswitch-vault",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Hyperswitch card form for React Native. Authored in ReScript, published as JavaScript with genType-generated TypeScript declarations.",
   "license": "Apache-2.0",
   "main": "dist/cjs/index.js",

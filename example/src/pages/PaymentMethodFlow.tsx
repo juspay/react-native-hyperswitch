@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import {
   Hyperswitch as HyperswitchPaymentMethods,
-  HyperPaymentMethodsSession,
+  HyperPaymentMethodSession,
   CardForm,
   CardNumberField,
   CardExpiryField,
@@ -96,7 +96,7 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
       </View>
 
       {sdkAuthorization ? (
-        <HyperPaymentMethodsSession
+        <HyperPaymentMethodSession
           hyper={hyper}
           options={{ sdkAuthorization, appearance }}
           onError={(error) => setStatus(error.message)}
@@ -125,7 +125,7 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
           >
             <Text style={styles.buttonText}>Tokenize</Text>
           </TouchableOpacity>
-        </HyperPaymentMethodsSession>
+        </HyperPaymentMethodSession>
       ) : (
         <TouchableOpacity style={styles.button} onPress={start} disabled={busy}>
           <Text style={styles.buttonText}>Start payment method session</Text>

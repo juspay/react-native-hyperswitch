@@ -6,7 +6,7 @@ export function usePaymentMethodsSession(): PaymentMethodsSession {
   const session = useContext(SessionContext);
   if (!session) {
     throw new Error(
-      'usePaymentMethodsSession must be used inside a <HyperPaymentMethodsSession>.'
+      'usePaymentMethodsSession must be used inside a <HyperPaymentMethodSession>.'
     );
   }
   return session;

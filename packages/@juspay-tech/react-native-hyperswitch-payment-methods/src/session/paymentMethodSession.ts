@@ -35,7 +35,7 @@ function createCardForm(
   if (!adapter.createCollector) {
     throw new Error(
       `The ${vaultDetails.vaultType} SDK builds its client from a React provider, so its ` +
-        'fields cannot be mounted detached. Use <HyperPaymentMethodsSession> with <CardForm> ' +
+        'fields cannot be mounted detached. Use <HyperPaymentMethodSession> with <CardForm> ' +
         'for this vault.'
     );
   }

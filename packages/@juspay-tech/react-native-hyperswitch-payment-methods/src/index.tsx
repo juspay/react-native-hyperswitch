@@ -19,11 +19,11 @@ export type {
   OverrideEndpointConfiguration,
 } from './session/fetchVaultDetails';
 
-export { HyperPaymentMethodsSession } from './session/HyperPaymentMethodsSession';
+export { HyperPaymentMethodSession } from './session/HyperPaymentMethodSession';
 export type {
-  HyperPaymentMethodsSessionOptions,
-  HyperPaymentMethodsSessionProps,
-} from './session/HyperPaymentMethodsSession';
+  HyperPaymentMethodSessionOptions,
+  HyperPaymentMethodSessionProps,
+} from './session/HyperPaymentMethodSession';
 export { usePaymentMethodsSession } from './session/usePaymentMethodsSession';
 export type { PaymentMethodsSession } from './session/SessionContext';
 

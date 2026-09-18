@@ -49,7 +49,7 @@ export function createFormSession(
         undefined,
         'unsupported_configuration',
         'No vault configuration. Pass options.vaultDetails or options.sdkAuthorization on ' +
-          '<HyperPaymentMethodsSession>, or vaultDetails directly on <CardForm>.'
+          '<HyperPaymentMethodSession>, or vaultDetails directly on <CardForm>.'
       );
     }
 
