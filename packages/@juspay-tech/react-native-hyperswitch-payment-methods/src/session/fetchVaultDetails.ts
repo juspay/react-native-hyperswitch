@@ -37,7 +37,13 @@ export interface FetchVaultDetailsOptions {
 }
 
 export type FetchVaultDetailsResult =
-  { ok: true; vaultDetails: VaultDetails } | { ok: false; message: string };
+  | {
+      ok: true;
+      vaultDetails: VaultDetails;
+      /** Hyperswitch vault only: the looked-up session with `vault_details` filled in, for expiry checks. */
+      session?: Record<string, unknown>;
+    }
+  | { ok: false; message: string };
 
 function camelize(key: string): string {
   return key.replace(/_([a-z0-9])/g, (_, character: string) =>
@@ -83,7 +89,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function readVaultDetails(body: unknown, sdkAuthorization: string): FetchVaultDetailsResult {
+/**
+ * The lookup response does not repeat the authorization it was fetched with;
+ * the vault reads it from `vault_details.vault_data.sdk_authorization` (and
+ * `expires_at` from the root), so fill that in as the web runtime does.
+ */
+export function toVaultSession(
+  body: Record<string, unknown>,
+  sdkAuthorization: string
+): Record<string, unknown> {
+  const own = isRecord(body.vault_details) ? body.vault_details : {};
+  const ownData = isRecord(own.vault_data) ? own.vault_data : {};
+  return {
+    ...body,
+    vault_details: {
+      ...own,
+      vault_type: 'hyperswitch',
+      vault_data: { ...ownData, sdk_authorization: sdkAuthorization },
+    },
+  };
+}
+
+export function readVaultDetails(
+  body: unknown,
+  sdkAuthorization: string
+): FetchVaultDetailsResult {
   if (!isRecord(body)) {
     return {
       ok: false,
@@ -105,6 +135,9 @@ export function readVaultDetails(body: unknown, sdkAuthorization: string): Fetch
           vaultType: ownType,
           vaultData: toVaultData(ownType, ownData),
         },
+        ...(ownType === 'hyperswitch'
+          ? { session: toVaultSession(body, sdkAuthorization) }
+          : {}),
       };
     }
   }
@@ -113,7 +146,11 @@ export function readVaultDetails(body: unknown, sdkAuthorization: string): Fetch
   if (!isRecord(external)) {
     return {
       ok: true,
-      vaultDetails: { vaultType: 'hyperswitch', vaultData: { sdkAuthorization: sdkAuthorization } },
+      vaultDetails: {
+        vaultType: 'hyperswitch',
+        vaultData: { sdkAuthorization: sdkAuthorization },
+      },
+      session: toVaultSession(body, sdkAuthorization),
     };
   }
 

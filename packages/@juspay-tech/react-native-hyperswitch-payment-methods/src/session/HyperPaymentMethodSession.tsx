@@ -3,12 +3,17 @@ import type { ReactNode } from 'react';
 
 import { SessionContext } from './SessionContext';
 import type { PaymentMethodsSession } from './SessionContext';
+import { VaultSessionContext } from './VaultSessionContext';
+import type { VaultSession } from './VaultSessionContext';
 import type { HyperswitchConfiguration } from './config';
 import { fetchVaultDetails } from './fetchVaultDetails';
 import type { Appearance, VaultDetails } from '../core/types';
 
 interface CommonOptions {
   appearance?: Appearance;
+
+  /** The web SDK's `options.locale`; forwarded to the vault fields. */
+  locale?: string;
 }
 
 export type HyperPaymentMethodSessionOptions =
@@ -18,12 +23,26 @@ export type HyperPaymentMethodSessionOptions =
 export interface HyperPaymentMethodSessionProps {
   hyper: HyperswitchConfiguration | Promise<HyperswitchConfiguration>;
 
-  options: HyperPaymentMethodSessionOptions;
+  /** An object, or a promise of one, as the web wrapper accepts. */
+  options:
+    | HyperPaymentMethodSessionOptions
+    | Promise<HyperPaymentMethodSessionOptions>;
 
   onError?: (error: Error) => void;
 
   children: ReactNode;
 }
+
+function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as Promise<T>).then === 'function'
+  );
+}
+
+const toError = (reason: unknown): Error =>
+  reason instanceof Error ? reason : new Error(String(reason));
 
 export function HyperPaymentMethodSession({
   hyper,
@@ -31,11 +50,44 @@ export function HyperPaymentMethodSession({
   onError,
   children,
 }: HyperPaymentMethodSessionProps) {
-  const {
-    appearance,
-    vaultDetails: providedVaultDetails,
-    sdkAuthorization,
-  } = options;
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+
+  const immediateOptions = isPromiseLike(options) ? null : options;
+  const [awaitedOptions, setAwaitedOptions] =
+    useState<HyperPaymentMethodSessionOptions | null>(null);
+  const [optionsError, setOptionsError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    if (!isPromiseLike(options)) {
+      setOptionsError(null);
+      return;
+    }
+    let cancelled = false;
+    options.then(
+      (value) => {
+        if (cancelled) return;
+        setAwaitedOptions(value);
+        setOptionsError(null);
+      },
+      (reason: unknown) => {
+        if (cancelled) return;
+        const failure = toError(reason);
+        setAwaitedOptions(null);
+        setOptionsError(failure);
+        onErrorRef.current?.(failure);
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [options]);
+
+  const resolvedOptions = immediateOptions ?? awaitedOptions;
+  const appearance = resolvedOptions?.appearance;
+  const locale = resolvedOptions?.locale;
+  const providedVaultDetails = resolvedOptions?.vaultDetails;
+  const sdkAuthorization = resolvedOptions?.sdkAuthorization;
 
   const [resolvedHyper, setResolvedHyper] =
     useState<HyperswitchConfiguration | null>(null);
@@ -43,11 +95,11 @@ export function HyperPaymentMethodSession({
 
   const [fetchedVaultDetails, setFetchedVaultDetails] =
     useState<VaultDetails | null>(null);
+  const [fetchedSession, setFetchedSession] = useState<VaultSession | null>(
+    null
+  );
   const [vaultLoading, setVaultLoading] = useState(false);
   const [vaultError, setVaultError] = useState<Error | null>(null);
-
-  const onErrorRef = useRef(onError);
-  onErrorRef.current = onError;
 
   useEffect(() => {
     let cancelled = false;
@@ -60,8 +112,7 @@ export function HyperPaymentMethodSession({
       },
       (reason: unknown) => {
         if (cancelled) return;
-        const failure =
-          reason instanceof Error ? reason : new Error(String(reason));
+        const failure = toError(reason);
         setResolvedHyper(null);
         setHyperError(failure);
         onErrorRef.current?.(failure);
@@ -76,11 +127,16 @@ export function HyperPaymentMethodSession({
   useEffect(() => {
     if (providedVaultDetails || !sdkAuthorization) {
       setFetchedVaultDetails(null);
+      setFetchedSession(null);
       setVaultLoading(false);
       setVaultError(null);
       return;
     }
 
+    // A replaced sdkAuthorization must not keep serving the previous
+    // session's vault details or expiry while the new lookup is in flight.
+    setFetchedVaultDetails(null);
+    setFetchedSession(null);
     setVaultLoading(true);
     setVaultError(null);
     if (!resolvedHyper) return;
@@ -97,11 +153,13 @@ export function HyperPaymentMethodSession({
       if (cancelled) return;
       if (result.ok) {
         setFetchedVaultDetails(result.vaultDetails);
+        setFetchedSession(result.session ?? null);
         setVaultLoading(false);
         return;
       }
       const failure = new Error(result.message);
       setFetchedVaultDetails(null);
+      setFetchedSession(null);
       setVaultError(failure);
       setVaultLoading(false);
       onErrorRef.current?.(failure);
@@ -113,14 +171,18 @@ export function HyperPaymentMethodSession({
     };
   }, [providedVaultDetails, sdkAuthorization, resolvedHyper]);
 
+  const optionsPending = resolvedOptions === null && optionsError === null;
+
   const value = useMemo<PaymentMethodsSession>(
     () => ({
       hyper: resolvedHyper,
       sdkAuthorization: sdkAuthorization ?? null,
       vaultDetails: providedVaultDetails ?? fetchedVaultDetails,
       appearance: appearance ?? null,
-      loading: (!resolvedHyper && !hyperError) || vaultLoading,
-      error: hyperError ?? vaultError,
+      locale: locale ?? null,
+      loading:
+        (!resolvedHyper && !hyperError) || vaultLoading || optionsPending,
+      error: hyperError ?? optionsError ?? vaultError,
     }),
     [
       resolvedHyper,
@@ -128,13 +190,22 @@ export function HyperPaymentMethodSession({
       providedVaultDetails,
       fetchedVaultDetails,
       appearance,
+      locale,
       hyperError,
+      optionsError,
+      optionsPending,
       vaultLoading,
       vaultError,
     ]
   );
 
+  const vaultSession = providedVaultDetails ? null : fetchedSession;
+
   return (
-    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+    <SessionContext.Provider value={value}>
+      <VaultSessionContext.Provider value={vaultSession}>
+        {children}
+      </VaultSessionContext.Provider>
+    </SessionContext.Provider>
   );
 }

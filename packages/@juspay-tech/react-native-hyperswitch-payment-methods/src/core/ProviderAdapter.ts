@@ -1,8 +1,10 @@
 import type { ComponentType, ReactNode, Ref } from 'react';
 import type {
+  CardBrandIconDisplay,
   CardDetails,
   CvcIconDisplay,
   ElementType,
+  FieldAppearance,
   FieldChange,
   FieldEvent,
   FieldHandle,
@@ -31,6 +33,10 @@ export interface ProviderFieldProps<Collector = unknown> {
   savedCard?: SavedCard;
 
   cvcIcon?: CvcIconDisplay;
+
+  cardBrandIcon?: CardBrandIconDisplay;
+
+  appearance?: FieldAppearance;
   onChange?: (change: FieldChange) => void;
   onFocus?: (event: FieldEvent) => void;
   onBlur?: (event: FieldEvent) => void;

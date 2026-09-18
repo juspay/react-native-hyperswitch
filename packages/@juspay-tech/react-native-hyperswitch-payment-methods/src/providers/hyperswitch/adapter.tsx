@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useContext, useEffect, useMemo, useRef } from 'react';
 
 import { fieldChange } from '../../core/fieldChange';
+import { FormContext } from '../../core/FormContext';
 import type { ProviderAdapter } from '../../core/ProviderAdapter';
 import { errorResult, messageOf } from '../../core/results';
 import type {
@@ -9,6 +10,14 @@ import type {
   TokenizeErrorCode,
   TokenizeResult,
 } from '../../core/types';
+import { resolveLocale } from '../../session/deviceLocale';
+import { SessionContext } from '../../session/SessionContext';
+import { VaultSessionContext } from '../../session/VaultSessionContext';
+import {
+  mergeFieldStyles,
+  resolveFieldAppearance,
+  toVaultAppearance,
+} from './appearance';
 import type { HyperswitchVaultData } from './types';
 
 declare const require: (moduleId: string) => unknown;
@@ -59,6 +68,15 @@ function validateVaultData(raw: unknown): HyperswitchVaultData {
   return raw as unknown as HyperswitchVaultData;
 }
 
+/** The authorization a looked-up session was shaped for, so a form that overrides `vaultDetails` never inherits a stranger's expiry. */
+function sessionAuthorization(session: Record<string, unknown>): string {
+  const details = isRecord(session.vault_details) ? session.vault_details : {};
+  const data = isRecord(details.vault_data) ? details.vault_data : {};
+  return typeof data.sdk_authorization === 'string'
+    ? data.sdk_authorization
+    : '';
+}
+
 const Host: ProviderAdapter['Host'] = ({
   vaultData,
   onReady,
@@ -69,6 +87,34 @@ const Host: ProviderAdapter['Host'] = ({
   const data = vaultData as HyperswitchVaultData;
   const formRef = useRef<any>(null);
 
+  // Configuration that the merchant gave the session (not the vault
+  // credentials) is read from context so the public `HyperswitchVaultData`
+  // stays the web's `{sdkAuthorization}`.
+  const session = useContext(SessionContext);
+  const lookedUp = useContext(VaultSessionContext);
+  const form = useContext(FormContext);
+
+  const hyper = session?.hyper;
+  // An explicit vaultData.environment wins; then the instance the session was
+  // created with (its lookup used the same value, default PROD); a bare
+  // <CardForm> outside a session keeps its previous SANDBOX default.
+  const environment =
+    data.environment ?? hyper?.environment ?? (session ? 'PROD' : 'SANDBOX');
+  const customEndpoints = hyper?.customEndpoints;
+  // Web: omitted or 'auto' means the browser language. Inside a session the
+  // same rule resolves to the device locale; a bare <CardForm> outside a
+  // session keeps its previous behaviour (the vault's English).
+  const locale = session ? resolveLocale(session.locale) : undefined;
+  const layers = form?.appearances;
+  const appearance = useMemo(
+    () => (layers ? toVaultAppearance(layers) : undefined),
+    [layers]
+  );
+  const vaultSession =
+    lookedUp && sessionAuthorization(lookedUp) === data.sdkAuthorization
+      ? lookedUp
+      : undefined;
+
   useEffect(() => {
     if (formRef.current) onReady(formRef.current);
     else onError(new Error('The Hyperswitch vault form did not mount.'));
@@ -77,11 +123,18 @@ const Host: ProviderAdapter['Host'] = ({
   return (
     <VaultCardForm
       ref={formRef}
-      vaultDetails={{
-        vaultType: 'hyperswitch',
-        vaultData: { sdkAuthorization: data.sdkAuthorization },
-      }}
-      environment={data.environment ?? 'SANDBOX'}
+      {...(vaultSession
+        ? { session: vaultSession }
+        : {
+            vaultDetails: {
+              vaultType: 'hyperswitch',
+              vaultData: { sdkAuthorization: data.sdkAuthorization },
+            },
+          })}
+      environment={environment}
+      customEndpoints={customEndpoints}
+      locale={locale}
+      appearance={appearance}
       onChange={(event: any) => {
         const payload = event?.payload ?? {};
         const details: Partial<CardDetails> = {
@@ -107,20 +160,32 @@ const Field: ProviderAdapter['Field'] = ({
   testID,
   savedCard,
   cvcIcon,
+  cardBrandIcon,
+  appearance,
   onChange,
   onFocus,
   onBlur,
 }) => {
   const Component = FIELD_COMPONENT[elementType] as any;
+  const fieldAppearance = useMemo(
+    () => resolveFieldAppearance(appearance),
+    [appearance]
+  );
+  const vaultStyles = useMemo(
+    () => mergeFieldStyles(fieldAppearance.styles, styles),
+    [fieldAppearance, styles]
+  );
   if (!Component) return null;
 
   return (
     <Component
-      styles={styles}
+      styles={vaultStyles}
       placeholder={placeholder}
       testID={testID}
+      labelBehavior={fieldAppearance.labelBehavior}
       options={savedCard ? { savedCard } : undefined}
       cvcIcon={elementType === 'cardCvc' ? cvcIcon : undefined}
+      cardBrandIcon={elementType === 'cardNumber' ? cardBrandIcon : undefined}
       onChange={(event: any) =>
         onChange?.(
           fieldChange(elementType, {
