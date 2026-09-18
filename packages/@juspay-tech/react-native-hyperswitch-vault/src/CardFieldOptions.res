@@ -305,15 +305,24 @@ let resolveCvc = (
     ~defaultLabel=labels.cvcFloatingLabel,
   )
 
+// An explicit per-field icon setting always wins. Without one, an unstyled
+// field shows no icon (the host that draws the chrome may draw its own),
+// otherwise the form-wide / default mode applies.
 let resolveBrandIconMode = (
   options: option<cardNumberOptions>,
   ~formWide: brandIconMode,
   ~unstyled: bool,
 ): brandIconMode =>
-  unstyled ? #hidden : options->Option.flatMap(o => o.cardBrandIcon)->Option.getOr(formWide)
+  switch options->Option.flatMap(o => o.cardBrandIcon) {
+  | Some(mode) => mode
+  | None => unstyled ? #hidden : formWide
+  }
 
 let cvcIconOf = (options: option<cvcOptions>, ~unstyled: bool) =>
-  unstyled ? #hidden : options->Option.flatMap(o => o.cvcIcon)->Option.getOr(defaultCvcIcon)
+  switch options->Option.flatMap(o => o.cvcIcon) {
+  | Some(mode) => mode
+  | None => unstyled ? #hidden : defaultCvcIcon
+  }
 
 let unstyledFor = (fieldUnstyled: option<bool>, ~formWide: bool) =>
   fieldUnstyled->Option.getOr(formWide)

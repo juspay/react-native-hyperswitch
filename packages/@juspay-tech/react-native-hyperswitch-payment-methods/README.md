@@ -191,6 +191,109 @@ await HyperswitchPaymentMethods.tokenize('checkout');
 
 Descendant components can also use the `useCardForm()` hook.
 
+### Confirming a payment through the form (host SDKs)
+
+For the Hyperswitch vault the form can own the whole card leg of a payment: it tokenizes,
+builds the card representation, merges the non-card context you pass, POSTs
+`${endpoint.baseUrl}/payments/${paymentId}/confirm`, and hands back the **complete** backend
+body. Available on the form ref, on `useCardForm()`, and by id:
+
+```ts
+const result = await HyperswitchPaymentMethods.confirmCardPayment('checkout', {
+  paymentId,
+  auth: { type: 'sdk_authorization', authorization }, // or { type: 'publishable_key', publishableKey, clientSecret }
+  endpoint: { baseUrl },                              // the resolved payment backend, never guessed
+  appId, paymentMethodType, paymentMethodData /* billing only */, customerAcceptance,
+  browserInfo, returnUrl, paymentType, email,         // already computed by the host; forwarded as given
+});
+
+if (result.status === 'backend_response') {
+  handle(result.response); // the parsed JSON body, for 2xx AND non-2xx
+} else {
+  // 'validation_error' | 'not_ready' | 'tokenization_error' | 'network_error' | 'unknown_outcome'
+  show(result.error.message);
+}
+```
+
+- `auth` is the **payment-intent** credential and is separate from the vault `sdkAuthorization`
+  in `vaultDetails`. `sdk_authorization` sends the `Authorization` header and no `client_secret`;
+  `publishable_key` sends `api-key` and puts `client_secret` in the body.
+- The host never supplies a card source, a token or any card key; the form decides those from its
+  own state. Card keys in `paymentMethodData` are refused.
+- One operation per form at a time: a second `confirmCardPayment` while one is pending returns the
+  same promise; `tokenize` during a confirm (and vice versa) is refused without a request. A retry
+  after a failed confirm re-sends the confirm only — the token minted for the same card is reused.
+- Providers without payment support (VGS, Skyflow, Basis Theory, Evervault) answer
+  `not_ready` / `unsupported_configuration`; their `tokenize` path is unchanged.
+- Hyperswitch vault: `vaultData.environment` is required for confirmation; `nickName` in
+  `paymentMethodData` is currently dropped on this path (recorded behaviour, unchanged).
+
+### Direct card, no vault (host SDKs)
+
+When the merchant profile does not tokenize (`vaulting_action = skip`), mount the form in
+**explicit direct mode** instead of with `vaultDetails`. No payment-method session exists,
+nothing is tokenized, and the raw card never leaves the provider's secure fields; on
+`confirmCardPayment` the provider POSTs `payment_method_data.card` to
+`${endpoint.baseUrl}/payments/${paymentId}/confirm` itself and hands back the complete body.
+
+```tsx
+<CardForm
+  id="checkout"
+  directCard={{
+    environment: 'SANDBOX',                     // required; also picks the asset host
+    enabledCardSchemes: ['Visa', 'Mastercard'], // optional: selects / offers the network
+    cardholderName: 'external',                 // optional: collect (default) | external | omit
+    eligibility: {                              // optional: the provider probes eligibility itself
+      paymentId, auth: { type: 'sdk_authorization', authorization },
+      appId, endpoint: { baseUrl },
+    },
+  }}
+>
+  <CardNumberField />
+  <CardExpiryField />
+  <CardCVCField />
+</CardForm>
+
+const result = await HyperswitchPaymentMethods.confirmCardPayment('checkout', {
+  paymentId, auth, endpoint, appId, paymentMethodType,
+  paymentMethodData: { billing, nickName, cardholderName }, // nickname IS sent; name only with cardholderName: 'external'
+  customerAcceptance, browserInfo, returnUrl, paymentType, email,
+  eligibilityRequired: true,                  // gate the confirm on the provider's verdict
+});
+```
+
+- Direct mode is never inferred: `directCard` must be passed, and it cannot be combined with
+  `vaultDetails` (prop or session). A form with neither is a configuration error, exactly as
+  before. `tokenize()` on a direct form answers `unsupported_configuration` without a request.
+- The request is the same `payment_method_data.card` a checkout's own card form sends
+  (`card_number`, `card_exp_month`, `card_exp_year`, `card_cvc`, `card_network`, `nick_name`,
+  plus `card_holder_name` when a `CardholderNameField` is mounted); the PAN is sent digits-only
+  and the year as four digits, as the web SDK does.
+- `CardFormChange.payload` additionally reports `isCoBadged`, `eligibility`
+  (`unknown | pending | allowed | denied`) and `networkError` (the provider's message when the
+  network is outside `enabledCardSchemes`; while present, `valid` is `false`). It never carries
+  the PAN, CVC or expiry input.
+- `enabledCardSchemes` selects the network: exactly one detected scheme enabled (a single-network
+  card, or a co-badged card of which you accept one network) is selected automatically with no
+  chooser; several enabled show the provider's chooser, with the detected brand until the user
+  picks; none enabled makes the form invalid (`networkError`, `valid: false`) as soon as the number
+  is complete — before any submit — and it recovers when the number changes to an accepted card.
+  `payload.brand` is always the network in force and it is what `card_network` carries.
+- `cardholderName` picks where the holder name comes from: `'collect'` (default) a mounted
+  `<CardholderNameField />`; `'external'` the host passes it on the confirm input as
+  `paymentMethodData.cardholderName` (no name field is rendered or required; blank is omitted);
+  `'omit'` none is sent. The name lands in `payment_method_data.card.card_holder_name`, the
+  nickname in `nick_name`, always as separate keys. In any other mode a host-supplied name is
+  refused (`not_ready` / `unsupported_configuration`) rather than silently dropped.
+- `eligibility` probes `/payments/{id}/eligibility` inside the provider as soon as the number is
+  complete; only the request context (payment id, credential, app id, endpoint) crosses this
+  boundary. With `eligibilityRequired: true` a denied card answers
+  `validation_error` / `card_not_eligible` and no confirm is sent; the form stays usable. Without
+  a mount-time `eligibility`, `eligibilityRequired` makes the confirm run the probe first.
+- Only the Hyperswitch provider supports direct mode today (its fields ship the confirm
+  transport). Tokenized forms are unchanged: `vaultDetails` still requires `sdkAuthorization`,
+  `tokenize()` returns the same shapes, and the tokenized confirm still drops `nickName`.
+
 ## Saved card — CVC recollect
 
 Mount **only** the CVC field and give it the stored card's token:

@@ -37,6 +37,15 @@ type finalConfirmRequest = {
   signal?: VaultConfirm.abortSignal,
 }
 
+// The decoded outcome plus the complete parsed backend body it was decoded from.
+// `response` is `Some` whenever the backend answered with a JSON body, whether the
+// HTTP status was 2xx or not; it is `None` when the request never produced a
+// readable body (fetch rejected, aborted, or the body was not JSON).
+type finalConfirmOutcome = {
+  outcome: navOutcome,
+  response: option<JSON.t>,
+}
+
 let reasonForCode = (code: string) =>
   switch code {
   | "IR_00" | "IR_01" | "IR_03" => Unauthorized
@@ -159,7 +168,7 @@ let describeHttpFailure = (parsed: option<JSON.t>, _status: int): navOutcome => 
 let confirmUrl = (~baseUrl, ~paymentId) =>
   `${baseUrl}/payments/${paymentId->encodeURIComponent}/confirm`
 
-let confirmPayment = async (request: finalConfirmRequest): navOutcome => {
+let confirmPayment = async (request: finalConfirmRequest): finalConfirmOutcome => {
   let url = confirmUrl(~baseUrl=request.baseUrl, ~paymentId=request.paymentId)
 
   let controller = VaultConfirm.makeAbortController()
@@ -199,9 +208,7 @@ let confirmPayment = async (request: finalConfirmRequest): navOutcome => {
   timer->Option.forEach(VaultConfirm.clearTimeout)
 
   switch attempted {
-  | Error() =>
-
-    UnknownOutcome
+  | Error() => {outcome: UnknownOutcome, response: None}
   | Ok(response) =>
     let status = response->VaultConfirm.responseStatus
     let parsed = try {
@@ -212,11 +219,11 @@ let confirmPayment = async (request: finalConfirmRequest): navOutcome => {
 
     if response->VaultConfirm.responseOk {
       switch parsed {
-      | None => Failed({reason: MalformedResponse})
-      | Some(json) => json->decodeConfirmResponse
+      | None => {outcome: Failed({reason: MalformedResponse}), response: None}
+      | Some(json) => {outcome: json->decodeConfirmResponse, response: Some(json)}
       }
     } else {
-      describeHttpFailure(parsed, status)
+      {outcome: describeHttpFailure(parsed, status), response: parsed}
     }
   }
 }

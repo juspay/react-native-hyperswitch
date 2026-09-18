@@ -2,7 +2,7 @@
 type paymentMethodType = [#credit | #debit]
 
 @genType
-type paymentType = [#new_mandate | #setup_mandate]
+type paymentType = [#normal | #new_mandate | #setup_mandate | #recurring_mandate]
 
 @genType
 type acceptanceType = [#online | #offline]
@@ -44,8 +44,10 @@ let paymentMethodTypeToWire = (value: paymentMethodType) =>
 
 let paymentTypeToWire = (value: paymentType) =>
   switch value {
+  | #normal => "normal"
   | #new_mandate => "new_mandate"
   | #setup_mandate => "setup_mandate"
+  | #recurring_mandate => "recurring_mandate"
   }
 
 let acceptanceTypeToWire = (value: acceptanceType) =>

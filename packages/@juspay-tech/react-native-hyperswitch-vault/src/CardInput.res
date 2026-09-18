@@ -159,8 +159,36 @@ let make = (
           ?accessible
         />
 
+  // The accessory (brand icon, co-badge chooser, scan button, CVC icon) is
+  // rendered the same way in both branches: the field owns it whether or not
+  // the host draws the chrome around the input.
+  let accessory = switch iconRight {
+  | NoIcon => React.null
+  | CustomIcon(element) =>
+    <View
+      accessible={false}
+      accessibilityElementsHidden={true}
+      importantForAccessibility={#"no-hide-descendants"}
+      style={s({})->CardFieldStyles.withView(styles->CardFieldStyles.accessoryOf)}>
+      element
+    </View>
+  | InteractiveIcon(element) =>
+    <View style={s({})->CardFieldStyles.withView(styles->CardFieldStyles.accessoryOf)}>
+      element
+    </View>
+  }
+
   if options.unstyled {
-    inputElement(~unstyled=true)
+    // Unstyled: the host owns the box, border and label; the field still owns
+    // its accessory, laid out beside the bare input.
+    switch iconRight {
+    | NoIcon => inputElement(~unstyled=true)
+    | _ =>
+      <View style={s({flexDirection: #row, alignItems: #center, width: 100.->pct})}>
+        <View style={s({flex: 1.})}> {inputElement(~unstyled=true)} </View>
+        accessory
+      </View>
+    }
   } else {
     <View style={s({width: 100.->pct})}>
       {switch staticLabel {
@@ -287,23 +315,7 @@ let make = (
               </View>
             : React.null}
         </View>
-        {switch iconRight {
-        | NoIcon => React.null
-        | CustomIcon(element) =>
-
-          <View
-            accessible={false}
-            accessibilityElementsHidden={true}
-            importantForAccessibility={#"no-hide-descendants"}
-            style={s({})->CardFieldStyles.withView(styles->CardFieldStyles.accessoryOf)}>
-            element
-          </View>
-        | InteractiveIcon(element) =>
-
-          <View style={s({})->CardFieldStyles.withView(styles->CardFieldStyles.accessoryOf)}>
-            element
-          </View>
-        }}
+        accessory
       </View>
     </View>
   }

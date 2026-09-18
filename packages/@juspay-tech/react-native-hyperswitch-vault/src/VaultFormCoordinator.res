@@ -166,6 +166,11 @@ let useMachinery = (
   ~vaultEndpoint: option<VaultEndpoint.vaultEndpointConfig>,
 
   ~cardNetwork: unit => option<string>,
+
+  // Direct cards report the network in force even when the card matches a
+  // single scheme, as the web SDK and client-core's own card form do. The
+  // vault mint request keeps using `cardNetwork` (co-badged choice only).
+  ~directCardNetwork: unit => option<string>,
   ~cardVersion: unit => int,
 
   ~eligibilityVerdict: unit => option<VaultEligibility.verdict>,
@@ -517,7 +522,7 @@ let useMachinery = (
                             ~cardPayload=DirectPayload({
                               card: cardDetails(),
                               cardholderName: resolvedCardholderName,
-                              cardNetwork: cardNetwork(),
+                              cardNetwork: directCardNetwork(),
                               nickName: VaultPaymentMethodData.nickNameOf(args.paymentMethodData),
                             }),
                             ~paymentMethodType=args.paymentMethodType,
@@ -538,7 +543,7 @@ let useMachinery = (
                             body,
                             signal,
                           })
-                          navOutcome->VaultResult.fromNavOutcome
+                          navOutcome->VaultResult.fromFinalConfirm
 
                         | Some((confirmTokenMode, vaultSession)) =>
                           let minted = await mintToken(
@@ -579,7 +584,7 @@ let useMachinery = (
                               body,
                               signal,
                             })
-                            navOutcome->VaultResult.fromNavOutcome
+                            navOutcome->VaultResult.fromFinalConfirm
                           }
                         }
                       }

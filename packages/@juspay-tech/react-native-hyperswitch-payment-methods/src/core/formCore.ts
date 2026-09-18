@@ -3,11 +3,17 @@ import type { FormSession } from './formSession';
 import { mountedField, savedCardOf, withSavedCard } from './savedCard';
 import type { MountedFields } from './savedCard';
 import { checkConfiguration } from './savedCard';
-import { tokenizedCardOf } from './results';
+import {
+  paymentError,
+  paymentErrorOfTokenizeProblem,
+  tokenizedCardOf,
+} from './results';
 import type { ProviderAdapter } from './ProviderAdapter';
 import type {
   Appearance,
   CardDetails,
+  CardPaymentConfirmInput,
+  CardPaymentResult,
   ElementType,
   FieldChange,
   FieldOptions,
@@ -32,6 +38,7 @@ export interface FormCore {
   forgetField(elementType: ElementType): void;
   reportChange(change: FieldChange): void;
   tokenize(providerData?: unknown): Promise<TokenizeResult>;
+  confirmPayment(input: CardPaymentConfirmInput): Promise<CardPaymentResult>;
 }
 
 export function createFormCore(
@@ -88,6 +95,19 @@ export function createFormCore(
         card ? { ...result, card } : result,
         savedCardOf(core.mounted)
       );
+    },
+
+    async confirmPayment(input: CardPaymentConfirmInput) {
+      const problem = checkConfiguration(core.vaultType, core.mounted);
+      if (problem) return paymentErrorOfTokenizeProblem(problem);
+      if (savedCardOf(core.mounted)) {
+        return paymentError(
+          'validation_error',
+          'unsupported_configuration',
+          'confirmPayment collects a whole card; a CVC-only saved-card form cannot confirm a payment.'
+        );
+      }
+      return session.confirmPayment(input);
     },
   };
 

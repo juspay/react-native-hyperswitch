@@ -38,7 +38,12 @@ export {
   CardCVCField,
   CardholderNameField,
 } from './fields';
-export type { FieldProps, CardCVCFieldProps, FieldStyles } from './fields';
+export type {
+  FieldProps,
+  CardNumberFieldProps,
+  CardCVCFieldProps,
+  FieldStyles,
+} from './fields';
 
 export type {
   FormId,
@@ -67,6 +72,27 @@ export type {
   CardFormHandle,
   CardFormInstance,
   FieldHandle,
+  PaymentConfirmAuth,
+  PaymentEndpoint,
+  CardPaymentMethodType,
+  CardPaymentType,
+  CardPaymentBillingAddress,
+  CardPaymentPhone,
+  CardPaymentBilling,
+  CardPaymentMethodData,
+  CardPaymentOnlineAcceptance,
+  CardPaymentCustomerAcceptance,
+  CardPaymentBrowserInfo,
+  CardPaymentConfirmInput,
+  CardPaymentErrorStatus,
+  CardPaymentError,
+  CardPaymentResult,
+  CardEligibilityStatus,
+  CardBrandIconMode,
+  DirectCardEnvironment,
+  DirectCardEligibility,
+  DirectCardholderNameMode,
+  DirectCardConfig,
 } from './core/types';
 
 export type {
@@ -75,7 +101,10 @@ export type {
   ProviderFieldProps,
 } from './core/ProviderAdapter';
 
-export type { HyperswitchVaultData } from './providers/hyperswitch/types';
+export type {
+  HyperswitchVaultData,
+  HyperswitchDirectData,
+} from './providers/hyperswitch/types';
 export type { VgsVaultData, VgsTokenizeOptions } from './providers/vgs/types';
 export type {
   SkyflowVaultData,

@@ -6,6 +6,8 @@ import type { HyperswitchConfiguration } from './config';
 import type {
   Appearance,
   CardFormInstance,
+  CardPaymentConfirmInput,
+  CardPaymentResult,
   FormStatus,
   TokenizeResult,
   VaultDetails,
@@ -64,6 +66,9 @@ function createCardForm(
   const instance: CardFormInstance = {
     tokenize: (providerData?: unknown): Promise<TokenizeResult> =>
       core.tokenize(providerData),
+    confirmPayment: (
+      input: CardPaymentConfirmInput
+    ): Promise<CardPaymentResult> => core.confirmPayment(input),
     get status(): FormStatus {
       return core.status;
     },

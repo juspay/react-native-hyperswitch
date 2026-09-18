@@ -5,7 +5,11 @@
 
 export type paymentMethodType = "credit" | "debit";
 
-export type paymentType = "new_mandate" | "setup_mandate";
+export type paymentType = 
+    "normal"
+  | "new_mandate"
+  | "setup_mandate"
+  | "recurring_mandate";
 
 export type acceptanceType = "online" | "offline";
 

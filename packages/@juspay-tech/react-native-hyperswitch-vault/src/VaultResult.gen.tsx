@@ -3,6 +3,8 @@
 /* eslint-disable */
 /* tslint:disable */
 
+import type {HostBackendResponse as $$backendResponse} from './merchantTypes';
+
 import type {nextActionType as VaultNavigation_nextActionType} from './VaultNavigation.gen';
 
 import type {safeDdc as VaultNavigation_safeDdc} from './VaultNavigation.gen';
@@ -58,10 +60,13 @@ export type vaultPaymentStatus =
 
 export type vaultTokenizeStatus = "success" | "validation_error" | "error";
 
+export type backendResponse = $$backendResponse;
+
 export type vaultPaymentResult = {
   readonly status: vaultPaymentStatus; 
   readonly error?: safeVaultError; 
-  readonly nextAction?: safeNextAction
+  readonly nextAction?: safeNextAction; 
+  readonly response?: backendResponse
 };
 
 export type vaultTokenizedCard = {

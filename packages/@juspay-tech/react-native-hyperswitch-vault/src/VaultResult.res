@@ -74,11 +74,21 @@ type vaultPaymentStatus = [
 @genType
 type vaultTokenizeStatus = [#success | #validation_error | #error]
 
+// The complete parsed `/payments/{id}/confirm` body, exposed on the host surface only.
+// Typed as `unknown` on the TypeScript side: the host feeds it into its own decoder.
+@genType.import(("./merchantTypes", "HostBackendResponse"))
+type backendResponse
+
+external backendResponseOfJson: JSON.t => backendResponse = "%identity"
+
 @genType
 type vaultPaymentResult = {
   status: vaultPaymentStatus,
   error?: safeVaultError,
   nextAction?: safeNextAction,
+  // Present whenever the backend answered with a JSON body (2xx or non-2xx).
+  // Absent for local refusals and for requests that produced no readable body.
+  response?: backendResponse,
 }
 
 @genType
@@ -220,6 +230,12 @@ let fromPmsFailure = (error: VaultConfirm.vaultError): vaultPaymentResult =>
     failedWith(#tokenization_failed, error.message)
   }
 
+let withResponse = (result: vaultPaymentResult, response: option<JSON.t>): vaultPaymentResult =>
+  switch response {
+  | Some(json) => {...result, response: json->backendResponseOfJson}
+  | None => result
+  }
+
 let fromNavOutcome = (outcome: VaultFinalConfirm.navOutcome): vaultPaymentResult =>
   switch outcome {
   | VaultFinalConfirm.Succeeded => {status: #succeeded}
@@ -246,3 +262,7 @@ let fromNavOutcome = (outcome: VaultFinalConfirm.navOutcome): vaultPaymentResult
     }
   | VaultFinalConfirm.UnknownOutcome => failedWith(#unknown_outcome, unknownOutcomeMessage)
   }
+
+// Host-surface mapping: the decoded outcome plus the complete backend body.
+let fromFinalConfirm = (final: VaultFinalConfirm.finalConfirmOutcome): vaultPaymentResult =>
+  final.outcome->fromNavOutcome->withResponse(final.response)

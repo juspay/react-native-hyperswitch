@@ -60,10 +60,18 @@ let onCvcBackspace = (~value: string) => value === "" ? #focusExpiry : #none
 
 type eligibilityProbe = [#check(string) | #reset | #idle]
 
-let eligibilityFor = (~cardNumber: string, ~brand: string, ~alreadyAllowed: bool) => {
+// `alreadyProbed`: a verdict (or a probe in flight) already exists for this
+// exact number — every edit of the number resets it — so a host re-render must
+// not probe the same PAN again.
+let eligibilityFor = (
+  ~cardNumber: string,
+  ~brand: string,
+  ~alreadyAllowed: bool,
+  ~alreadyProbed: bool=false,
+) => {
   let isValid = cardValid(cardNumber, brand)
   if isValid && isCardNumberEqualsMax(cardNumber, brand) {
-    #check(cardNumber->clearSpaces)
+    alreadyProbed ? #idle : #check(cardNumber->clearSpaces)
   } else if !isValid && !alreadyAllowed {
     #reset
   } else {

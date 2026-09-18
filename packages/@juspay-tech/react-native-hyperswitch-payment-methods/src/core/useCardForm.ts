@@ -1,9 +1,18 @@
 import { useContext } from 'react';
 import { FormContext } from './FormContext';
-import type { FormStatus, TokenizeResult, VaultType } from './types';
+import type {
+  CardPaymentConfirmInput,
+  CardPaymentResult,
+  FormStatus,
+  TokenizeResult,
+  VaultType,
+} from './types';
 
 export interface UseCardForm {
   tokenize: (providerData?: unknown) => Promise<TokenizeResult>;
+  confirmPayment: (
+    input: CardPaymentConfirmInput
+  ) => Promise<CardPaymentResult>;
   status: FormStatus;
 
   vaultType: VaultType | undefined;
@@ -16,6 +25,7 @@ export function useCardForm(): UseCardForm {
   }
   return {
     tokenize: ctx.tokenize,
+    confirmPayment: ctx.confirmPayment,
     status: ctx.status,
     vaultType: ctx.vaultType,
   };

@@ -230,6 +230,25 @@ type SafeVaultError = {
 `if (result.error)` works as it does on the web; `status` is this library's addition so TypeScript
 can narrow.
 
+`enabledCardSchemes` decides the network in force: with exactly one detected scheme enabled (a
+single-network card, or a co-badged card of which the merchant accepts one network) that network
+is selected automatically and no chooser is shown; with several enabled the chooser offers them
+and the detected brand applies until the user picks; with none enabled the form reports
+`networkError` (`unsupported_network`) and `valid: false` as soon as the number is complete, before
+any submit, and clears it when the number changes to an accepted card.
+
+On `./host` only, a `confirmPayment()` with `cardSource: { type_: 'direct' }` (a form mounted
+with no session) sends `payment_method_data.card` with `card_network` set to the network in
+force — the detected scheme, or the one picked on a co-badged card — matching what the web SDK
+and the checkout's own card form send. The tokenized mint request is unchanged and still names a
+network only for a co-badged choice.
+
+On `./host` only, `confirmPayment()` results that the backend produced also carry `response`: the
+complete parsed `/payments/{id}/confirm` body, for 2xx and non-2xx alike, so the checkout SDK
+can run its own decoder over exactly what the backend said. `response` is absent for local
+refusals and for requests that yielded no readable JSON body. The root (merchant) result is
+unchanged and never carries it.
+
 | `error.code` | Meaning | Request sent? |
 |---|---|---|
 | `validation_error` | a field is empty or malformed, or `savedCard` has no token | no |
