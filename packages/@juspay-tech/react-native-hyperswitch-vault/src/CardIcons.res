@@ -173,7 +173,11 @@ let make = (
   }
 
   let iconName = hasBrand ? detectedScheme : placeholder
+  let artwork = iconName->fromDetectedName->artworkFor
 
+  // Keyed by artwork: a change remounts the SvgUri, so a slower response for
+  // the previous artwork (e.g. the last placeholder of the animated cycle)
+  // can never overwrite the detected brand.
   visible
     ? <Animated.View
         style={Style.s({
@@ -181,7 +185,8 @@ let make = (
           transform: [Style.scale(~scale=scaleAnim->Animated.StyleProp.float)],
         })}>
         <SvgUri
-          uri={CardIconUrls.iconUrl(~baseUrl, ~name=iconName->fromDetectedName->artworkFor)}
+          key=artwork
+          uri={CardIconUrls.iconUrl(~baseUrl, ~name=artwork)}
           width=size
           height=size
         />

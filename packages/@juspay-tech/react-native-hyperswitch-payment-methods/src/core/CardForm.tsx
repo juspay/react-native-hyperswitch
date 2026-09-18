@@ -18,7 +18,12 @@ import { registerForm } from './formRegistry';
 import { resolveAdapter } from '../providers/registry';
 import { SessionContext } from '../session/SessionContext';
 import type { ProviderAdapter } from './ProviderAdapter';
-import { errorResult, tokenizedCardOf } from './results';
+import {
+  errorResult,
+  paymentError,
+  paymentErrorOfTokenizeProblem,
+  tokenizedCardOf,
+} from './results';
 import {
   checkConfiguration,
   mountedField,
@@ -32,6 +37,9 @@ import type {
   CardFormChange,
   CardFormEvent,
   CardFormHandle,
+  CardPaymentConfirmInput,
+  CardPaymentResult,
+  DirectCardConfig,
   ElementType,
   FieldChange,
   FieldOptions,
@@ -41,6 +49,9 @@ import type {
   VaultDetails,
   VaultType,
 } from './types';
+
+/** The only provider whose fields can confirm a direct card themselves. */
+const DIRECT_CARD_VAULT_TYPE: VaultType = 'hyperswitch';
 
 function unavailableAdapter(vaultType: VaultType): ProviderAdapter {
   return {
@@ -58,7 +69,17 @@ function unavailableAdapter(vaultType: VaultType): ProviderAdapter {
 }
 
 export interface CardFormProps {
+  /** Tokenized mode: the provider vault this form mints a token with. */
   vaultDetails?: VaultDetails;
+
+  /**
+   * Explicit direct-card mode: no vault, no payment-method session, no
+   * tokenization. The provider's own fields hold the card and
+   * `confirmCardPayment` has the provider POST `/payments/{id}/confirm`
+   * itself. Mutually exclusive with `vaultDetails` (prop or session); a form
+   * without either is a configuration error, never a direct form.
+   */
+  directCard?: DirectCardConfig;
 
   appearance?: Appearance;
 
@@ -75,7 +96,9 @@ export interface CardFormProps {
 }
 
 type ValidatedData =
-  { ok: true; value: unknown } | { ok: false; error: unknown };
+  | { ok: true; vaultData: unknown; direct?: undefined }
+  | { ok: true; vaultData?: undefined; direct: unknown }
+  | { ok: false; error: unknown };
 
 const twoDigit = (value: string) => (value.length === 1 ? `0${value}` : value);
 
@@ -112,9 +135,21 @@ function buildChange(
       isExpiryComplete: expiry?.complete ?? false,
       isCardNumberValid: number?.valid ?? false,
       isExpiryValid: expiry?.valid ?? false,
+      ...(details.isCoBadged !== undefined
+        ? { isCoBadged: details.isCoBadged }
+        : {}),
+      ...(details.eligibility !== undefined
+        ? { eligibility: details.eligibility }
+        : {}),
+      ...(details.networkError !== undefined
+        ? { networkError: details.networkError }
+        : {}),
     },
     complete: mounted.length > 0 && mounted.every((field) => field.complete),
-    valid: mounted.length > 0 && mounted.every((field) => field.valid),
+    valid:
+      mounted.length > 0 &&
+      mounted.every((field) => field.valid) &&
+      details.networkError === undefined,
     fields: { ...fields },
   };
 }
@@ -123,6 +158,7 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
   function CardFormImpl(
     {
       vaultDetails,
+      directCard,
       appearance,
       id,
       onReady,
@@ -136,7 +172,9 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
     const session = useContext(SessionContext);
 
     const details = vaultDetails ?? session?.vaultDetails;
-    const vaultType = details?.vaultType;
+    // Direct mode is only ever explicit: the prop names it, and the provider
+    // is fixed. A missing vault configuration stays a configuration error.
+    const vaultType = directCard ? DIRECT_CARD_VAULT_TYPE : details?.vaultType;
 
     const { adapter, resolveError } = useMemo(() => {
       if (!vaultType) {
@@ -157,16 +195,40 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
 
     const validated = useMemo<ValidatedData>(() => {
       if (resolveError !== undefined) return { ok: false, error: resolveError };
+      if (directCard) {
+        if (details) {
+          return {
+            ok: false,
+            error: new Error(
+              'directCard cannot be combined with vaultDetails: a form is either a direct ' +
+                'card form or a tokenized vault form.'
+            ),
+          };
+        }
+        if (!adapter?.validateDirectData) {
+          return {
+            ok: false,
+            error: new Error(
+              `The ${vaultType} provider cannot collect a direct card.`
+            ),
+          };
+        }
+        try {
+          return { ok: true, direct: adapter.validateDirectData(directCard) };
+        } catch (error) {
+          return { ok: false, error };
+        }
+      }
       if (!adapter || !details) return { ok: false, error: undefined };
       try {
         return {
           ok: true,
-          value: adapter.validateVaultData(details.vaultData),
+          vaultData: adapter.validateVaultData(details.vaultData),
         };
       } catch (error) {
         return { ok: false, error };
       }
-    }, [adapter, details, resolveError]);
+    }, [adapter, details, directCard, resolveError, vaultType]);
 
     const sessionOptions = useMemo<CreateFormSessionOptions>(
       () => (readyTimeoutMs !== undefined ? { readyTimeoutMs } : {}),
@@ -275,21 +337,46 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
       [formSession, vaultType]
     );
 
+    const confirmPayment = useCallback(
+      async (input: CardPaymentConfirmInput): Promise<CardPaymentResult> => {
+        const mounted = mountedRef.current;
+
+        const problem = checkConfiguration(
+          vaultType,
+          mounted,
+          unresolvedRef.current
+        );
+        if (problem) return paymentErrorOfTokenizeProblem(problem);
+
+        if (savedCardOf(mounted)) {
+          return paymentError(
+            'validation_error',
+            'unsupported_configuration',
+            'confirmPayment collects a whole card; a CVC-only saved-card form cannot confirm a payment.'
+          );
+        }
+
+        return formSession.confirmPayment(input);
+      },
+      [formSession, vaultType]
+    );
+
     useImperativeHandle(
       ref,
       () => ({
         tokenize,
+        confirmPayment,
         get status() {
           return status;
         },
       }),
-      [tokenize, status]
+      [tokenize, confirmPayment, status]
     );
 
     useEffect(() => {
       if (!id) return;
-      return registerForm(id, tokenize);
-    }, [id, tokenize]);
+      return registerForm(id, { tokenize, confirmPayment });
+    }, [id, tokenize, confirmPayment]);
 
     useEffect(() => {
       if (!validated.ok && validated.error !== undefined) {
@@ -312,6 +399,7 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
         status,
         appearances,
         tokenize,
+        confirmPayment,
         reportChange,
         registerField,
         forgetField,
@@ -323,6 +411,7 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
         status,
         appearances,
         tokenize,
+        confirmPayment,
         reportChange,
         registerField,
         forgetField,
@@ -335,7 +424,8 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
       <FormContext.Provider value={value}>
         {validated.ok && Host ? (
           <Host
-            vaultData={validated.value}
+            vaultData={validated.vaultData}
+            direct={validated.direct}
             onReady={handleReady}
             onError={handleError}
             onCardDetails={handleCardDetails}

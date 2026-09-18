@@ -27,6 +27,7 @@ export function useFormBinding(
     status: core.status,
     appearances: core.appearances,
     tokenize: core.tokenize,
+    confirmPayment: core.confirmPayment,
     reportChange: core.reportChange,
     registerField: core.registerField,
     forgetField: core.forgetField,

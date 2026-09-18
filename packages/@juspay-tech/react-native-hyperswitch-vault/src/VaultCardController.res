@@ -34,6 +34,11 @@ type controller = {
 
   cardNetwork: unit => option<string>,
 
+  // The network in force whenever one is known (detected, or picked on a
+  // co-badged card). Unlike `cardNetwork`, which only answers for co-badged
+  // cards, this is what a direct card confirm reports as `card_network`.
+  detectedNetwork: unit => option<string>,
+
   selectNetwork: string => unit,
 
   scanCard: unit => unit,
@@ -100,7 +105,7 @@ let use = (
   let register = kind => VaultCardStore.register(store, kind)
   let countOf = kind => VaultCardStore.countOf(store, kind)
 
-  let errors = state->CardStateReducer.errorsFor(~validators)
+  let errors = state->CardStateReducer.errorsFor(~validators, ~enabledSchemes=enabledCardSchemes)
 
   let latestRef = React.useRef((state, errors))
   latestRef.current = (state, errors)
@@ -131,12 +136,7 @@ let use = (
     | #none => ()
     }
 
-  let eligibleSchemes =
-    enabledCardSchemes->Array.length === 0
-      ? state.matchedSchemes
-      : state.matchedSchemes->Array.filter(scheme =>
-          enabledCardSchemes->Array.some(enabled => enabled === scheme)
-        )
+  let eligibleSchemes = state->CardStateReducer.eligibleSchemes(~enabledSchemes=enabledCardSchemes)
 
   let eligibilityStatus: VaultPublicState.vaultEligibilityStatus = switch state.eligibility {
   | Unknown => #unknown
@@ -145,7 +145,7 @@ let use = (
   | Denied => #denied
   }
 
-  let networkInForce = state->CardStateReducer.effectiveNetwork
+  let networkInForce = state->CardStateReducer.effectiveNetwork(~enabledSchemes=enabledCardSchemes)
   let isCoBadged = state->CardStateReducer.isCoBadged && eligibleSchemes->Array.length > 1
 
   let publicSnapshot = (): VaultPublicState.controllerSnapshot => {
@@ -260,11 +260,16 @@ let use = (
       let (latest, _) = latestRef.current
 
       if latest.matchedSchemes->Array.length > 1 {
-        let network = latest->CardStateReducer.effectiveNetwork
+        let network = latest->CardStateReducer.effectiveNetwork(~enabledSchemes=enabledCardSchemes)
         network->String.length > 0 ? Some(network) : None
       } else {
         None
       }
+    },
+    detectedNetwork: () => {
+      let (latest, _) = latestRef.current
+      let network = latest->CardStateReducer.effectiveNetwork(~enabledSchemes=enabledCardSchemes)
+      network->String.length > 0 ? Some(network) : None
     },
     selectNetwork: network => dispatch(NetworkSelected(network)),
 
@@ -310,8 +315,9 @@ let use = (
       let (latest, _) = latestRef.current
       CardFieldLogic.eligibilityFor(
         ~cardNumber=latest.cardNumber,
-        ~brand=latest->CardStateReducer.effectiveNetwork,
+        ~brand=latest->CardStateReducer.effectiveNetwork(~enabledSchemes=enabledCardSchemes),
         ~alreadyAllowed=latest.eligibility === Allowed,
+        ~alreadyProbed=latest.eligibility !== Unknown,
       )
     },
     onCardholderNameChange: name => dispatch(CardholderNameChanged(name)),

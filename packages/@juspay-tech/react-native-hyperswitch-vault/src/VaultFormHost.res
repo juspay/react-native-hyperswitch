@@ -192,6 +192,7 @@ let useHost = (
     ~cardholderNameMode,
     ~vaultEndpoint,
     ~cardNetwork=controller.cardNetwork,
+    ~directCardNetwork=controller.detectedNetwork,
     ~cardVersion=controller.cardVersion,
     ~eligibilityVerdict=controller.eligibilityVerdict,
     ~recordEligibility=controller.recordEligibility,

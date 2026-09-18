@@ -73,7 +73,7 @@ let confirmTokenizedCardPayment = async (
             timeoutMs: ?input.timeoutMs,
           })
 
-          navOutcome->VaultResult.fromNavOutcome
+          navOutcome->VaultResult.fromFinalConfirm
         }
       }
     }

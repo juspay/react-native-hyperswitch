@@ -16,7 +16,10 @@ import type { paymentConfirmInput as VaultPaymentConfirmInputInternal } from './
 import type { safeVaultError as SafeVaultErrorInternal } from './VaultResult.gen';
 import type { safeNextAction as SafeNextActionInternal } from './VaultNavigation.gen';
 import type { confirmTokenMode as VaultConfirmTokenModeInternal } from './VaultConfirmBody.gen';
-import type { MerchantSession as MerchantSessionInternal } from './merchantTypes';
+import type {
+  MerchantSession as MerchantSessionInternal,
+  HostBackendResponse as HostBackendResponseInternal,
+} from './merchantTypes';
 import type { VaultField, VaultTokenizeResult } from './public';
 
 export type HostFormHandle = {
@@ -42,11 +45,27 @@ export type VaultPaymentConfirmInput = Omit<VaultPaymentConfirmInputInternal, 'c
 
 export type VaultCardholderNameMode = 'collect' | 'external' | 'omit';
 
+/**
+ * The complete parsed `/payments/{id}/confirm` body. Present on every result that the
+ * backend produced — 2xx and non-2xx alike — so the host can run its own decoder over
+ * exactly what the backend said. Absent when the request never yielded a readable JSON
+ * body (fetch rejected, aborted, or non-JSON body) and for local refusals.
+ */
+export type VaultBackendResponse = HostBackendResponseInternal;
+
 export type VaultPaymentResult =
-  | { readonly status: 'succeeded' }
-  | { readonly status: 'processing' }
-  | { readonly status: 'requires_customer_action'; readonly nextAction: SafeNextActionInternal }
-  | { readonly status: 'failed'; readonly error: SafeVaultErrorInternal }
+  | { readonly status: 'succeeded'; readonly response?: VaultBackendResponse }
+  | { readonly status: 'processing'; readonly response?: VaultBackendResponse }
+  | {
+      readonly status: 'requires_customer_action';
+      readonly nextAction: SafeNextActionInternal;
+      readonly response?: VaultBackendResponse;
+    }
+  | {
+      readonly status: 'failed';
+      readonly error: SafeVaultErrorInternal;
+      readonly response?: VaultBackendResponse;
+    }
   | { readonly status: 'validation_error'; readonly error: SafeVaultErrorInternal };
 
 export type CardFormProps = ProviderProps;

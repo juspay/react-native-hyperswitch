@@ -72,14 +72,45 @@ type action =
   | SubmitAttempted
   | Reset
 
-let effectiveNetwork = (state: state) =>
+// The detected schemes the card may confirm with. `enabledSchemes` holds the
+// merchant's accepted networks in canonical form (CardNetworkNames.normaliseList);
+// an empty list means "every detected scheme".
+let eligibleSchemes = (state: state, ~enabledSchemes: array<string>) =>
+  enabledSchemes->Array.length === 0
+    ? state.matchedSchemes
+    : state.matchedSchemes->Array.filter(scheme =>
+        enabledSchemes->Array.some(enabled => enabled === scheme)
+      )
+
+// The network in force, by precedence:
+//   1. a saved card's stored network;
+//   2. the user's pick, while it is still one of the eligible schemes;
+//   3. the ONLY eligible scheme (a single-network card, or a co-badged card of
+//      which the merchant enabled exactly one network): selected automatically,
+//      no chooser;
+//   4. with several eligible schemes and no pick yet, the detected brand when it
+//      is eligible, else the first eligible scheme, until the user picks;
+//   5. with no eligible scheme, the detected brand, so the network validator
+//      reports it as unsupported.
+// With no enabled schemes this reduces to the pick or the detected brand, the
+// historical behaviour.
+let effectiveNetwork = (state: state, ~enabledSchemes: array<string>) =>
   switch state.savedCard {
   | Some(saved) => saved.network
   | None =>
-    switch state.selectedNetwork {
-    | "" => state.brand
-    | picked =>
-      state.matchedSchemes->Array.some(scheme => scheme === picked) ? picked : state.brand
+    let eligible = state->eligibleSchemes(~enabledSchemes)
+    let picked = state.selectedNetwork
+    if picked !== "" && eligible->Array.some(scheme => scheme === picked) {
+      picked
+    } else {
+      switch eligible {
+      | [only] => only
+      | [] => state.brand
+      | several =>
+        several->Array.some(scheme => scheme === state.brand)
+          ? state.brand
+          : several->Array.get(0)->Option.getOr(state.brand)
+      }
     }
   }
 
@@ -217,16 +248,21 @@ type errors = {
   eligibility: option<string>,
 }
 
-let errorsFor = (state: state, ~validators: validators): errors => {
+let errorsFor = (
+  state: state,
+  ~validators: validators,
+  ~enabledSchemes: array<string>,
+): errors => {
   let savedMode = state.savedCard->Option.isSome
+  let network = state->effectiveNetwork(~enabledSchemes)
   {
     cardNumber: savedMode ? None : validators.cardNumber(Some(state.cardNumber)),
     expiry: savedMode ? None : validators.expiry(state.expiryDisplay)(Some(state.expiryYear)),
 
-    cvc: validators.cvc(state->effectiveNetwork)(Some(state.cvc)),
+    cvc: validators.cvc(network)(Some(state.cvc)),
     network: savedMode
       ? None
-      : validators.network->Option.flatMap(validate => validate(Some(state->effectiveNetwork))),
+      : validators.network->Option.flatMap(validate => validate(Some(network))),
     eligibility: switch state.eligibility {
     | Denied => validators.notEligible
     | Unknown

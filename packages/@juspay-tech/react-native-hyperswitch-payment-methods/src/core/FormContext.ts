@@ -3,6 +3,8 @@ import type { ProviderAdapter } from './ProviderAdapter';
 import type { MountedField } from './savedCard';
 import type {
   Appearance,
+  CardPaymentConfirmInput,
+  CardPaymentResult,
   ElementType,
   FieldChange,
   FieldOptions,
@@ -19,6 +21,9 @@ export interface FormContextValue {
 
   appearances: readonly Appearance[];
   tokenize: (providerData?: unknown) => Promise<TokenizeResult>;
+  confirmPayment: (
+    input: CardPaymentConfirmInput
+  ) => Promise<CardPaymentResult>;
 
   reportChange: (change: FieldChange) => void;
 

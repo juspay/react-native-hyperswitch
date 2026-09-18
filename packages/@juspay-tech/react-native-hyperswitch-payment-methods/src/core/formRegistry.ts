@@ -1,4 +1,10 @@
-import type { CardFormInstance, FormId, TokenizeResult } from './types';
+import type {
+  CardFormInstance,
+  CardPaymentConfirmInput,
+  CardPaymentResult,
+  FormId,
+  TokenizeResult,
+} from './types';
 import type { FormCore } from './formCore';
 
 const cores = new WeakMap<CardFormInstance, FormCore>();
@@ -15,17 +21,37 @@ export type FormTokenizeFn = (
   providerData?: unknown
 ) => Promise<TokenizeResult>;
 
-const forms = new Map<FormId, FormTokenizeFn>();
+export type FormConfirmFn = (
+  input: CardPaymentConfirmInput
+) => Promise<CardPaymentResult>;
 
-export function registerForm(id: FormId, tokenize: FormTokenizeFn): () => void {
-  forms.set(id, tokenize);
+export interface FormRegistration {
+  tokenize: FormTokenizeFn;
+  confirmPayment?: FormConfirmFn;
+}
+
+const forms = new Map<FormId, FormRegistration>();
+
+export function registerForm(
+  id: FormId,
+  registration: FormTokenizeFn | FormRegistration
+): () => void {
+  const entry: FormRegistration =
+    typeof registration === 'function'
+      ? { tokenize: registration }
+      : registration;
+  forms.set(id, entry);
   return () => {
-    if (forms.get(id) === tokenize) {
+    if (forms.get(id) === entry) {
       forms.delete(id);
     }
   };
 }
 
-export function getFormTokenize(id: FormId): FormTokenizeFn | undefined {
+export function getFormRegistration(id: FormId): FormRegistration | undefined {
   return forms.get(id);
+}
+
+export function getFormTokenize(id: FormId): FormTokenizeFn | undefined {
+  return forms.get(id)?.tokenize;
 }
