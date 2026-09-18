@@ -339,6 +339,8 @@ A field has the same two slots as the Hyperswitch vault fields:
 - `styles.container` — the field's **box** (border, background, radius, height, padding).
 - `styles.input` — the secure input's **text** (color, fontSize, fontFamily).
 - `placeholder` — placeholder text.
+- `cvcIcon` (`CardCVCField` only) — `'default'` shows the CVC icon, `'hidden'` removes it.
+  Supported by the Hyperswitch vault; other providers ignore it.
 
 ```tsx
 <CardNumberField
@@ -384,8 +386,8 @@ const off = registerAdapter(myAdapter); // off() to unregister
 ```
 
 An adapter provides `vaultType`, `validateVaultData`, a `Host`, a `Field` (which
-receives `elementType`, `styles`, `placeholder`, `savedCard`, `onChange`, `onFocus`,
-`onBlur`) and `tokenize(collector, providerData?)`.
+receives `elementType`, `styles`, `placeholder`, `savedCard`, `cvcIcon`, `onChange`,
+`onFocus`, `onBlur`) and `tokenize(collector, providerData?)`.
 
 ## Notes
 

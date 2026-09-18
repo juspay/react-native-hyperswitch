@@ -38,7 +38,7 @@ export {
   CardCVCField,
   CardholderNameField,
 } from './fields';
-export type { FieldProps, FieldStyles } from './fields';
+export type { FieldProps, CardCVCFieldProps, FieldStyles } from './fields';
 
 export type {
   FormId,
@@ -49,6 +49,7 @@ export type {
   SavedCardData,
   SavedCardPaymentMethodData,
   FieldOptions,
+  CvcIconDisplay,
   ElementType,
   FieldEvent,
   FieldChange,

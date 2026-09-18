@@ -12,8 +12,11 @@ import type { ElementType, FieldChange, FieldHandle } from '../core/types';
 import { Placeholder } from './Placeholder';
 import type { FieldProps } from './types';
 
-export function createCardField(elementType: ElementType, displayName: string) {
-  const CardField = forwardRef<FieldHandle, FieldProps>((props, ref) => {
+export function createCardField<P extends FieldProps = FieldProps>(
+  elementType: ElementType,
+  displayName: string
+) {
+  const CardField = forwardRef<FieldHandle, P>((props, ref) => {
     const fieldRef = useRef<FieldHandle | null>(null);
     const {
       form,

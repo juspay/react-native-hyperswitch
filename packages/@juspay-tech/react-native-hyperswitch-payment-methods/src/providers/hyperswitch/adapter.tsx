@@ -106,6 +106,7 @@ const Field: ProviderAdapter['Field'] = ({
   placeholder,
   testID,
   savedCard,
+  cvcIcon,
   onChange,
   onFocus,
   onBlur,
@@ -119,6 +120,7 @@ const Field: ProviderAdapter['Field'] = ({
       placeholder={placeholder}
       testID={testID}
       options={savedCard ? { savedCard } : undefined}
+      cvcIcon={elementType === 'cardCvc' ? cvcIcon : undefined}
       onChange={(event: any) =>
         onChange?.(
           fieldChange(elementType, {

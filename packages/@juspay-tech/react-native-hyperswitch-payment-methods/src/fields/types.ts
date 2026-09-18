@@ -1,5 +1,6 @@
 import type {
   CardFormInstance,
+  CvcIconDisplay,
   FieldChange,
   FieldEvent,
   FieldOptions,
@@ -22,4 +23,8 @@ export interface FieldProps {
   onBlur?: (event: FieldEvent) => void;
 
   onChange?: (change: FieldChange) => void;
+}
+
+export interface CardCVCFieldProps extends FieldProps {
+  cvcIcon?: CvcIconDisplay;
 }

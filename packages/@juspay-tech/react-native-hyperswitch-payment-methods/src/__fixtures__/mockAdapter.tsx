@@ -61,6 +61,7 @@ export function createMockAdapter(
     onChange,
     styles,
     savedCard,
+    cvcIcon,
   }: ProviderFieldProps) {
     const state = options.fieldState;
     useEffect(() => {
@@ -75,6 +76,7 @@ export function createMockAdapter(
             ? `saved:${savedCard.paymentMethodToken}:${savedCard.paymentMethodData?.card?.cardNetwork ?? ''}`
             : undefined
         }
+        accessibilityHint={cvcIcon}
       >{`mock:${elementType}`}</Text>
     );
   }

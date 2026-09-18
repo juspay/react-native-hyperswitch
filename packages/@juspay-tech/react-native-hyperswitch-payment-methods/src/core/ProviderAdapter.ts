@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode, Ref } from 'react';
 import type {
   CardDetails,
+  CvcIconDisplay,
   ElementType,
   FieldChange,
   FieldEvent,
@@ -28,6 +29,8 @@ export interface ProviderFieldProps<Collector = unknown> {
   testID?: string;
 
   savedCard?: SavedCard;
+
+  cvcIcon?: CvcIconDisplay;
   onChange?: (change: FieldChange) => void;
   onFocus?: (event: FieldEvent) => void;
   onBlur?: (event: FieldEvent) => void;

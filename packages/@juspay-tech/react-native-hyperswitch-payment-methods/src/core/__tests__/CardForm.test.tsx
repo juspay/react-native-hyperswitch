@@ -92,6 +92,22 @@ describe('CardForm', () => {
     expect(fieldReady).toHaveBeenCalledWith({ elementType: 'cardNumber' });
   });
 
+  it('forwards cvcIcon on CardCVCField to the provider field', async () => {
+    useMock({ vaultType: 'hyperswitch' });
+    render(
+      <CardForm vaultDetails={details('hyperswitch')}>
+        <CardNumberField />
+        <CardCVCField cvcIcon="hidden" />
+      </CardForm>
+    );
+
+    const cvc = await screen.findByTestId('mock-field-cardCvc');
+    expect(cvc.props.accessibilityHint).toBe('hidden');
+    expect(
+      screen.getByTestId('mock-field-cardNumber').props.accessibilityHint
+    ).toBeUndefined();
+  });
+
   it('tokenize resolves with the provider result once ready', async () => {
     useMock({ vaultType: 'vgs', readyDelayMs: 0 });
     const ref = createRef<CardFormHandle>();

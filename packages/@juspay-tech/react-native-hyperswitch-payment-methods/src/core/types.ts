@@ -38,6 +38,8 @@ export interface SavedCard {
   paymentMethodData?: SavedCardPaymentMethodData;
 }
 
+export type CvcIconDisplay = 'hidden' | 'default';
+
 export interface FieldOptions {
   savedCard?: SavedCard;
 }
