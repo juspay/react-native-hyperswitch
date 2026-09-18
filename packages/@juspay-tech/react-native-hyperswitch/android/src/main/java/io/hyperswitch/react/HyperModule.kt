@@ -33,6 +33,20 @@ import java.util.concurrent.atomic.AtomicInteger
 import org.json.JSONObject
 import io.hyperswitch.webview.utils.Callback as HSCallback
 
+/* The shared JS bundle sends exit results as objects (post #569); convert to
+   the JSON string contract consumed by downstream callback managers. A null or
+   missing `status` field must never throw here: ReadableNativeMap.getString
+   crashes the entire ReactHost ("No value for status"). */
+internal fun ReadableMap?.toExitResultJson(): String {
+  if (this == null) return """{"status":"failed","message":"unknown"}"""
+  return JSONObject().apply {
+    put("status", if (hasKey("status") && !isNull("status")) getString("status") else "failed")
+    if (hasKey("code") && !isNull("code")) put("code", getString("code"))
+    if (hasKey("message") && !isNull("message")) put("message", getString("message"))
+    if (hasKey("type") && !isNull("type")) put("type", getString("type"))
+  }.toString()
+}
+
 class HyperModule internal constructor(private val rct: ReactApplicationContext) :
   NativeHyperModuleSpec(rct) {
   companion object {
@@ -197,8 +211,8 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
 
   // Method to exit the payment sheet
   @ReactMethod
-  override fun exitPaymentsheet(rootTag: Double, paymentResult: String, reset: Boolean) {
-    val isFragment = PaymentSheetCallbackManager.executeCallback(paymentResult)
+  override fun exitPaymentsheet(rootTag: Double, paymentResult: ReadableMap, reset: Boolean) {
+    val isFragment = PaymentSheetCallbackManager.executeCallback(paymentResult.toExitResultJson())
     (currentActivity as? FragmentActivity)?.let {
       if (isFragment) it.supportFragmentManager.findFragmentByTag("paymentSheet")
         ?.let { fragment ->
@@ -211,7 +225,7 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
 
   override fun exitPaymentMethodManagement(
     rootTag: Double,
-    result: String?,
+    result: ReadableMap?,
     reset: Boolean
   ) {
     TODO("Not yet implemented")
@@ -219,14 +233,14 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
 
   // Method to exit the widget
   @ReactMethod
-  override fun exitWidget(paymentResult: String, widgetType: String) {
-//        WidgetLaunche.onPaymentResultCallback(widgetType, paymentResult)
+  override fun exitWidget(paymentResult: ReadableMap, widgetType: String) {
+//        WidgetLaunche.onPaymentResultCallback(widgetType, paymentResult.toExitResultJson())
   }
 
   // Method to exit the card form
   @ReactMethod
-  override fun exitCardForm(paymentResult: String) {
-//        WidgetLauncher.onPaymentResultCallback(PaymentMethod.CARD.apiValue, paymentResult)
+  override fun exitCardForm(paymentResult: ReadableMap) {
+//        WidgetLauncher.onPaymentResultCallback(PaymentMethod.CARD.apiValue, paymentResult.toExitResultJson())
   }
 
   // Method to launch widget payment sheet
@@ -236,14 +250,14 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
 
   // Method to exit widget payment sheet
   @ReactMethod
-  override fun exitWidgetPaymentsheet(rootTag: Double, paymentResult: String, reset: Boolean) {
+  override fun exitWidgetPaymentsheet(rootTag: Double, paymentResult: ReadableMap, reset: Boolean) {
     findViewWithRootTag(rootTag.toInt(), {
-      it?.notifyResult(CallbackType.PAYMENT_RESULT, paymentResult)
+      it?.notifyResult(CallbackType.PAYMENT_RESULT, paymentResult.toExitResultJson())
     })
   }
 
   @ReactMethod
-  override fun notifyWidgetPaymentResult(rootTag: Double, result: String) {
+  override fun notifyWidgetPaymentResult(rootTag: Double, result: ReadableMap) {
     findViewWithRootTag(rootTag.toInt(), { fragment ->
       if (fragment == null) {
         Log.w(
@@ -251,7 +265,7 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
           "notifyWidgetPaymentResult: no fragment found for rootTag=$rootTag"
         )
       } else {
-        fragment.notifyResult(CallbackType.CONFIRM_ACTION, result)
+        fragment.notifyResult(CallbackType.CONFIRM_ACTION, result.toExitResultJson())
       }
     })
   }
@@ -261,16 +275,16 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
   }
 
   @ReactMethod
-  override fun onUpdateIntentEvent(rootTag: Double, type: String, result: String) {
+  override fun onUpdateIntentEvent(rootTag: Double, type: String, result: ReadableMap) {
     findViewWithRootTag(rootTag.toInt(), { fragment ->
       if (fragment == null) {
         Log.w("HyperModule", "onUpdateIntentEvent: no fragment found for rootTag=$rootTag")
         return@findViewWithRootTag
       }
       if (type == "UPDATE_INTENT_INIT_RETURNED") {
-        fragment.notifyResult(CallbackType.UPDATE_INTENT_INIT, result)
+        fragment.notifyResult(CallbackType.UPDATE_INTENT_INIT, result.toExitResultJson())
       } else if (type == "UPDATE_INTENT_COMPLETE_RETURNED") {
-        fragment.notifyResult(CallbackType.UPDATE_INTENT_COMPLETE, result)
+        fragment.notifyResult(CallbackType.UPDATE_INTENT_COMPLETE, result.toExitResultJson())
       }
     })
   }
@@ -419,6 +433,18 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
   }
 
   private fun findViewWithRootTag(rootTag: Int, onFound: (HyperFragment?) -> Unit) {
+    // Registry first (surface-backed rn81 fragments tag their root view); legacy
+    // FragmentManager.findFragment fallback keeps the rn79 ReactFragment path working.
+    SurfaceOwners.resolve(rct, rootTag) { owner ->
+      if (owner is HyperFragment) {
+        onFound(owner)
+      } else {
+        legacyFindViewWithRootTag(rootTag, onFound)
+      }
+    }
+  }
+
+  private fun legacyFindViewWithRootTag(rootTag: Int, onFound: (HyperFragment?) -> Unit) {
     UiThreadUtil.runOnUiThread {
       val uiManagerModule =
         UIManagerHelper.getUIManager(

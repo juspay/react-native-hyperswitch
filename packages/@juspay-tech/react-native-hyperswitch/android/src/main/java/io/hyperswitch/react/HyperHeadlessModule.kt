@@ -49,9 +49,17 @@ class HyperHeadlessModule internal constructor(private val rct: ReactApplication
     }
 
     @ReactMethod
-    override fun exitHeadless(rootTag: Double, status: String) {
+    override fun exitHeadless(rootTag: Double, status: ReadableMap) {
       try {
-        ExitHeadlessCallBackManager.executeCallback(rootTag.toInt(), status)
+        val json = status.toExitResultJson()
+        // A CVC widget answers through its own surface root: resolve the owner
+        // first; headless-API flows fall back to the callback manager.
+        SurfaceOwners.resolve(rct, rootTag.toInt()) { owner ->
+          when (owner) {
+            is HyperFragment -> owner.notifyResult(CallbackType.CONFIRM_CVC_ACTION, json)
+            else -> ExitHeadlessCallBackManager.executeCallback(rootTag.toInt(), json)
+          }
+        }
       }catch (_: Exception){
       }
     }

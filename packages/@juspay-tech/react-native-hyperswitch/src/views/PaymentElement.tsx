@@ -6,6 +6,7 @@ import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfigurati
 import { useHyperElementsContext } from '../context/HyperElements';
 import {
   makeUnknownEventWarningPayload,
+  normalizeSubscribedEvents,
   validateSubscribedEventStrings,
 } from '../utils/EventValidator';
 import type {
@@ -94,7 +95,9 @@ export const PaymentElement = forwardRef<
     if (!options || !onChange || warningEmitted.current) {
       return;
     }
-    const subscribedEvents = options.subscribedEvents as string[] | undefined;
+    const subscribedEvents = normalizeSubscribedEvents(
+      options.subscribedEvents as string[] | undefined
+    );
 
     const invalidEvents = validateSubscribedEventStrings(subscribedEvents);
     if (invalidEvents.length > 0) {
@@ -129,6 +132,21 @@ export const PaymentElement = forwardRef<
     onChange?.(event.nativeEvent);
   };
 
+  /* Normalize legacy subscription names to the bundle's camelCase taxonomy
+     before they reach native. */
+  const configuration = options
+    ? {
+        ...(options as Record<string, unknown>),
+        ...(options.subscribedEvents
+          ? {
+              subscribedEvents: normalizeSubscribedEvents(
+                options.subscribedEvents as string[]
+              ),
+            }
+          : {}),
+      }
+    : undefined;
+
   return (
     <NativePaymentWidgetImpl
       ref={viewRef}
@@ -139,7 +157,7 @@ export const PaymentElement = forwardRef<
       options={{
         hyperswitchConfig: hyperswitchConfig || undefined,
         paymentSessionConfig: paymentSessionConfig || undefined,
-        configuration: options as Record<string, unknown> | undefined,
+        configuration,
       }}
       style={{ ...style, flex: 1 }}
     />

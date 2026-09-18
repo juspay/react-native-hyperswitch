@@ -29,6 +29,18 @@
 
 RCT_EXPORT_MODULE(HyperHeadless);
 
+/* The shared JS bundle sends exit results as objects (post #569); convert to
+   the JSON string contract consumed by the Swift impl layer. */
+static NSString *HyperHeadlessExitResultJSON(NSDictionary *status) {
+    if (![status isKindOfClass:[NSDictionary class]] ||
+        ![NSJSONSerialization isValidJSONObject:status]) {
+        return @"{\"status\":\"failed\",\"message\":\"unknown\"}";
+    }
+    NSData *data = [NSJSONSerialization dataWithJSONObject:status options:0 error:nil];
+    return data ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]
+                : @"{\"status\":\"failed\",\"message\":\"unknown\"}";
+}
+
 + (BOOL)requiresMainQueueSetup {
     return YES;
 }
@@ -54,9 +66,9 @@ RCT_EXPORT_METHOD(getWalletSession:(double)rootTag
 }
 
 RCT_EXPORT_METHOD(exitHeadless:(double)rootTag
-                  status:(NSString *)status) {
+                  status:(NSDictionary *)status) {
     [HyperHeadlessModuleImpl.shared exitHeadlessWithRootTag:@(rootTag)
-                                                      status:status];
+                                                      status:HyperHeadlessExitResultJSON(status)];
 }
 
 #ifdef RCT_NEW_ARCH_ENABLED
