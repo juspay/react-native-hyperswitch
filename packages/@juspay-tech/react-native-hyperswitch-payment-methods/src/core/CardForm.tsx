@@ -189,13 +189,6 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
     const fieldsRef = useRef<Partial<Record<ElementType, FieldChange>>>({});
     const mountedRef = useRef<MountedFields>({});
     const detailsRef = useRef<Partial<CardDetails>>({});
-    const aliveRef = useRef(true);
-    useEffect(() => {
-      aliveRef.current = true;
-      return () => {
-        aliveRef.current = false;
-      };
-    }, []);
 
     const unresolvedRef = useRef<UnresolvedVault>({ pending: false });
     unresolvedRef.current = {
@@ -205,44 +198,62 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
         : undefined,
     };
 
-    // A single keystroke reaches the form several times in one task: each
-    // field reports its own change first (child effects), then the provider
-    // reports the card details (parent effect). Emitting on each arrival would
-    // publish envelopes whose `payload` lags `fields`. Coalesce every arrival
-    // in the same task into one envelope and, as the web coordinator does,
-    // drop an envelope identical to the last one emitted.
-    const flushScheduledRef = useRef(false);
-    const lastEmittedRef = useRef('');
-    // A new vault session starts with no dedupe history, so its first
-    // envelope is delivered even when the field state looks the same.
-    const sessionKey = details ? JSON.stringify(details) : '';
-    useEffect(() => {
-      lastEmittedRef.current = '';
-    }, [sessionKey]);
-    const flushChange = useCallback(() => {
-      flushScheduledRef.current = false;
-      if (!aliveRef.current) return;
-      const listener = onChangeRef.current;
-      if (!listener) return;
-      const change = buildChange(fieldsRef.current, detailsRef.current);
-      const serialized = JSON.stringify(change);
-      if (serialized === lastEmittedRef.current) return;
-      lastEmittedRef.current = serialized;
-      try {
-        listener(change);
-      } catch (error) {
-        // Surface a listener error as an uncaught error, as a synchronous
-        // effect would, instead of an unhandled promise rejection.
-        setTimeout(() => {
-          throw error;
-        }, 0);
-      }
-    }, []);
     const emitChange = useCallback(() => {
-      if (flushScheduledRef.current) return;
-      flushScheduledRef.current = true;
-      Promise.resolve().then(flushChange);
-    }, [flushChange]);
+      const listener = onChangeRef.current;
+      if (listener)
+        listener(buildChange(fieldsRef.current, detailsRef.current));
+    }, []);
+
+    // DEFERRED (follow-up PR): coalesce the several reports a keystroke
+    // produces into one envelope per task, drop an envelope identical to the
+    // last one, never fire after unmount, reset that history on a session
+    // change, and surface a throwing listener as an uncaught error. Replaces
+    // the synchronous emitChange above; see WEB_PARITY.md "Deferred".
+    //     // A single keystroke reaches the form several times in one task: each
+    //     // field reports its own change first (child effects), then the provider
+    //     // reports the card details (parent effect). Emitting on each arrival would
+    //     // publish envelopes whose `payload` lags `fields`. Coalesce every arrival
+    //     // in the same task into one envelope and, as the web coordinator does,
+    //     // drop an envelope identical to the last one emitted.
+    //     const aliveRef = useRef(true);
+    //     useEffect(() => {
+    //       aliveRef.current = true;
+    //       return () => {
+    //         aliveRef.current = false;
+    //       };
+    //     }, []);
+    //     const flushScheduledRef = useRef(false);
+    //     const lastEmittedRef = useRef('');
+    //     // A new vault session starts with no dedupe history, so its first
+    //     // envelope is delivered even when the field state looks the same.
+    //     const sessionKey = details ? JSON.stringify(details) : '';
+    //     useEffect(() => {
+    //       lastEmittedRef.current = '';
+    //     }, [sessionKey]);
+    //     const flushChange = useCallback(() => {
+    //       flushScheduledRef.current = false;
+    //       if (!aliveRef.current) return;
+    //       const listener = onChangeRef.current;
+    //       if (!listener) return;
+    //       const change = buildChange(fieldsRef.current, detailsRef.current);
+    //       const serialized = JSON.stringify(change);
+    //       if (serialized === lastEmittedRef.current) return;
+    //       lastEmittedRef.current = serialized;
+    //       try {
+    //         listener(change);
+    //       } catch (error) {
+    //         // Surface a listener error as an uncaught error, as a synchronous
+    //         // effect would, instead of an unhandled promise rejection.
+    //         setTimeout(() => {
+    //           throw error;
+    //         }, 0);
+    //       }
+    //     }, []);
+    //     const emitChange = useCallback(() => {
+    //       if (flushScheduledRef.current) return;
+    //       flushScheduledRef.current = true;
+    //       Promise.resolve().then(flushChange);
+    //     }, [flushChange]);
 
     const reportChange = useCallback(
       (change: FieldChange) => {

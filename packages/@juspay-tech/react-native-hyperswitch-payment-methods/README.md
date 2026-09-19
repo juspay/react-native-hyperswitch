@@ -97,9 +97,9 @@ function Checkout({ sdkAuthorization, appearance }) {
 
 | Prop | |
 | --- | --- |
-| `hyper` | **Required.** What `Hyperswitch.init(...)` returns, or a plain `HyperswitchConfiguration` — a promise or an object. The merchant's identity and endpoints live here, not in `options`, the same split `react-hyper-js` uses. Its `environment` and `customEndpoints` drive the lookup **and** the Hyperswitch vault's tokenization request. |
+| `hyper` | **Required.** What `Hyperswitch.init(...)` returns, or a plain `HyperswitchConfiguration` — a promise or an object. The merchant's identity and endpoints live here, not in `options`, the same split `react-hyper-js` uses. The fields do not wait for it; only the lookup does. |
 | `options` | An object, or a promise of one, as the web wrapper accepts. |
-| `options.sdkAuthorization` | The payment session your backend minted, as the checkout SDK spells it. Enough on its own: the vault is [looked up](#resolving-the-vault) from it, and the session's `expires_at` is honoured so `tokenize()` answers `session_expired` with no confirm request after the lookup. |
+| `options.sdkAuthorization` | The payment session your backend minted, as the checkout SDK spells it. Enough on its own: the vault is [looked up](#resolving-the-vault) from it. |
 | `options.vaultDetails` | Which vault to drive — `{vaultType, vaultData}`, the web SDK's shape. Supply it and **no lookup happens**, even alongside `sdkAuthorization`. |
 | `options.locale` | The web SDK's `locale` (`'fr'`, `'de'`, …), forwarded to the Hyperswitch vault fields for placeholders, labels and validation messages. Omitted, `'auto'` or an unsupported tag renders English; there is no device-locale detection. |
 | `options.appearance` | The vault's theme `variables` and `labels`, plus this package's RN slots. See [Appearance](#appearance). |
@@ -170,9 +170,6 @@ reason, and `tokenize()` answers `unsupported_configuration` quoting it.
 Default hosts: `https://live.hyperswitch.io/api` for `PROD` (the default) and
 `https://app.hyperswitch.io/api` for `SANDBOX` — the route is appended after the `/api` prefix.
 `INTEG` and self-hosted deployments have no default and are reached through `customEndpoints`.
-The Hyperswitch vault's tokenization request uses the same `environment` and `customEndpoints`
-as the lookup; an explicit `vaultData.environment` overrides them. A bare `<CardForm vaultDetails>`
-outside a session keeps its `SANDBOX` default.
 
 ### `vaultDetails`
 
@@ -313,10 +310,8 @@ requires a field-level `subscriptionEvents` opt-in; this package does not):
 >
 ```
 
-One envelope is emitted per change with a consistent `payload` and `fields` (a keystroke reaches
-the form as several reports; they are coalesced), and an envelope identical to the previous one is
-dropped. A field-only change (for example `touched` on blur, or the RN-only cardholder-name field)
-still emits because `fields`, `complete` and `valid` are part of the envelope.
+A keystroke can reach `onChange` more than once (each field reports, then the provider reports
+the card details); read the latest event rather than counting calls.
 
 A provider's secure input keeps the digits to itself, so `bin`, `last4` and the expiry
 parts are `null` unless the provider reports them (Evervault does); the flags are derived

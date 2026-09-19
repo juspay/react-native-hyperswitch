@@ -9,6 +9,9 @@ export interface PaymentMethodsSession {
   vaultDetails: VaultDetails | null;
   appearance: Appearance | null;
   locale: string | null;
+  // DEFERRED (follow-up PR): the looked-up session's `expires_at`, carried
+  // here (not in a separate context) for the hyperswitch adapter.
+  // expiresAt: string | null;
 
   loading: boolean;
   error: Error | null;

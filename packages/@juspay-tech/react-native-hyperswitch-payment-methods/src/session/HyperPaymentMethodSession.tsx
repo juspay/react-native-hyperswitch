@@ -3,8 +3,6 @@ import type { ReactNode } from 'react';
 
 import { SessionContext } from './SessionContext';
 import type { PaymentMethodsSession } from './SessionContext';
-import { VaultSessionContext } from './VaultSessionContext';
-import type { VaultSessionExpiry } from './VaultSessionContext';
 import type { HyperswitchConfiguration } from './config';
 import { fetchVaultDetails } from './fetchVaultDetails';
 import type { Appearance, VaultDetails } from '../core/types';
@@ -95,9 +93,8 @@ export function HyperPaymentMethodSession({
 
   const [fetchedVaultDetails, setFetchedVaultDetails] =
     useState<VaultDetails | null>(null);
-  const [fetchedExpiry, setFetchedExpiry] = useState<VaultSessionExpiry | null>(
-    null
-  );
+  // DEFERRED (follow-up PR): keep the lookup's `expires_at` for the vault.
+  // const [fetchedExpiry, setFetchedExpiry] = useState<string | null>(null);
   const [vaultLoading, setVaultLoading] = useState(false);
   const [vaultError, setVaultError] = useState<Error | null>(null);
 
@@ -127,16 +124,17 @@ export function HyperPaymentMethodSession({
   useEffect(() => {
     if (providedVaultDetails || !sdkAuthorization) {
       setFetchedVaultDetails(null);
-      setFetchedExpiry(null);
+      // DEFERRED (follow-up PR): setFetchedExpiry(null);
       setVaultLoading(false);
       setVaultError(null);
       return;
     }
 
-    // A replaced sdkAuthorization must not keep serving the previous
-    // session's vault details or expiry while the new lookup is in flight.
-    setFetchedVaultDetails(null);
-    setFetchedExpiry(null);
+    // DEFERRED (follow-up PR): a replaced sdkAuthorization must not keep
+    // serving the previous session's vault details or expiry while the new
+    // lookup is in flight.
+    // setFetchedVaultDetails(null);
+    // setFetchedExpiry(null);
     setVaultLoading(true);
     setVaultError(null);
     if (!resolvedHyper) return;
@@ -153,17 +151,13 @@ export function HyperPaymentMethodSession({
       if (cancelled) return;
       if (result.ok) {
         setFetchedVaultDetails(result.vaultDetails);
-        setFetchedExpiry(
-          result.expiresAt
-            ? { sdkAuthorization, expiresAt: result.expiresAt }
-            : null
-        );
+        // DEFERRED (follow-up PR): setFetchedExpiry(result.expiresAt ?? null);
         setVaultLoading(false);
         return;
       }
       const failure = new Error(result.message);
       setFetchedVaultDetails(null);
-      setFetchedExpiry(null);
+      // DEFERRED (follow-up PR): setFetchedExpiry(null);
       setVaultError(failure);
       setVaultLoading(false);
       onErrorRef.current?.(failure);
@@ -184,6 +178,7 @@ export function HyperPaymentMethodSession({
       vaultDetails: providedVaultDetails ?? fetchedVaultDetails,
       appearance: appearance ?? null,
       locale: locale ?? null,
+      // DEFERRED (follow-up PR): expiresAt: providedVaultDetails ? null : fetchedExpiry,
       loading:
         (!resolvedHyper && !hyperError) || vaultLoading || optionsPending,
       error: hyperError ?? optionsError ?? vaultError,
@@ -203,13 +198,7 @@ export function HyperPaymentMethodSession({
     ]
   );
 
-  const vaultExpiry = providedVaultDetails ? null : fetchedExpiry;
-
   return (
-    <SessionContext.Provider value={value}>
-      <VaultSessionContext.Provider value={vaultExpiry}>
-        {children}
-      </VaultSessionContext.Provider>
-    </SessionContext.Provider>
+    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
   );
 }

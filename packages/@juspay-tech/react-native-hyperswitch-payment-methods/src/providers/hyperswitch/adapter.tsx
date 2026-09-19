@@ -11,7 +11,6 @@ import type {
   TokenizeResult,
 } from '../../core/types';
 import { SessionContext } from '../../session/SessionContext';
-import { VaultSessionContext } from '../../session/VaultSessionContext';
 import { toVaultAppearance } from './appearance';
 import type { HyperswitchVaultData } from './types';
 
@@ -73,46 +72,46 @@ const Host: ProviderAdapter['Host'] = ({
   const data = vaultData as HyperswitchVaultData;
   const formRef = useRef<any>(null);
 
-  // Configuration that the merchant gave the session (not the vault
-  // credentials) is read from context so the public `HyperswitchVaultData`
-  // stays the web's `{sdkAuthorization}`.
+  // The session's `locale` and `appearance` props are read from context so
+  // the public `HyperswitchVaultData` stays the web's `{sdkAuthorization}`.
   const session = useContext(SessionContext);
-  const expiry = useContext(VaultSessionContext);
   const form = useContext(FormContext);
-
-  const hyper = session?.hyper;
-  // An explicit vaultData.environment wins; then the instance the session was
-  // created with (its lookup used the same value, default PROD); a bare
-  // <CardForm> outside a session keeps its previous SANDBOX default.
-  const environment =
-    data.environment ?? hyper?.environment ?? (session ? 'PROD' : 'SANDBOX');
-  const customEndpoints = hyper?.customEndpoints;
   const locale = session?.locale ?? undefined;
   const layers = form?.appearances;
   const appearance = useMemo(
     () => (layers ? toVaultAppearance(layers) : undefined),
     [layers]
   );
-  // The vault reads `expires_at` only from its `session` prop, so a looked-up
-  // expiry is handed over in that shape. It applies only to the authorization
-  // it was fetched for: a <CardForm vaultDetails> override never inherits it.
-  const expiresAt =
-    expiry && expiry.sdkAuthorization === data.sdkAuthorization
-      ? expiry.expiresAt
-      : undefined;
-  const vaultSession = useMemo(
-    () =>
-      expiresAt
-        ? {
-            vault_details: {
-              vault_type: 'hyperswitch',
-              vault_data: { sdk_authorization: data.sdkAuthorization },
-            },
-            expires_at: expiresAt,
-          }
-        : undefined,
-    [expiresAt, data.sdkAuthorization]
-  );
+
+  // DEFERRED (follow-up PR): route the tokenization request to the instance's
+  // `environment` / `customEndpoints` (today it always goes to SANDBOX unless
+  // vaultData.environment is set). An explicit vaultData.environment wins;
+  // then the instance the session was created with (its lookup used the same
+  // value, default PROD); a bare <CardForm> outside a session keeps SANDBOX.
+  // const hyper = session?.hyper;
+  // const environment =
+  //   data.environment ?? hyper?.environment ?? (session ? 'PROD' : 'SANDBOX');
+  // const customEndpoints = hyper?.customEndpoints;
+  const environment = data.environment ?? 'SANDBOX';
+
+  // DEFERRED (follow-up PR): the vault reads `expires_at` only from its
+  // `session` prop, so hand a looked-up expiry over in that shape and let the
+  // vault answer `session_expired` before any confirm request. The backend
+  // reports the expiry on the confirm request until then.
+  // const expiresAt = session?.expiresAt ?? undefined;
+  // const vaultSession = useMemo(
+  //   () =>
+  //     expiresAt
+  //       ? {
+  //           vault_details: {
+  //             vault_type: 'hyperswitch',
+  //             vault_data: { sdk_authorization: data.sdkAuthorization },
+  //           },
+  //           expires_at: expiresAt,
+  //         }
+  //       : undefined,
+  //   [expiresAt, data.sdkAuthorization]
+  // );
 
   useEffect(() => {
     if (formRef.current) onReady(formRef.current);
@@ -122,16 +121,14 @@ const Host: ProviderAdapter['Host'] = ({
   return (
     <VaultCardForm
       ref={formRef}
-      {...(vaultSession
-        ? { session: vaultSession }
-        : {
-            vaultDetails: {
-              vaultType: 'hyperswitch',
-              vaultData: { sdkAuthorization: data.sdkAuthorization },
-            },
-          })}
+      // DEFERRED (follow-up PR): pass `session={vaultSession}` instead of
+      // `vaultDetails` when a looked-up expiry is present.
+      vaultDetails={{
+        vaultType: 'hyperswitch',
+        vaultData: { sdkAuthorization: data.sdkAuthorization },
+      }}
       environment={environment}
-      customEndpoints={customEndpoints}
+      // DEFERRED (follow-up PR): customEndpoints={customEndpoints}
       locale={locale}
       appearance={appearance}
       onChange={(event: any) => {
