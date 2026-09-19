@@ -72,8 +72,6 @@ const Host: ProviderAdapter['Host'] = ({
   const data = vaultData as HyperswitchVaultData;
   const formRef = useRef<any>(null);
 
-  // The session's `locale` and `appearance` props are read from context so
-  // the public `HyperswitchVaultData` stays the web's `{sdkAuthorization}`.
   const session = useContext(SessionContext);
   const form = useContext(FormContext);
   const locale = session?.locale ?? undefined;
@@ -83,21 +81,12 @@ const Host: ProviderAdapter['Host'] = ({
     [layers]
   );
 
-  // DEFERRED (follow-up PR): route the tokenization request to the instance's
-  // `environment` / `customEndpoints` (today it always goes to SANDBOX unless
-  // vaultData.environment is set). An explicit vaultData.environment wins;
-  // then the instance the session was created with (its lookup used the same
-  // value, default PROD); a bare <CardForm> outside a session keeps SANDBOX.
   // const hyper = session?.hyper;
   // const environment =
   //   data.environment ?? hyper?.environment ?? (session ? 'PROD' : 'SANDBOX');
   // const customEndpoints = hyper?.customEndpoints;
   const environment = data.environment ?? 'SANDBOX';
 
-  // DEFERRED (follow-up PR): the vault reads `expires_at` only from its
-  // `session` prop, so hand a looked-up expiry over in that shape and let the
-  // vault answer `session_expired` before any confirm request. The backend
-  // reports the expiry on the confirm request until then.
   // const expiresAt = session?.expiresAt ?? undefined;
   // const vaultSession = useMemo(
   //   () =>
@@ -121,14 +110,13 @@ const Host: ProviderAdapter['Host'] = ({
   return (
     <VaultCardForm
       ref={formRef}
-      // DEFERRED (follow-up PR): pass `session={vaultSession}` instead of
-      // `vaultDetails` when a looked-up expiry is present.
+      // session={vaultSession}
       vaultDetails={{
         vaultType: 'hyperswitch',
         vaultData: { sdkAuthorization: data.sdkAuthorization },
       }}
       environment={environment}
-      // DEFERRED (follow-up PR): customEndpoints={customEndpoints}
+      // customEndpoints={customEndpoints}
       locale={locale}
       appearance={appearance}
       onChange={(event: any) => {

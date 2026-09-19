@@ -1,7 +1,6 @@
 import type { Appearance, AppearanceVariables } from '../../core/types';
 import { APPEARANCE_LABELS, pickAllowed } from '../../core/validate';
 
-/** What the Hyperswitch vault `CardForm` takes as `appearance`. */
 export interface VaultAppearance {
   variables?: AppearanceVariables;
   labels?: 'above' | 'floating' | 'never';
@@ -18,7 +17,6 @@ const STRING_KEYS = [
 ] as const;
 const NUMBER_KEYS = ['borderRadius', 'inputFieldHeight'] as const;
 
-/** The vault's variables, with values of the wrong runtime type dropped. */
 function sanitizeVariables(
   variables: AppearanceVariables
 ): AppearanceVariables {
@@ -34,10 +32,6 @@ function sanitizeVariables(
   return out;
 }
 
-/**
- * Folds the session's and the form's `appearance` layers (later wins, per
- * variable) into the vault's shape.
- */
 export function toVaultAppearance(
   layers: readonly Appearance[]
 ): VaultAppearance | undefined {

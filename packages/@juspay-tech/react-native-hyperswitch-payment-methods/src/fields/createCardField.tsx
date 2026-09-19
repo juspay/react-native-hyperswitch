@@ -69,11 +69,6 @@ export function createCardField<P extends FieldProps = FieldProps>(
       [reportChange]
     );
 
-    // The web SDK reads every field option from `options`, applies a
-    // placeholder only when it is a string, and warns on an icon value it
-    // does not know, keeping the default. The top-level `placeholder` and
-    // `cvcIcon` props predate the nesting and stay as aliases; an explicit
-    // top-level prop wins over the nested one.
     const placeholder =
       pickString(ownPlaceholder) ?? pickString(options?.placeholder);
     const cvcIcon =

@@ -20,10 +20,6 @@ export interface FieldStyles {
   input?: StyleProp<TextStyle>;
 }
 
-/**
- * The Hyperswitch vault's theme variables, under the names the web SDK also
- * uses. Lengths are React Native points; colours are colour strings.
- */
 export interface AppearanceVariables {
   colorPrimary?: string;
   colorText?: string;
@@ -36,7 +32,6 @@ export interface AppearanceVariables {
   inputFieldHeight?: number;
 }
 
-/** The Hyperswitch vault's label modes (`never` renders no label). */
 export type AppearanceLabels = 'above' | 'floating' | 'never';
 
 export interface Appearance extends FieldStyles {
@@ -66,14 +61,11 @@ export type CvcIconDisplay = 'hidden' | 'default';
 export type CardBrandIconDisplay =
   'standard' | 'hidden' | 'animated' | 'hideGeneric';
 
-/** The web SDK's per-field `options` object, same names and nesting. */
 export interface FieldOptions {
   placeholder?: string;
 
-  /** `CardCVCField` only. */
   cvcIcon?: CvcIconDisplay;
 
-  /** `CardNumberField` only. */
   cardBrandIcon?: CardBrandIconDisplay;
 
   savedCard?: SavedCard;

@@ -40,8 +40,6 @@ export type FetchVaultDetailsResult =
   | {
       ok: true;
       vaultDetails: VaultDetails;
-      // DEFERRED (follow-up PR): the session's `expires_at`, so the vault can
-      // refuse an expired session before any confirm request.
       // expiresAt?: string;
     }
   | { ok: false; message: string };
@@ -90,7 +88,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-// DEFERRED (follow-up PR): see `expiresAt` in FetchVaultDetailsResult.
 // const expiryOf = (body: Record<string, unknown>) =>
 //   typeof body.expires_at === 'string' && body.expires_at
 //     ? { expiresAt: body.expires_at }
@@ -121,7 +118,7 @@ export function readVaultDetails(
           vaultType: ownType,
           vaultData: toVaultData(ownType, ownData),
         },
-        // DEFERRED (follow-up PR): ...(ownType === 'hyperswitch' ? expiryOf(body) : {}),
+        // ...(ownType === 'hyperswitch' ? expiryOf(body) : {}),
       };
     }
   }
@@ -134,7 +131,7 @@ export function readVaultDetails(
         vaultType: 'hyperswitch',
         vaultData: { sdkAuthorization: sdkAuthorization },
       },
-      // DEFERRED (follow-up PR): ...expiryOf(body),
+      // ...expiryOf(body),
     };
   }
 

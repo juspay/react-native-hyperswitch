@@ -1,9 +1,3 @@
-/*
- * Runtime validation of the nested field options. TypeScript narrows these
- * for typed callers; JavaScript callers and dynamic data reach the runtime,
- * where the web SDK warns and falls back to the default. Mirror that: the
- * compiled vault would otherwise hide the brand icon on an unknown value.
- */
 import type {
   AppearanceLabels,
   CardBrandIconDisplay,
@@ -34,10 +28,6 @@ function warnUnknownValue(
   );
 }
 
-/**
- * A string from `allowed`, or undefined (the default) after a development
- * warning. `undefined`, `null` and `''` mean "not set" without a warning.
- */
 export function pickAllowed<T extends string>(
   value: unknown,
   allowed: readonly T[],
@@ -54,7 +44,6 @@ export function pickAllowed<T extends string>(
   return undefined;
 }
 
-/** A string, else undefined: a placeholder applies only when it is a string. */
 export function pickString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }

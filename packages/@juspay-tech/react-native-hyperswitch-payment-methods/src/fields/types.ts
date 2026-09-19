@@ -12,11 +12,9 @@ export type { FieldStyles };
 export interface FieldProps {
   form?: CardFormInstance;
 
-  /** The web SDK's field options: `placeholder`, `cvcIcon`, `cardBrandIcon`, `savedCard`. */
   options?: FieldOptions;
 
   styles?: FieldStyles;
-  /** Alias of `options.placeholder`; wins when both are given. */
   placeholder?: string;
   testID?: string;
 
@@ -28,6 +26,5 @@ export interface FieldProps {
 }
 
 export interface CardCVCFieldProps extends FieldProps {
-  /** Alias of `options.cvcIcon`; wins when both are given. */
   cvcIcon?: CvcIconDisplay;
 }
