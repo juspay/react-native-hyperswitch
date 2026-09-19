@@ -4,7 +4,6 @@ import type {
   CardDetails,
   CvcIconDisplay,
   ElementType,
-  FieldAppearance,
   FieldChange,
   FieldEvent,
   FieldHandle,
@@ -35,8 +34,6 @@ export interface ProviderFieldProps<Collector = unknown> {
   cvcIcon?: CvcIconDisplay;
 
   cardBrandIcon?: CardBrandIconDisplay;
-
-  appearance?: FieldAppearance;
   onChange?: (change: FieldChange) => void;
   onFocus?: (event: FieldEvent) => void;
   onBlur?: (event: FieldEvent) => void;

@@ -13,14 +13,12 @@ import {
   CVC_ICONS,
   pickAllowed,
   pickString,
-  pickStringArray,
 } from '../core/validate';
 import type {
   CvcIconDisplay,
   ElementType,
   FieldChange,
   FieldHandle,
-  FieldOptions,
 } from '../core/types';
 import { Placeholder } from './Placeholder';
 import type { FieldProps } from './types';
@@ -91,42 +89,27 @@ export function createCardField<P extends FieldProps = FieldProps>(
             'options.cardBrandIcon'
           )
         : undefined;
-    const appearance =
-      options?.appearance && typeof options.appearance === 'object'
-        ? options.appearance
-        : undefined;
-
     const savedCard = options?.savedCard;
     const savedToken = savedCard?.paymentMethodToken;
     const savedBrand = savedCard?.paymentMethodData?.card?.cardNetwork;
-    const subscriptionEvents = pickStringArray(
-      options?.subscriptionEvents,
-      'options.subscriptionEvents'
-    );
-    const subscriptionKey = subscriptionEvents?.join(' ') ?? '';
-    const subscriptionRef = useRef(subscriptionEvents);
-    subscriptionRef.current = subscriptionEvents;
     const registerField = ctx?.registerField;
     const forgetField = ctx?.forgetField;
     useEffect(() => {
-      const registration: FieldOptions = {};
-      if (savedToken !== undefined) {
-        registration.savedCard = {
-          paymentMethodToken: savedToken,
-          ...(savedBrand
-            ? { paymentMethodData: { card: { cardNetwork: savedBrand } } }
-            : {}),
-        };
-      }
-      if (subscriptionRef.current?.length) {
-        registration.subscriptionEvents = subscriptionRef.current;
-      }
       registerField?.(
         elementType,
-        Object.keys(registration).length ? registration : undefined
+        savedToken === undefined
+          ? undefined
+          : {
+              savedCard: {
+                paymentMethodToken: savedToken,
+                ...(savedBrand
+                  ? { paymentMethodData: { card: { cardNetwork: savedBrand } } }
+                  : {}),
+              },
+            }
       );
       return () => forgetField?.(elementType);
-    }, [registerField, forgetField, savedToken, savedBrand, subscriptionKey]);
+    }, [registerField, forgetField, savedToken, savedBrand]);
 
     const styles = useMemo(
       () => resolveFieldStyles(ctx?.appearances, elementType, ownStyles),
@@ -161,7 +144,6 @@ export function createCardField<P extends FieldProps = FieldProps>(
         placeholder={placeholder}
         cvcIcon={cvcIcon}
         cardBrandIcon={cardBrandIcon}
-        appearance={appearance}
         savedCard={savedCard}
         onChange={handleChange}
         onFocus={onFocus}

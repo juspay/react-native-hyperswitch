@@ -1,11 +1,16 @@
 import { createContext } from 'react';
 
 /**
- * The payment-method-session response looked up from `sdkAuthorization`,
- * reshaped for the Hyperswitch vault (`vault_details` carries the
- * authorization, `expires_at` is kept). Internal: the hyperswitch adapter
- * reads it so the vault can refuse an expired session before any request.
+ * The `expires_at` of the payment-method session looked up from
+ * `sdkAuthorization`, with the authorization it belongs to. Internal: the
+ * hyperswitch adapter passes it to the vault so an expired session is refused
+ * before any confirm request. Absent when the lookup carried no expiry.
  */
-export type VaultSession = Record<string, unknown>;
+export interface VaultSessionExpiry {
+  sdkAuthorization: string;
+  expiresAt: string;
+}
 
-export const VaultSessionContext = createContext<VaultSession | null>(null);
+export const VaultSessionContext = createContext<VaultSessionExpiry | null>(
+  null
+);

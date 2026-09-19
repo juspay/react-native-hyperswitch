@@ -106,12 +106,11 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
             onChange={(event) => setCanPay(event.complete && event.valid)}
             onError={(error) => setStatus(String(error))}
           >
-            {/* Field options use the web SDK's nesting; CardForm.onChange
-                emits cardDetailsChange only while a field subscribes. */}
+            {/* Field options use the web SDK's nesting. */}
             <CardNumberField
               options={{
                 placeholder: "1234 5678 9012 3456",
-                subscriptionEvents: ["cardDetailsChange"],
+                cardBrandIcon: "hidden",
               }}
             />
             <View style={styles.row}>
@@ -119,7 +118,7 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
                 <CardExpiryField options={{ placeholder: "MM / YY" }} />
               </View>
               <View style={styles.half}>
-                <CardCVCField options={{ placeholder: "CVC" }} />
+                <CardCVCField options={{ placeholder: "CVC"}} />
               </View>
             </View>
             <CardholderNameField options={{ placeholder: "Name on card" }} />

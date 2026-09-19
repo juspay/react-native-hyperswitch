@@ -21,9 +21,8 @@ export interface FieldStyles {
 }
 
 /**
- * The web SDK's `appearance.variables` names that the Hyperswitch vault fields
- * honour. Length values accept a number (RN points) or a CSS `px` string as on
- * web; other CSS units are dropped.
+ * The Hyperswitch vault's theme variables, under the names the web SDK also
+ * uses. Lengths are React Native points; colours are colour strings.
  */
 export interface AppearanceVariables {
   colorPrimary?: string;
@@ -32,47 +31,21 @@ export interface AppearanceVariables {
   colorTextPlaceholder?: string;
   colorBackground?: string;
   borderColor?: string;
-  borderRadius?: number | string;
+  borderRadius?: number;
   fontFamily?: string;
-  inputFieldHeight?: number | string;
+  inputFieldHeight?: number;
 }
 
-/**
- * The web SDK's theme presets. Accepted so a web `appearance` object can be
- * passed unchanged; the Hyperswitch vault has no presets, so every value
- * renders the default look on RN.
- */
-export type AppearanceTheme =
-  | 'default'
-  | 'midnight'
-  | 'brutal'
-  | 'charcoal'
-  | 'soft'
-  | 'bubblegum'
-  | 'none';
-
-/** The web SDK's `appearance.labels` values (`none` renders no label). */
-export type AppearanceLabels = 'above' | 'floating' | 'none';
+/** The Hyperswitch vault's label modes (`never` renders no label). */
+export type AppearanceLabels = 'above' | 'floating' | 'never';
 
 export interface Appearance extends FieldStyles {
   fields?: Partial<Record<ElementType, FieldStyles>>;
-
-  theme?: AppearanceTheme;
 
   variables?: AppearanceVariables;
 
   labels?: AppearanceLabels;
 }
-
-/**
- * The web SDK's per-field `options.appearance`. On RN its `variables` become
- * that field's styles over the session theme, and `labels` that field's
- * label behaviour.
- */
-export type FieldAppearance = Pick<
-  Appearance,
-  'theme' | 'variables' | 'labels'
->;
 
 export interface SavedCardData {
   cardNetwork?: string;
@@ -102,15 +75,6 @@ export interface FieldOptions {
 
   /** `CardNumberField` only. */
   cardBrandIcon?: CardBrandIconDisplay;
-
-  /**
-   * `CardForm.onChange` emits `cardDetailsChange` only while a mounted field
-   * subscribes to it, as on web.
-   */
-  subscriptionEvents?: readonly string[];
-
-  /** Per-field appearance, see {@link FieldAppearance}. */
-  appearance?: FieldAppearance;
 
   savedCard?: SavedCard;
 }

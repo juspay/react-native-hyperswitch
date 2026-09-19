@@ -1,11 +1,11 @@
 /*
- * Runtime validation of the web-shaped options. TypeScript narrows these for
- * typed callers; JavaScript callers and dynamic data reach the runtime, where
- * the web SDK warns and falls back to the default. Mirror that.
+ * Runtime validation of the nested field options. TypeScript narrows these
+ * for typed callers; JavaScript callers and dynamic data reach the runtime,
+ * where the web SDK warns and falls back to the default. Mirror that: the
+ * compiled vault would otherwise hide the brand icon on an unknown value.
  */
 import type {
   AppearanceLabels,
-  AppearanceTheme,
   CardBrandIconDisplay,
   CvcIconDisplay,
 } from './types';
@@ -20,19 +20,10 @@ export const CARD_BRAND_ICONS: readonly CardBrandIconDisplay[] = [
 export const APPEARANCE_LABELS: readonly AppearanceLabels[] = [
   'above',
   'floating',
-  'none',
-];
-export const APPEARANCE_THEMES: readonly AppearanceTheme[] = [
-  'default',
-  'midnight',
-  'brutal',
-  'charcoal',
-  'soft',
-  'bubblegum',
-  'none',
+  'never',
 ];
 
-export function warnUnknownValue(
+function warnUnknownValue(
   value: unknown,
   allowed: readonly string[],
   path: string
@@ -45,8 +36,7 @@ export function warnUnknownValue(
 
 /**
  * A string from `allowed`, or undefined (the default) after a development
- * warning. `undefined`, `null` and `''` mean "not set" without a warning, as
- * the web SDK treats them.
+ * warning. `undefined`, `null` and `''` mean "not set" without a warning.
  */
 export function pickAllowed<T extends string>(
   value: unknown,
@@ -64,21 +54,7 @@ export function pickAllowed<T extends string>(
   return undefined;
 }
 
-/** A string, else undefined: the web SDK applies `placeholder` only when it is a string. */
+/** A string, else undefined: a placeholder applies only when it is a string. */
 export function pickString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
-}
-
-/** String entries of an array, else undefined; non-string entries warn as on web. */
-export function pickStringArray(
-  value: unknown,
-  path: string
-): readonly string[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const strings: string[] = [];
-  for (const entry of value) {
-    if (typeof entry === 'string') strings.push(entry);
-    else warnUnknownValue(entry, ['string'], path);
-  }
-  return strings;
 }

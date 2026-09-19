@@ -101,8 +101,8 @@ function Checkout({ sdkAuthorization, appearance }) {
 | `options` | An object, or a promise of one, as the web wrapper accepts. |
 | `options.sdkAuthorization` | The payment session your backend minted, as the checkout SDK spells it. Enough on its own: the vault is [looked up](#resolving-the-vault) from it, and the session's `expires_at` is honoured so `tokenize()` answers `session_expired` with no confirm request after the lookup. |
 | `options.vaultDetails` | Which vault to drive — `{vaultType, vaultData}`, the web SDK's shape. Supply it and **no lookup happens**, even alongside `sdkAuthorization`. |
-| `options.locale` | The web SDK's `locale` (`'fr'`, `'de'`, …), forwarded to the Hyperswitch vault fields for placeholders, labels and validation messages. Omitted or `'auto'` resolves to the device locale (Hermes `Intl`, else Android's `I18nManager`), as web uses the browser language; an unsupported tag falls back to English. |
-| `options.appearance` | The web SDK's `appearance` object (`variables`, `labels`, `theme`) plus this package's RN slots. See [Appearance](#appearance). |
+| `options.locale` | The web SDK's `locale` (`'fr'`, `'de'`, …), forwarded to the Hyperswitch vault fields for placeholders, labels and validation messages. Omitted, `'auto'` or an unsupported tag renders English; there is no device-locale detection. |
+| `options.appearance` | The vault's theme `variables` and `labels`, plus this package's RN slots. See [Appearance](#appearance). |
 | `onError` | Called if the `hyper` promise or the `options` promise rejects, or the lookup fails. |
 
 ### `Hyperswitch.init`
@@ -298,8 +298,8 @@ Every field takes the web's four events. The change carries no card value:
 Focus and blur are reported where the provider reports them (VGS, Skyflow); change is
 wired for VGS, Skyflow and Basis Theory (Evervault reports validity at the card level).
 
-The form emits the web's `cardDetailsChange` — and, as on web, only while a mounted field
-subscribes to it through `options.subscriptionEvents`:
+The form emits the web's `cardDetailsChange` envelope on every change, always on (the web SDK
+requires a field-level `subscriptionEvents` opt-in; this package does not):
 
 ```tsx
 <CardForm
@@ -311,18 +311,12 @@ subscribes to it through `options.subscriptionEvents`:
     e.fields;  // the latest change per mounted field
   }}
 >
-  <CardNumberField options={{ subscriptionEvents: ['cardDetailsChange'] }} />
-  ...
-</CardForm>
 ```
 
-The subscription lasts for the life of the form (the web keeps it for the session), so it
-survives the subscribing field unmounting. **Interim behaviour:** a form with no subscriber still
-emits, as 1.0.x did, and warns once in development; the web default (no opt-in, no event) is a
-pending breaking decision, not parity. One envelope is emitted per change with a consistent
-`payload` and `fields`, and an envelope identical to the previous one is dropped; a field-only
-change (for example `touched` on blur, or the RN-only cardholder-name field) still emits because
-`fields`, `complete` and `valid` are part of the envelope, which web would not emit.
+One envelope is emitted per change with a consistent `payload` and `fields` (a keystroke reaches
+the form as several reports; they are coalesced), and an envelope identical to the previous one is
+dropped. A field-only change (for example `touched` on blur, or the RN-only cardholder-name field)
+still emits because `fields`, `complete` and `valid` are part of the envelope.
 
 A provider's secure input keeps the digits to itself, so `bin`, `last4` and the expiry
 parts are `null` unless the provider reports them (Evervault does); the flags are derived
@@ -365,33 +359,24 @@ Every field takes the web SDK's `options` object, same names and nesting:
 | `placeholder` | all | any string (`''` shows none) | the vault's locale text: `Card number`, `MM / YY`, `CVC` (web shows `1234 1234 1234 1234` / `123`) |
 | `cvcIcon` | CVC | `'default'` \| `'hidden'` | `'default'` |
 | `cardBrandIcon` | number | `'standard'` \| `'hidden'` \| `'animated'` \| `'hideGeneric'` | `'standard'`; `animated` cycles brand marks here, while web currently renders it like `standard` |
-| `subscriptionEvents` | any | `['cardDetailsChange']` | none — see [Events](#events) |
 | `savedCard` | CVC | see [Saved card](#saved-card--cvc-recollect) | none |
 
 The top-level `placeholder` (all fields) and `cvcIcon` (CVC) props from 1.0.x still work as
-aliases; when both forms are given the top-level prop wins. Supported by the Hyperswitch vault;
-other providers take `placeholder` and ignore the icons. At runtime an icon value outside the
-list warns in development and falls back to the default; `''`, `null` and `undefined` mean
-"not set"; a non-string `placeholder` is ignored, as on web.
-
-A field also takes `options.appearance` (`variables`, `labels`; `theme` accepted without effect).
-As on web, a non-empty field appearance replaces the session's for that field: the variables it
-sets apply (`colorText`, `colorTextPlaceholder`, `colorBackground`, `borderColor`, `borderRadius`,
-`fontFamily`, `inputFieldHeight`), the ones it leaves out revert to the vault defaults rather than
-the session's values, and an unset `labels` reverts to the vault's floating label. An empty `{}`
-inherits the session appearance. `colorPrimary` (focus ring) and `colorDanger` (error tint) are
-state-dependent theme colours the field slots cannot express, so they stay at session level. The
-field's `styles` prop wins over its `options.appearance`.
+aliases; when both forms are given the top-level prop wins (an empty top-level `''` wins too).
+Supported by the Hyperswitch vault; other providers take `placeholder` and ignore the icons. At
+runtime an icon value outside the list warns in development and falls back to the default; `''`,
+`null` and `undefined` mean "not set"; a non-string `placeholder` is ignored, as on web.
 
 ## Appearance
 
-`options.appearance` on the session takes the web SDK's object. `variables` uses the web's names
-(`colorPrimary`, `colorText`, `colorDanger`, `colorTextPlaceholder`, `colorBackground`,
-`borderColor`, `borderRadius`, `fontFamily`, `inputFieldHeight`); lengths accept a number or a
-`px` string. `labels` takes the web's `'above' | 'floating' | 'none'` (`none` renders no label;
-the RN default stays `floating`). `theme` is accepted so a web object compiles, but the vault has
-no presets, so every value renders the default look. The web's `rules` (CSS selectors) are not
-accepted.
+`options.appearance` on the session takes the Hyperswitch vault's theme: `variables` under the
+names the web SDK also uses (`colorPrimary`, `colorText`, `colorDanger`, `colorTextPlaceholder`,
+`colorBackground`, `borderColor`, `borderRadius`, `fontFamily`, `inputFieldHeight`), with lengths
+as React Native points, and `labels` as `'above' | 'floating' | 'never'` (the RN default is
+`floating`; web's separate fields never render a label). Values of the wrong runtime type are
+dropped and an unknown `labels` value warns in development. The web's `theme` presets, `rules`
+(CSS selectors), `innerLayout` and `colorScheme` are not accepted; a web `appearance` object needs
+its lengths as numbers and `labels: 'none'` spelt `'never'`.
 
 ```tsx
 <HyperPaymentMethodSession
@@ -399,8 +384,8 @@ accepted.
   options={{
     sdkAuthorization,
     appearance: {
-      variables: { colorPrimary: '#0570DE', colorText: '#1A1A1A', borderRadius: '8px', inputFieldHeight: 48 },
-      labels: 'none',
+      variables: { colorPrimary: '#0570DE', colorText: '#1A1A1A', borderRadius: 8, inputFieldHeight: 48 },
+      labels: 'never',
     },
   }}
 >

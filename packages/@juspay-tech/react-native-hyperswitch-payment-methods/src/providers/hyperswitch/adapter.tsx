@@ -10,14 +10,9 @@ import type {
   TokenizeErrorCode,
   TokenizeResult,
 } from '../../core/types';
-import { resolveLocale } from '../../session/deviceLocale';
 import { SessionContext } from '../../session/SessionContext';
 import { VaultSessionContext } from '../../session/VaultSessionContext';
-import {
-  mergeFieldStyles,
-  resolveFieldAppearance,
-  toVaultAppearance,
-} from './appearance';
+import { toVaultAppearance } from './appearance';
 import type { HyperswitchVaultData } from './types';
 
 declare const require: (moduleId: string) => unknown;
@@ -68,15 +63,6 @@ function validateVaultData(raw: unknown): HyperswitchVaultData {
   return raw as unknown as HyperswitchVaultData;
 }
 
-/** The authorization a looked-up session was shaped for, so a form that overrides `vaultDetails` never inherits a stranger's expiry. */
-function sessionAuthorization(session: Record<string, unknown>): string {
-  const details = isRecord(session.vault_details) ? session.vault_details : {};
-  const data = isRecord(details.vault_data) ? details.vault_data : {};
-  return typeof data.sdk_authorization === 'string'
-    ? data.sdk_authorization
-    : '';
-}
-
 const Host: ProviderAdapter['Host'] = ({
   vaultData,
   onReady,
@@ -91,7 +77,7 @@ const Host: ProviderAdapter['Host'] = ({
   // credentials) is read from context so the public `HyperswitchVaultData`
   // stays the web's `{sdkAuthorization}`.
   const session = useContext(SessionContext);
-  const lookedUp = useContext(VaultSessionContext);
+  const expiry = useContext(VaultSessionContext);
   const form = useContext(FormContext);
 
   const hyper = session?.hyper;
@@ -101,19 +87,32 @@ const Host: ProviderAdapter['Host'] = ({
   const environment =
     data.environment ?? hyper?.environment ?? (session ? 'PROD' : 'SANDBOX');
   const customEndpoints = hyper?.customEndpoints;
-  // Web: omitted or 'auto' means the browser language. Inside a session the
-  // same rule resolves to the device locale; a bare <CardForm> outside a
-  // session keeps its previous behaviour (the vault's English).
-  const locale = session ? resolveLocale(session.locale) : undefined;
+  const locale = session?.locale ?? undefined;
   const layers = form?.appearances;
   const appearance = useMemo(
     () => (layers ? toVaultAppearance(layers) : undefined),
     [layers]
   );
-  const vaultSession =
-    lookedUp && sessionAuthorization(lookedUp) === data.sdkAuthorization
-      ? lookedUp
+  // The vault reads `expires_at` only from its `session` prop, so a looked-up
+  // expiry is handed over in that shape. It applies only to the authorization
+  // it was fetched for: a <CardForm vaultDetails> override never inherits it.
+  const expiresAt =
+    expiry && expiry.sdkAuthorization === data.sdkAuthorization
+      ? expiry.expiresAt
       : undefined;
+  const vaultSession = useMemo(
+    () =>
+      expiresAt
+        ? {
+            vault_details: {
+              vault_type: 'hyperswitch',
+              vault_data: { sdk_authorization: data.sdkAuthorization },
+            },
+            expires_at: expiresAt,
+          }
+        : undefined,
+    [expiresAt, data.sdkAuthorization]
+  );
 
   useEffect(() => {
     if (formRef.current) onReady(formRef.current);
@@ -161,28 +160,18 @@ const Field: ProviderAdapter['Field'] = ({
   savedCard,
   cvcIcon,
   cardBrandIcon,
-  appearance,
   onChange,
   onFocus,
   onBlur,
 }) => {
   const Component = FIELD_COMPONENT[elementType] as any;
-  const fieldAppearance = useMemo(
-    () => resolveFieldAppearance(appearance),
-    [appearance]
-  );
-  const vaultStyles = useMemo(
-    () => mergeFieldStyles(fieldAppearance.styles, styles),
-    [fieldAppearance, styles]
-  );
   if (!Component) return null;
 
   return (
     <Component
-      styles={vaultStyles}
+      styles={styles}
       placeholder={placeholder}
       testID={testID}
-      labelBehavior={fieldAppearance.labelBehavior}
       options={savedCard ? { savedCard } : undefined}
       cvcIcon={elementType === 'cardCvc' ? cvcIcon : undefined}
       cardBrandIcon={elementType === 'cardNumber' ? cardBrandIcon : undefined}

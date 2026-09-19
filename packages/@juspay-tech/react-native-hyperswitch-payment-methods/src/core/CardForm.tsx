@@ -25,12 +25,6 @@ import {
   savedCardOf,
   withSavedCard,
 } from './savedCard';
-import {
-  EMIT_WITHOUT_SUBSCRIPTION,
-  warnUnknownSubscriptionEvents,
-  warnUnsubscribedEmission,
-  CARD_DETAILS_CHANGE,
-} from './subscriptions';
 import type { MountedFields, UnresolvedVault } from './savedCard';
 import type {
   Appearance,
@@ -217,24 +211,12 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
     // publish envelopes whose `payload` lags `fields`. Coalesce every arrival
     // in the same task into one envelope and, as the web coordinator does,
     // drop an envelope identical to the last one emitted.
-    //
-    // The web SDK emits `cardDetailsChange` only once a field of the session
-    // subscribed to it, and the subscription outlives that field (the union
-    // only grows). Mirror that per form instance; see EMIT_WITHOUT_SUBSCRIPTION
-    // for the pending default.
-    const subscribedRef = useRef<Set<string>>(new Set());
-    const warnedRef = useRef(false);
     const flushScheduledRef = useRef(false);
     const lastEmittedRef = useRef('');
-    // A new vault session (web: a new PaymentMethodsSession) starts with the
-    // subscriptions of the fields mounted now and no dedupe history.
+    // A new vault session starts with no dedupe history, so its first
+    // envelope is delivered even when the field state looks the same.
     const sessionKey = details ? JSON.stringify(details) : '';
     useEffect(() => {
-      const next = new Set<string>();
-      Object.values(mountedRef.current).forEach((field) =>
-        field?.subscriptionEvents?.forEach((event) => next.add(event))
-      );
-      subscribedRef.current = next;
       lastEmittedRef.current = '';
     }, [sessionKey]);
     const flushChange = useCallback(() => {
@@ -242,18 +224,19 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
       if (!aliveRef.current) return;
       const listener = onChangeRef.current;
       if (!listener) return;
-      if (!subscribedRef.current.has(CARD_DETAILS_CHANGE)) {
-        if (!EMIT_WITHOUT_SUBSCRIPTION) return;
-        if (!warnedRef.current) {
-          warnedRef.current = true;
-          warnUnsubscribedEmission();
-        }
-      }
       const change = buildChange(fieldsRef.current, detailsRef.current);
       const serialized = JSON.stringify(change);
       if (serialized === lastEmittedRef.current) return;
       lastEmittedRef.current = serialized;
-      listener(change);
+      try {
+        listener(change);
+      } catch (error) {
+        // Surface a listener error as an uncaught error, as a synchronous
+        // effect would, instead of an unhandled promise rejection.
+        setTimeout(() => {
+          throw error;
+        }, 0);
+      }
     }, []);
     const emitChange = useCallback(() => {
       if (flushScheduledRef.current) return;
@@ -271,10 +254,6 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
 
     const registerField = useCallback(
       (elementType: ElementType, options?: FieldOptions) => {
-        warnUnknownSubscriptionEvents(options?.subscriptionEvents);
-        options?.subscriptionEvents?.forEach((event) =>
-          subscribedRef.current.add(event)
-        );
         mountedRef.current[elementType] = mountedField(elementType, options);
       },
       []

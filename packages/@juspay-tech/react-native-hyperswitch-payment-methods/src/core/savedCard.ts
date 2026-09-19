@@ -11,7 +11,6 @@ import type {
 export interface MountedField {
   elementType: ElementType;
   savedCard?: SavedCard;
-  subscriptionEvents?: readonly string[];
 }
 
 export type MountedFields = Partial<Record<ElementType, MountedField>>;
@@ -20,12 +19,9 @@ export function mountedField(
   elementType: ElementType,
   options: FieldOptions | undefined
 ): MountedField {
-  const field: MountedField = { elementType };
-  if (options?.savedCard) field.savedCard = options.savedCard;
-  if (options?.subscriptionEvents?.length) {
-    field.subscriptionEvents = [...options.subscriptionEvents];
-  }
-  return field;
+  return options?.savedCard
+    ? { elementType, savedCard: options.savedCard }
+    : { elementType };
 }
 
 export function savedCardOf(mounted: MountedFields): SavedCard | undefined {

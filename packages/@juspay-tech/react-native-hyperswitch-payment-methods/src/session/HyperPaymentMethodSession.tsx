@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { SessionContext } from './SessionContext';
 import type { PaymentMethodsSession } from './SessionContext';
 import { VaultSessionContext } from './VaultSessionContext';
-import type { VaultSession } from './VaultSessionContext';
+import type { VaultSessionExpiry } from './VaultSessionContext';
 import type { HyperswitchConfiguration } from './config';
 import { fetchVaultDetails } from './fetchVaultDetails';
 import type { Appearance, VaultDetails } from '../core/types';
@@ -95,7 +95,7 @@ export function HyperPaymentMethodSession({
 
   const [fetchedVaultDetails, setFetchedVaultDetails] =
     useState<VaultDetails | null>(null);
-  const [fetchedSession, setFetchedSession] = useState<VaultSession | null>(
+  const [fetchedExpiry, setFetchedExpiry] = useState<VaultSessionExpiry | null>(
     null
   );
   const [vaultLoading, setVaultLoading] = useState(false);
@@ -127,7 +127,7 @@ export function HyperPaymentMethodSession({
   useEffect(() => {
     if (providedVaultDetails || !sdkAuthorization) {
       setFetchedVaultDetails(null);
-      setFetchedSession(null);
+      setFetchedExpiry(null);
       setVaultLoading(false);
       setVaultError(null);
       return;
@@ -136,7 +136,7 @@ export function HyperPaymentMethodSession({
     // A replaced sdkAuthorization must not keep serving the previous
     // session's vault details or expiry while the new lookup is in flight.
     setFetchedVaultDetails(null);
-    setFetchedSession(null);
+    setFetchedExpiry(null);
     setVaultLoading(true);
     setVaultError(null);
     if (!resolvedHyper) return;
@@ -153,13 +153,17 @@ export function HyperPaymentMethodSession({
       if (cancelled) return;
       if (result.ok) {
         setFetchedVaultDetails(result.vaultDetails);
-        setFetchedSession(result.session ?? null);
+        setFetchedExpiry(
+          result.expiresAt
+            ? { sdkAuthorization, expiresAt: result.expiresAt }
+            : null
+        );
         setVaultLoading(false);
         return;
       }
       const failure = new Error(result.message);
       setFetchedVaultDetails(null);
-      setFetchedSession(null);
+      setFetchedExpiry(null);
       setVaultError(failure);
       setVaultLoading(false);
       onErrorRef.current?.(failure);
@@ -199,11 +203,11 @@ export function HyperPaymentMethodSession({
     ]
   );
 
-  const vaultSession = providedVaultDetails ? null : fetchedSession;
+  const vaultExpiry = providedVaultDetails ? null : fetchedExpiry;
 
   return (
     <SessionContext.Provider value={value}>
-      <VaultSessionContext.Provider value={vaultSession}>
+      <VaultSessionContext.Provider value={vaultExpiry}>
         {children}
       </VaultSessionContext.Provider>
     </SessionContext.Provider>

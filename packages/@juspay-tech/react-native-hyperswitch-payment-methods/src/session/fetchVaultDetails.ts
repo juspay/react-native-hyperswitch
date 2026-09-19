@@ -40,8 +40,8 @@ export type FetchVaultDetailsResult =
   | {
       ok: true;
       vaultDetails: VaultDetails;
-      /** Hyperswitch vault only: the looked-up session with `vault_details` filled in, for expiry checks. */
-      session?: Record<string, unknown>;
+      /** Hyperswitch vault only: the session's `expires_at`, when the response carries one. */
+      expiresAt?: string;
     }
   | { ok: false; message: string };
 
@@ -89,26 +89,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/**
- * The lookup response does not repeat the authorization it was fetched with;
- * the vault reads it from `vault_details.vault_data.sdk_authorization` (and
- * `expires_at` from the root), so fill that in as the web runtime does.
- */
-export function toVaultSession(
-  body: Record<string, unknown>,
-  sdkAuthorization: string
-): Record<string, unknown> {
-  const own = isRecord(body.vault_details) ? body.vault_details : {};
-  const ownData = isRecord(own.vault_data) ? own.vault_data : {};
-  return {
-    ...body,
-    vault_details: {
-      ...own,
-      vault_type: 'hyperswitch',
-      vault_data: { ...ownData, sdk_authorization: sdkAuthorization },
-    },
-  };
-}
+const expiryOf = (body: Record<string, unknown>) =>
+  typeof body.expires_at === 'string' && body.expires_at
+    ? { expiresAt: body.expires_at }
+    : {};
 
 export function readVaultDetails(
   body: unknown,
@@ -135,9 +119,7 @@ export function readVaultDetails(
           vaultType: ownType,
           vaultData: toVaultData(ownType, ownData),
         },
-        ...(ownType === 'hyperswitch'
-          ? { session: toVaultSession(body, sdkAuthorization) }
-          : {}),
+        ...(ownType === 'hyperswitch' ? expiryOf(body) : {}),
       };
     }
   }
@@ -150,7 +132,7 @@ export function readVaultDetails(
         vaultType: 'hyperswitch',
         vaultData: { sdkAuthorization: sdkAuthorization },
       },
-      session: toVaultSession(body, sdkAuthorization),
+      ...expiryOf(body),
     };
   }
 

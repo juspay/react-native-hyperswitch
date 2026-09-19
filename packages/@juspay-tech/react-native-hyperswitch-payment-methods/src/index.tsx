@@ -48,7 +48,6 @@ export type {
   Appearance,
   AppearanceVariables,
   AppearanceLabels,
-  AppearanceTheme,
   SavedCard,
   SavedCardData,
   SavedCardPaymentMethodData,
