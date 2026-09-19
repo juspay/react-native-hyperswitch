@@ -4,8 +4,10 @@ import type {
   CardDetails,
   CvcIconDisplay,
   ElementType,
+  ErrorDisplay,
   FieldChange,
   FieldEvent,
+  LabelBehavior,
   FieldHandle,
   FieldStyles,
   SavedCard,
@@ -27,7 +29,10 @@ export interface ProviderFieldProps<Collector = unknown> {
   collector: Collector;
   styles?: FieldStyles;
   placeholder?: string;
-  testID?: string;
+  label?: string;
+  labelBehavior?: LabelBehavior;
+  errorDisplay?: ErrorDisplay;
+  unstyled?: boolean;
 
   savedCard?: SavedCard;
 

@@ -20,6 +20,7 @@ export interface FormCore {
   readonly vaultType: VaultType;
   readonly adapter: ProviderAdapter;
   readonly appearances: readonly Appearance[];
+  readonly unstyled?: boolean;
   collector: unknown | undefined;
   status: FormStatus;
   readonly session: FormSession;

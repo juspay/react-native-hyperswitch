@@ -16,7 +16,7 @@ export interface FieldProps {
 
   styles?: FieldStyles;
   placeholder?: string;
-  testID?: string;
+  unstyled?: boolean;
 
   onReady?: (event: FieldEvent) => void;
   onFocus?: (event: FieldEvent) => void;

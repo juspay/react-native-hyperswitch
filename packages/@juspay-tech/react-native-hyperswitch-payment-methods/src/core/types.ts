@@ -61,8 +61,18 @@ export type CvcIconDisplay = 'hidden' | 'default';
 export type CardBrandIconDisplay =
   'standard' | 'hidden' | 'animated' | 'hideGeneric';
 
+export type LabelBehavior = 'above' | 'floating' | 'never';
+
+export type ErrorDisplay = 'none' | 'colorOnly' | 'inline';
+
 export interface FieldOptions {
   placeholder?: string;
+
+  label?: string;
+
+  labelBehavior?: LabelBehavior;
+
+  errorDisplay?: ErrorDisplay;
 
   cvcIcon?: CvcIconDisplay;
 

@@ -352,15 +352,23 @@ Every field takes the web SDK's `options` object, same names and nesting:
 | `options.…` | Fields | Values | Default on RN |
 | --- | --- | --- | --- |
 | `placeholder` | all | any string (`''` shows none) | the vault's locale text: `Card number`, `MM / YY`, `CVC` (web shows `1234 1234 1234 1234` / `123`) |
+| `label` | all | any string (`''` shows none) | the vault's locale text |
+| `labelBehavior` | all | `'above'` \| `'floating'` \| `'never'` | `appearance.labels`, else `'floating'` |
+| `errorDisplay` | all | `'none'` \| `'colorOnly'` \| `'inline'` | `'colorOnly'` (tint only; `inline` also prints the message under the field) |
 | `cvcIcon` | CVC | `'default'` \| `'hidden'` | `'default'` |
 | `cardBrandIcon` | number | `'standard'` \| `'hidden'` \| `'animated'` \| `'hideGeneric'` | `'standard'`; `animated` cycles brand marks here, while web currently renders it like `standard` |
 | `savedCard` | CVC | see [Saved card](#saved-card--cvc-recollect) | none |
 
+`unstyled` is a top-level prop on every field and on `<CardForm>` (form-wide, a field can set its
+own). It renders the bare secure input with no placeholder, label, border, background, error tint
+or icon, for merchants who draw the chrome themselves; `label`, `labelBehavior`, `errorDisplay` and
+the icons are ignored while it is on.
+
 The top-level `placeholder` (all fields) and `cvcIcon` (CVC) props from 1.0.x still work as
 aliases; when both forms are given the top-level prop wins (an empty top-level `''` wins too).
-Supported by the Hyperswitch vault; other providers take `placeholder` and ignore the icons. At
-runtime an icon value outside the list warns in development and falls back to the default; `''`,
-`null` and `undefined` mean "not set"; a non-string `placeholder` is ignored, as on web.
+Supported by the Hyperswitch vault; other providers take `placeholder` and ignore the rest. At
+runtime a value outside the listed set warns in development and falls back to the default; `''`,
+`null` and `undefined` mean "not set"; a non-string `placeholder` or `label` is ignored.
 
 ## Appearance
 
