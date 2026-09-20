@@ -62,6 +62,8 @@ export interface CardFormProps {
 
   appearance?: Appearance;
 
+  unstyled?: boolean;
+
   id?: FormId;
 
   onReady?: (event: CardFormEvent) => void;
@@ -124,6 +126,7 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
     {
       vaultDetails,
       appearance,
+      unstyled,
       id,
       onReady,
       onChange,
@@ -347,6 +350,7 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
         collector,
         status,
         appearances,
+        unstyled,
         tokenize,
         reportChange,
         registerField,
@@ -358,6 +362,7 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
         collector,
         status,
         appearances,
+        unstyled,
         tokenize,
         reportChange,
         registerField,

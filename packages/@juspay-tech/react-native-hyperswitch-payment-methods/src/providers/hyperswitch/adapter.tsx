@@ -141,7 +141,10 @@ const Field: ProviderAdapter['Field'] = ({
   elementType,
   styles,
   placeholder,
-  testID,
+  label,
+  labelBehavior,
+  errorDisplay,
+  unstyled,
   savedCard,
   cvcIcon,
   cardBrandIcon,
@@ -156,7 +159,10 @@ const Field: ProviderAdapter['Field'] = ({
     <Component
       styles={styles}
       placeholder={placeholder}
-      testID={testID}
+      label={label}
+      labelBehavior={labelBehavior}
+      errorDisplay={errorDisplay}
+      unstyled={unstyled}
       options={savedCard ? { savedCard } : undefined}
       cvcIcon={elementType === 'cardCvc' ? cvcIcon : undefined}
       cardBrandIcon={elementType === 'cardNumber' ? cardBrandIcon : undefined}

@@ -1,17 +1,18 @@
 import { View } from 'react-native';
-import type { ElementType } from '../core/types';
-import type { FieldProps } from './types';
+import type { ElementType, FieldStyles } from '../core/types';
 
 export function Placeholder({
   elementType,
   styles,
-  testID,
-}: FieldProps & { elementType: ElementType }) {
+}: {
+  elementType: ElementType;
+  styles?: FieldStyles;
+}) {
   return (
     <View
       accessibilityState={{ busy: true }}
       style={styles?.container}
-      testID={testID ?? `hs-placeholder-${elementType}`}
+      testID={`hs-placeholder-${elementType}`}
     />
   );
 }

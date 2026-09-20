@@ -18,6 +18,7 @@ export interface FormContextValue {
   status: FormStatus;
 
   appearances: readonly Appearance[];
+  unstyled?: boolean;
   tokenize: (providerData?: unknown) => Promise<TokenizeResult>;
 
   reportChange: (change: FieldChange) => void;

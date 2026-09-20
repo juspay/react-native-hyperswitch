@@ -26,6 +26,7 @@ export function useFormBinding(
     collector,
     status: core.status,
     appearances: core.appearances,
+    unstyled: core.unstyled,
     tokenize: core.tokenize,
     reportChange: core.reportChange,
     registerField: core.registerField,

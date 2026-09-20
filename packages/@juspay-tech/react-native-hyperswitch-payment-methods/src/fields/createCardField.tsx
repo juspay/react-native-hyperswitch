@@ -41,6 +41,7 @@ export function createCardField<P extends FieldProps = FieldProps>(
       styles: ownStyles,
       placeholder: ownPlaceholder,
       cvcIcon: ownCvcIcon,
+      unstyled,
       ...rest
     } = props as AliasProps;
     const ctx = useFormBinding(form);
@@ -123,9 +124,7 @@ export function createCardField<P extends FieldProps = FieldProps>(
     }
 
     if (ctx.adapter === null || ctx.collector === undefined) {
-      return (
-        <Placeholder elementType={elementType} styles={styles} {...rest} />
-      );
+      return <Placeholder elementType={elementType} styles={styles} />;
     }
 
     const Field = ctx.adapter.Field;
