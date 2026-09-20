@@ -368,14 +368,14 @@ runtime an icon value outside the list warns in development and falls back to th
 
 ## Appearance
 
-`options.appearance` on the session takes the Hyperswitch vault's theme: `variables` under the
-names the web SDK also uses (`colorPrimary`, `colorText`, `colorDanger`, `colorTextPlaceholder`,
-`colorBackground`, `borderColor`, `borderRadius`, `fontFamily`, `inputFieldHeight`), with lengths
-as React Native points, and `labels` as `'above' | 'floating' | 'never'` (the RN default is
-`floating`; web's separate fields never render a label). Values of the wrong runtime type are
-dropped and an unknown `labels` value warns in development. The web's `theme` presets, `rules`
-(CSS selectors), `innerLayout` and `colorScheme` are not accepted; a web `appearance` object needs
-its lengths as numbers and `labels: 'none'` spelt `'never'`.
+`options.appearance` on the session takes `colors`, `shapes` and `font` under the same names as
+`@juspay-tech/react-native-hyperswitch`, with lengths as React Native points, plus `labels` as
+`'above' | 'floating' | 'never'` (the RN default is `floating`; web's separate fields never render
+a label). `colors` is split into `light` and `dark`: the active one follows the device and `dark`
+falls back to `light`. Values of the wrong runtime type are dropped and an unknown `labels` value
+warns in development. Members with no field to paint — `overlay`, `loaderBackground`, `icon`,
+`selectedComponent*`, `theme` presets, `primaryButton`, `logo`, `shapes.shadow` — are accepted and
+ignored, as are the web's `rules` (CSS selectors) and `innerLayout`.
 
 ```tsx
 <HyperPaymentMethodSession
@@ -383,7 +383,11 @@ its lengths as numbers and `labels: 'none'` spelt `'never'`.
   options={{
     sdkAuthorization,
     appearance: {
-      variables: { colorPrimary: '#0570DE', colorText: '#1A1A1A', borderRadius: 8, inputFieldHeight: 48 },
+      colors: {
+        light: { primary: '#0570DE', componentText: '#1A1A1A', componentBorder: '#E0E0E0' },
+        dark: { primary: '#8AB4F8', componentText: '#FFFFFF', componentBackground: '#121212' },
+      },
+      shapes: { borderRadius: 8, inputHeight: 48 },
       labels: 'never',
     },
   }}

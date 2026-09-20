@@ -1,4 +1,5 @@
 import { useContext, useEffect, useMemo, useRef } from 'react';
+import { useColorScheme } from 'react-native';
 
 import { fieldChange } from '../../core/fieldChange';
 import { FormContext } from '../../core/FormContext';
@@ -76,9 +77,11 @@ const Host: ProviderAdapter['Host'] = ({
   const form = useContext(FormContext);
   const locale = session?.locale ?? undefined;
   const layers = form?.appearances;
+  /* Follows the device between renders, so a scheme switch re-themes the fields. */
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const appearance = useMemo(
-    () => (layers ? toVaultAppearance(layers) : undefined),
-    [layers]
+    () => (layers ? toVaultAppearance(layers, scheme) : undefined),
+    [layers, scheme]
   );
 
   // const hyper = session?.hyper;

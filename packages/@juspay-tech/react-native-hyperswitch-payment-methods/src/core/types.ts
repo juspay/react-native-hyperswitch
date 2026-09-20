@@ -20,16 +20,47 @@ export interface FieldStyles {
   input?: StyleProp<TextStyle>;
 }
 
-export interface AppearanceVariables {
-  colorPrimary?: string;
-  colorText?: string;
-  colorDanger?: string;
-  colorTextPlaceholder?: string;
-  colorBackground?: string;
-  borderColor?: string;
+/* The names @juspay-tech/react-native-hyperswitch uses. The vault draws fields only, so
+   the sheet-wide members (loader, overlay, selected*) have no effect here. */
+export interface AppearanceColors {
+  primary?: string;
+  background?: string;
+  componentBackground?: string;
+  componentBorder?: string;
+  componentDivider?: string;
+  componentText?: string;
+  primaryText?: string;
+  secondaryText?: string;
+  placeholderText?: string;
+  icon?: string;
+  error?: string;
+  loaderBackground?: string;
+  loaderForeground?: string;
+  overlay?: string;
+  selectedComponentBackground?: string;
+  selectedComponentBorder?: string;
+  selectedComponentBorderWidth?: number;
+  selectedComponentDivider?: string;
+  selectedComponentText?: string;
+}
+
+export interface AppearanceColorScheme {
+  light?: AppearanceColors;
+  dark?: AppearanceColors;
+}
+
+export interface AppearanceShapes {
   borderRadius?: number;
-  fontFamily?: string;
-  inputFieldHeight?: number;
+  borderWidth?: number;
+  inputHeight?: number;
+  gap?: number;
+}
+
+export interface AppearanceFont {
+  family?: string;
+  scale?: number;
+  placeholderTextSizeAdjust?: number;
+  errorTextSizeAdjust?: number;
 }
 
 export type LabelBehavior = 'above' | 'floating' | 'never';
@@ -39,7 +70,11 @@ export type AppearanceLabels = LabelBehavior;
 export interface Appearance extends FieldStyles {
   fields?: Partial<Record<ElementType, FieldStyles>>;
 
-  variables?: AppearanceVariables;
+  colors?: AppearanceColorScheme;
+
+  shapes?: AppearanceShapes;
+
+  font?: AppearanceFont;
 
   labels?: AppearanceLabels;
 }
