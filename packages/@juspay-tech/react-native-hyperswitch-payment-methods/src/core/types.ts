@@ -32,7 +32,9 @@ export interface AppearanceVariables {
   inputFieldHeight?: number;
 }
 
-export type AppearanceLabels = 'above' | 'floating' | 'never';
+export type LabelBehavior = 'above' | 'floating' | 'never';
+
+export type AppearanceLabels = LabelBehavior;
 
 export interface Appearance extends FieldStyles {
   fields?: Partial<Record<ElementType, FieldStyles>>;
@@ -61,8 +63,18 @@ export type CvcIconDisplay = 'hidden' | 'default';
 export type CardBrandIconDisplay =
   'standard' | 'hidden' | 'animated' | 'hideGeneric';
 
+export type ErrorDisplay = 'none' | 'colorOnly' | 'inline';
+
 export interface FieldOptions {
   placeholder?: string;
+
+  label?: string;
+
+  labelBehavior?: LabelBehavior;
+
+  errorDisplay?: ErrorDisplay;
+
+  unstyled?: boolean;
 
   cvcIcon?: CvcIconDisplay;
 

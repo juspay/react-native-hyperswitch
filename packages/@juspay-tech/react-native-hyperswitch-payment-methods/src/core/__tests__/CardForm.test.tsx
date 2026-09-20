@@ -108,6 +108,67 @@ describe('CardForm', () => {
     ).toBeUndefined();
   });
 
+  it('forwards label, labelBehavior, errorDisplay and unstyled, from a prop or from options', async () => {
+    useMock({ vaultType: 'hyperswitch' });
+    render(
+      <CardForm vaultDetails={details('hyperswitch')}>
+        <CardNumberField
+          label="Card number"
+          labelBehavior="floating"
+          errorDisplay="colorOnly"
+          unstyled
+        />
+        <CardCVCField
+          options={{
+            label: 'Security code',
+            labelBehavior: 'above',
+            errorDisplay: 'none',
+            unstyled: true,
+          }}
+        />
+      </CardForm>
+    );
+
+    const number = await screen.findByTestId('mock-field-cardNumber');
+    expect(JSON.parse(number.props.accessibilityValue.text)).toMatchObject({
+      label: 'Card number',
+      labelBehavior: 'floating',
+      errorDisplay: 'colorOnly',
+      unstyled: true,
+    });
+    expect(
+      JSON.parse(
+        screen.getByTestId('mock-field-cardCvc').props.accessibilityValue.text
+      )
+    ).toMatchObject({
+      label: 'Security code',
+      labelBehavior: 'above',
+      errorDisplay: 'none',
+      unstyled: true,
+    });
+  });
+
+  it('drops an unknown labelBehavior or errorDisplay rather than passing it on', async () => {
+    useMock({ vaultType: 'hyperswitch' });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    render(
+      <CardForm vaultDetails={details('hyperswitch')}>
+        <CardNumberField
+          labelBehavior={'sideways' as never}
+          errorDisplay={'loud' as never}
+        />
+      </CardForm>
+    );
+
+    const number = await screen.findByTestId('mock-field-cardNumber');
+    const forwarded = JSON.parse(number.props.accessibilityValue.text);
+    expect(forwarded.labelBehavior).toBeUndefined();
+    expect(forwarded.errorDisplay).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('labelBehavior'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('errorDisplay'));
+    warn.mockRestore();
+  });
+
   it('tokenize resolves with the provider result once ready', async () => {
     useMock({ vaultType: 'vgs', readyDelayMs: 0 });
     const ref = createRef<CardFormHandle>();

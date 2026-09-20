@@ -85,7 +85,7 @@ const Host: ProviderAdapter['Host'] = ({
   // const environment =
   //   data.environment ?? hyper?.environment ?? (session ? 'PROD' : 'SANDBOX');
   // const customEndpoints = hyper?.customEndpoints;
-  const environment = data.environment ?? 'SANDBOX';
+  const environment = data.environment ?? 'PROD';
 
   // const expiresAt = session?.expiresAt ?? undefined;
   // const vaultSession = useMemo(

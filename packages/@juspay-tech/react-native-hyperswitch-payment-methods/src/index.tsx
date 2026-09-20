@@ -53,6 +53,8 @@ export type {
   SavedCardPaymentMethodData,
   FieldOptions,
   CvcIconDisplay,
+  LabelBehavior,
+  ErrorDisplay,
   CardBrandIconDisplay,
   ElementType,
   FieldEvent,

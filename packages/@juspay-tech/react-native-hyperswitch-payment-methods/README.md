@@ -354,10 +354,14 @@ Every field takes the web SDK's `options` object, same names and nesting:
 | `placeholder` | all | any string (`''` shows none) | the vault's locale text: `Card number`, `MM / YY`, `CVC` (web shows `1234 1234 1234 1234` / `123`) |
 | `cvcIcon` | CVC | `'default'` \| `'hidden'` | `'default'` |
 | `cardBrandIcon` | number | `'standard'` \| `'hidden'` \| `'animated'` \| `'hideGeneric'` | `'standard'`; `animated` cycles brand marks here, while web currently renders it like `standard` |
+| `label` | all | any string | the vault's locale text |
+| `labelBehavior` | all | `'above'` \| `'floating'` \| `'never'` | the session appearance's `labels` (`'floating'`) |
+| `errorDisplay` | all | `'none'` \| `'colorOnly'` \| `'inline'` | `'colorOnly'` — composed fields print no error text, so render it yourself from `onChange`'s `error` |
+| `unstyled` | all | `true` \| `false` | `false` — `true` drops the vault's chrome (border, label, icons) so you can draw your own |
 | `savedCard` | CVC | see [Saved card](#saved-card--cvc-recollect) | none |
 
-The top-level `placeholder` (all fields) and `cvcIcon` (CVC) props from 1.0.x still work as
-aliases; when both forms are given the top-level prop wins (an empty top-level `''` wins too).
+`label`, `labelBehavior`, `errorDisplay` and `unstyled` are also accepted as top-level props,
+as are `placeholder` (all fields) and `cvcIcon` (CVC) from 1.0.x; when both forms are given the top-level prop wins (an empty top-level `''` wins too).
 Supported by the Hyperswitch vault; other providers take `placeholder` and ignore the icons. At
 runtime an icon value outside the list warns in development and falls back to the default; `''`,
 `null` and `undefined` mean "not set"; a non-string `placeholder` is ignored, as on web.

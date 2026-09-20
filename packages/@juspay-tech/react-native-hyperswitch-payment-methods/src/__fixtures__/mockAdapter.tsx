@@ -61,7 +61,13 @@ export function createMockAdapter(
     onChange,
     styles,
     savedCard,
+    placeholder,
     cvcIcon,
+    cardBrandIcon,
+    label,
+    labelBehavior,
+    errorDisplay,
+    unstyled,
   }: ProviderFieldProps) {
     const state = options.fieldState;
     useEffect(() => {
@@ -77,6 +83,17 @@ export function createMockAdapter(
             : undefined
         }
         accessibilityHint={cvcIcon}
+        accessibilityValue={{
+          /* Every forwarded prop, for tests to read back; JSON drops the unset ones. */
+          text: JSON.stringify({
+            placeholder,
+            cardBrandIcon,
+            label,
+            labelBehavior,
+            errorDisplay,
+            unstyled,
+          }),
+        }}
       >{`mock:${elementType}`}</Text>
     );
   }

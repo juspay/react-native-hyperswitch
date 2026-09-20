@@ -1,6 +1,8 @@
 import type {
   CardFormInstance,
   CvcIconDisplay,
+  ErrorDisplay,
+  LabelBehavior,
   FieldChange,
   FieldEvent,
   FieldOptions,
@@ -16,6 +18,9 @@ export interface FieldProps {
 
   styles?: FieldStyles;
   placeholder?: string;
+  label?: string;
+  labelBehavior?: LabelBehavior;
+  errorDisplay?: ErrorDisplay;
   unstyled?: boolean;
 
   onReady?: (event: FieldEvent) => void;
