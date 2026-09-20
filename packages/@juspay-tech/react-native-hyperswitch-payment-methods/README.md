@@ -98,10 +98,12 @@ function Checkout({ sdkAuthorization, appearance }) {
 | Prop | |
 | --- | --- |
 | `hyper` | **Required.** What `Hyperswitch.init(...)` returns, or a plain `HyperswitchConfiguration` — a promise or an object. The merchant's identity and endpoints live here, not in `options`, the same split `react-hyper-js` uses. The fields do not wait for it; only the lookup does. |
+| `options` | An object, or a promise of one, as the web wrapper accepts. |
 | `options.sdkAuthorization` | The payment session your backend minted, as the checkout SDK spells it. Enough on its own: the vault is [looked up](#resolving-the-vault) from it. |
 | `options.vaultDetails` | Which vault to drive — `{vaultType, vaultData}`, the web SDK's shape. Supply it and **no lookup happens**, even alongside `sdkAuthorization`. |
-| `options.appearance` | Style defaults for every field below. See [Appearance](#appearance). |
-| `onError` | Called if the `hyper` promise rejects, or the lookup fails. |
+| `options.locale` | The web SDK's `locale` (`'fr'`, `'de'`, …), forwarded to the Hyperswitch vault fields for placeholders, labels and validation messages. Omitted, `'auto'` or an unsupported tag renders English; there is no device-locale detection. |
+| `options.appearance` | The vault's theme `variables` and `labels`, plus this package's RN slots. See [Appearance](#appearance). |
+| `onError` | Called if the `hyper` promise or the `options` promise rejects, or the lookup fails. |
 
 ### `Hyperswitch.init`
 
@@ -123,9 +125,10 @@ you need `environment` or `customEndpoints`.
 
 At least one of `sdkAuthorization` and `vaultDetails` is required, and the type enforces it.
 
-`usePaymentMethodsSession()` reads it back from anywhere inside the session: `hyper` (the
-resolved instance — `hyper.publishableKey` and the rest), `sdkAuthorization`, `vaultDetails`,
-`appearance`, `loading` and `error`.
+`usePaymentMethodSession()` (the web SDK's name) or `usePaymentMethodsSession()` reads it back
+from anywhere inside the session: `hyper` (the resolved instance — `hyper.publishableKey` and the
+rest), `sdkAuthorization`, `vaultDetails`, `appearance`, `locale`, `loading` and `error`. The web
+hook's `{session, isPresent}` is its iframe handle and has no counterpart here.
 
 A `<CardForm vaultDetails={…}>` still works on its own, with no session around it, and
 overrides the session's vault when there is one.
@@ -292,7 +295,8 @@ Every field takes the web's four events. The change carries no card value:
 Focus and blur are reported where the provider reports them (VGS, Skyflow); change is
 wired for VGS, Skyflow and Basis Theory (Evervault reports validity at the card level).
 
-The form emits the web's `cardDetailsChange` on every change, always on:
+The form emits the web's `cardDetailsChange` envelope on every change, always on (the web SDK
+requires a field-level `subscriptionEvents` opt-in; this package does not):
 
 ```tsx
 <CardForm
@@ -300,11 +304,14 @@ The form emits the web's `cardDetailsChange` on every change, always on:
   onChange={(e) => {
     // e.eventName === 'cardDetailsChange'
     setCanPay(e.complete && e.valid);
-    e.payload; // {bin, last4, brand, expiryMonth, expiryYear, formattedExpiry, is*Complete, is*Valid}
+    e.payload; // {bin, extendedBin, last4, brand, expiryMonth, expiryYear, formattedExpiry, is*Complete, is*Valid}
     e.fields;  // the latest change per mounted field
   }}
 >
 ```
+
+A keystroke can reach `onChange` more than once (each field reports, then the provider reports
+the card details); read the latest event rather than counting calls.
 
 A provider's secure input keeps the digits to itself, so `bin`, `last4` and the expiry
 parts are `null` unless the provider reports them (Evervault does); the flags are derived
@@ -332,28 +339,39 @@ function PayButton() {
 }
 ```
 
-## Appearance
+## Field options
 
-A field has the same two slots as the Hyperswitch vault fields:
-
-- `styles.container` — the field's **box** (border, background, radius, height, padding).
-- `styles.input` — the secure input's **text** (color, fontSize, fontFamily).
-- `placeholder` — placeholder text.
-- `cvcIcon` (`CardCVCField` only) — `'default'` shows the CVC icon, `'hidden'` removes it.
-  Supported by the Hyperswitch vault; other providers ignore it.
+Every field takes the web SDK's `options` object, same names and nesting:
 
 ```tsx
-<CardNumberField
-  styles={{
-    container: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, height: 44, paddingHorizontal: 12 },
-    input: { color: '#111', fontSize: 16 },
-  }}
-  placeholder="1234 5678 9012 3456"
-/>
+<CardNumberField options={{ placeholder: '1234 1234 1234 1234', cardBrandIcon: 'hideGeneric' }} />
+<CardExpiryField options={{ placeholder: 'MM / YY' }} />
+<CardCVCField options={{ placeholder: '123', cvcIcon: 'hidden' }} />
 ```
 
-`options.appearance` sets defaults for those same slots across every field below, with
-`fields` narrowing a default to one element type:
+| `options.…` | Fields | Values | Default on RN |
+| --- | --- | --- | --- |
+| `placeholder` | all | any string (`''` shows none) | the vault's locale text: `Card number`, `MM / YY`, `CVC` (web shows `1234 1234 1234 1234` / `123`) |
+| `cvcIcon` | CVC | `'default'` \| `'hidden'` | `'default'` |
+| `cardBrandIcon` | number | `'standard'` \| `'hidden'` \| `'animated'` \| `'hideGeneric'` | `'standard'`; `animated` cycles brand marks here, while web currently renders it like `standard` |
+| `savedCard` | CVC | see [Saved card](#saved-card--cvc-recollect) | none |
+
+The top-level `placeholder` (all fields) and `cvcIcon` (CVC) props from 1.0.x still work as
+aliases; when both forms are given the top-level prop wins (an empty top-level `''` wins too).
+Supported by the Hyperswitch vault; other providers take `placeholder` and ignore the icons. At
+runtime an icon value outside the list warns in development and falls back to the default; `''`,
+`null` and `undefined` mean "not set"; a non-string `placeholder` is ignored, as on web.
+
+## Appearance
+
+`options.appearance` on the session takes the Hyperswitch vault's theme: `variables` under the
+names the web SDK also uses (`colorPrimary`, `colorText`, `colorDanger`, `colorTextPlaceholder`,
+`colorBackground`, `borderColor`, `borderRadius`, `fontFamily`, `inputFieldHeight`), with lengths
+as React Native points, and `labels` as `'above' | 'floating' | 'never'` (the RN default is
+`floating`; web's separate fields never render a label). Values of the wrong runtime type are
+dropped and an unknown `labels` value warns in development. The web's `theme` presets, `rules`
+(CSS selectors), `innerLayout` and `colorScheme` are not accepted; a web `appearance` object needs
+its lengths as numbers and `labels: 'none'` spelt `'never'`.
 
 ```tsx
 <HyperPaymentMethodSession
@@ -361,16 +379,22 @@ A field has the same two slots as the Hyperswitch vault fields:
   options={{
     sdkAuthorization,
     appearance: {
-      container: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, height: 44 },
-      input: { color: '#111', fontSize: 16 },
-      fields: { cardCvc: { container: { width: 88 } } },
+      variables: { colorPrimary: '#0570DE', colorText: '#1A1A1A', borderRadius: 8, inputFieldHeight: 48 },
+      labels: 'never',
     },
   }}
 >
 ```
 
-Later wins, so the order is: the session's `appearance`, then a `<CardForm appearance>`,
-then the per-element-type `fields` entry, then the field's own `styles`.
+On top of that, a field has two RN-only style slots, which patch the theme rather than replace it:
+
+- `styles.container` — the field's **box** (border, background, radius, height, padding).
+- `styles.input` — the secure input's **text** (color, fontSize, fontFamily).
+
+`appearance.container`, `appearance.input` and `appearance.fields[elementType]` set defaults for
+those slots across every field below. Later wins, so the order is: the session's `appearance`,
+then a `<CardForm appearance>`, then the per-element-type `fields` entry, then the field's own
+`styles`.
 
 `styles.input` is forwarded to the provider's underlying secure input where supported
 (VGS `textStyle`, Basis Theory / Evervault field style); providers that don't support
@@ -386,8 +410,8 @@ const off = registerAdapter(myAdapter); // off() to unregister
 ```
 
 An adapter provides `vaultType`, `validateVaultData`, a `Host`, a `Field` (which
-receives `elementType`, `styles`, `placeholder`, `savedCard`, `cvcIcon`, `onChange`,
-`onFocus`, `onBlur`) and `tokenize(collector, providerData?)`.
+receives `elementType`, `styles`, `placeholder`, `savedCard`, `cvcIcon`, `cardBrandIcon`,
+`onChange`, `onFocus`, `onBlur`) and `tokenize(collector, providerData?)`.
 
 ## Notes
 

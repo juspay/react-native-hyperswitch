@@ -25,6 +25,7 @@ export type {
   HyperPaymentMethodSessionProps,
 } from './session/HyperPaymentMethodSession';
 export { usePaymentMethodsSession } from './session/usePaymentMethodsSession';
+export { usePaymentMethodSession } from './session/usePaymentMethodSession';
 export type { PaymentMethodsSession } from './session/SessionContext';
 
 export { CardForm } from './core/CardForm';
@@ -45,11 +46,14 @@ export type {
   VaultType,
   VaultDetails,
   Appearance,
+  AppearanceVariables,
+  AppearanceLabels,
   SavedCard,
   SavedCardData,
   SavedCardPaymentMethodData,
   FieldOptions,
   CvcIconDisplay,
+  CardBrandIconDisplay,
   ElementType,
   FieldEvent,
   FieldChange,

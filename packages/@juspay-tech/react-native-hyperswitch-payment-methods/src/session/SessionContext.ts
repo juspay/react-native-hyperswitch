@@ -8,6 +8,8 @@ export interface PaymentMethodsSession {
 
   vaultDetails: VaultDetails | null;
   appearance: Appearance | null;
+  locale: string | null;
+  // expiresAt: string | null;
 
   loading: boolean;
   error: Error | null;

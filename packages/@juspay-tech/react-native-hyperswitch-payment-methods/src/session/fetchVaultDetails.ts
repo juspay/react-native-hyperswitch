@@ -37,7 +37,12 @@ export interface FetchVaultDetailsOptions {
 }
 
 export type FetchVaultDetailsResult =
-  { ok: true; vaultDetails: VaultDetails } | { ok: false; message: string };
+  | {
+      ok: true;
+      vaultDetails: VaultDetails;
+      // expiresAt?: string;
+    }
+  | { ok: false; message: string };
 
 function camelize(key: string): string {
   return key.replace(/_([a-z0-9])/g, (_, character: string) =>
@@ -83,7 +88,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function readVaultDetails(body: unknown, sdkAuthorization: string): FetchVaultDetailsResult {
+// const expiryOf = (body: Record<string, unknown>) =>
+//   typeof body.expires_at === 'string' && body.expires_at
+//     ? { expiresAt: body.expires_at }
+//     : {};
+
+export function readVaultDetails(
+  body: unknown,
+  sdkAuthorization: string
+): FetchVaultDetailsResult {
   if (!isRecord(body)) {
     return {
       ok: false,
@@ -105,6 +118,7 @@ export function readVaultDetails(body: unknown, sdkAuthorization: string): Fetch
           vaultType: ownType,
           vaultData: toVaultData(ownType, ownData),
         },
+        // ...(ownType === 'hyperswitch' ? expiryOf(body) : {}),
       };
     }
   }
@@ -113,7 +127,11 @@ export function readVaultDetails(body: unknown, sdkAuthorization: string): Fetch
   if (!isRecord(external)) {
     return {
       ok: true,
-      vaultDetails: { vaultType: 'hyperswitch', vaultData: { sdkAuthorization: sdkAuthorization } },
+      vaultDetails: {
+        vaultType: 'hyperswitch',
+        vaultData: { sdkAuthorization: sdkAuthorization },
+      },
+      // ...expiryOf(body),
     };
   }
 

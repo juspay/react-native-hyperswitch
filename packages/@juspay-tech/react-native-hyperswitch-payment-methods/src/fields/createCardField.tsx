@@ -8,9 +8,22 @@ import {
 } from 'react';
 import { useFormBinding } from './useFormBinding';
 import { resolveFieldStyles } from '../core/appearance';
-import type { ElementType, FieldChange, FieldHandle } from '../core/types';
+import {
+  CARD_BRAND_ICONS,
+  CVC_ICONS,
+  pickAllowed,
+  pickString,
+} from '../core/validate';
+import type {
+  CvcIconDisplay,
+  ElementType,
+  FieldChange,
+  FieldHandle,
+} from '../core/types';
 import { Placeholder } from './Placeholder';
 import type { FieldProps } from './types';
+
+type AliasProps = FieldProps & { cvcIcon?: CvcIconDisplay };
 
 export function createCardField<P extends FieldProps = FieldProps>(
   elementType: ElementType,
@@ -26,8 +39,10 @@ export function createCardField<P extends FieldProps = FieldProps>(
       onBlur,
       options,
       styles: ownStyles,
+      placeholder: ownPlaceholder,
+      cvcIcon: ownCvcIcon,
       ...rest
-    } = props;
+    } = props as AliasProps;
     const ctx = useFormBinding(form);
 
     const onChangeRef = useRef(onChange);
@@ -54,6 +69,21 @@ export function createCardField<P extends FieldProps = FieldProps>(
       [reportChange]
     );
 
+    const placeholder =
+      pickString(ownPlaceholder) ?? pickString(options?.placeholder);
+    const cvcIcon =
+      elementType === 'cardCvc'
+        ? (pickAllowed(ownCvcIcon, CVC_ICONS, 'cvcIcon') ??
+          pickAllowed(options?.cvcIcon, CVC_ICONS, 'options.cvcIcon'))
+        : undefined;
+    const cardBrandIcon =
+      elementType === 'cardNumber'
+        ? pickAllowed(
+            options?.cardBrandIcon,
+            CARD_BRAND_ICONS,
+            'options.cardBrandIcon'
+          )
+        : undefined;
     const savedCard = options?.savedCard;
     const savedToken = savedCard?.paymentMethodToken;
     const savedBrand = savedCard?.paymentMethodData?.card?.cardNetwork;
@@ -101,15 +131,18 @@ export function createCardField<P extends FieldProps = FieldProps>(
     const Field = ctx.adapter.Field;
     return (
       <Field
+        {...rest}
         elementType={elementType}
         collector={ctx.collector}
         fieldRef={fieldRef}
         styles={styles}
+        placeholder={placeholder}
+        cvcIcon={cvcIcon}
+        cardBrandIcon={cardBrandIcon}
         savedCard={savedCard}
         onChange={handleChange}
         onFocus={onFocus}
         onBlur={onBlur}
-        {...rest}
       />
     );
   });

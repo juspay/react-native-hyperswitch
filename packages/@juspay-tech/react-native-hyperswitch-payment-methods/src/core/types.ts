@@ -20,8 +20,26 @@ export interface FieldStyles {
   input?: StyleProp<TextStyle>;
 }
 
+export interface AppearanceVariables {
+  colorPrimary?: string;
+  colorText?: string;
+  colorDanger?: string;
+  colorTextPlaceholder?: string;
+  colorBackground?: string;
+  borderColor?: string;
+  borderRadius?: number;
+  fontFamily?: string;
+  inputFieldHeight?: number;
+}
+
+export type AppearanceLabels = 'above' | 'floating' | 'never';
+
 export interface Appearance extends FieldStyles {
   fields?: Partial<Record<ElementType, FieldStyles>>;
+
+  variables?: AppearanceVariables;
+
+  labels?: AppearanceLabels;
 }
 
 export interface SavedCardData {
@@ -40,7 +58,16 @@ export interface SavedCard {
 
 export type CvcIconDisplay = 'hidden' | 'default';
 
+export type CardBrandIconDisplay =
+  'standard' | 'hidden' | 'animated' | 'hideGeneric';
+
 export interface FieldOptions {
+  placeholder?: string;
+
+  cvcIcon?: CvcIconDisplay;
+
+  cardBrandIcon?: CardBrandIconDisplay;
+
   savedCard?: SavedCard;
 }
 

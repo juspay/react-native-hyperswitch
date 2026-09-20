@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useContext, useEffect, useMemo, useRef } from 'react';
 
 import { fieldChange } from '../../core/fieldChange';
+import { FormContext } from '../../core/FormContext';
 import type { ProviderAdapter } from '../../core/ProviderAdapter';
 import { errorResult, messageOf } from '../../core/results';
 import type {
@@ -9,6 +10,8 @@ import type {
   TokenizeErrorCode,
   TokenizeResult,
 } from '../../core/types';
+import { SessionContext } from '../../session/SessionContext';
+import { toVaultAppearance } from './appearance';
 import type { HyperswitchVaultData } from './types';
 
 declare const require: (moduleId: string) => unknown;
@@ -69,6 +72,36 @@ const Host: ProviderAdapter['Host'] = ({
   const data = vaultData as HyperswitchVaultData;
   const formRef = useRef<any>(null);
 
+  const session = useContext(SessionContext);
+  const form = useContext(FormContext);
+  const locale = session?.locale ?? undefined;
+  const layers = form?.appearances;
+  const appearance = useMemo(
+    () => (layers ? toVaultAppearance(layers) : undefined),
+    [layers]
+  );
+
+  // const hyper = session?.hyper;
+  // const environment =
+  //   data.environment ?? hyper?.environment ?? (session ? 'PROD' : 'SANDBOX');
+  // const customEndpoints = hyper?.customEndpoints;
+  const environment = data.environment ?? 'SANDBOX';
+
+  // const expiresAt = session?.expiresAt ?? undefined;
+  // const vaultSession = useMemo(
+  //   () =>
+  //     expiresAt
+  //       ? {
+  //           vault_details: {
+  //             vault_type: 'hyperswitch',
+  //             vault_data: { sdk_authorization: data.sdkAuthorization },
+  //           },
+  //           expires_at: expiresAt,
+  //         }
+  //       : undefined,
+  //   [expiresAt, data.sdkAuthorization]
+  // );
+
   useEffect(() => {
     if (formRef.current) onReady(formRef.current);
     else onError(new Error('The Hyperswitch vault form did not mount.'));
@@ -77,11 +110,15 @@ const Host: ProviderAdapter['Host'] = ({
   return (
     <VaultCardForm
       ref={formRef}
+      // session={vaultSession}
       vaultDetails={{
         vaultType: 'hyperswitch',
         vaultData: { sdkAuthorization: data.sdkAuthorization },
       }}
-      environment={data.environment ?? 'SANDBOX'}
+      environment={environment}
+      // customEndpoints={customEndpoints}
+      locale={locale}
+      appearance={appearance}
       onChange={(event: any) => {
         const payload = event?.payload ?? {};
         const details: Partial<CardDetails> = {
@@ -107,6 +144,7 @@ const Field: ProviderAdapter['Field'] = ({
   testID,
   savedCard,
   cvcIcon,
+  cardBrandIcon,
   onChange,
   onFocus,
   onBlur,
@@ -121,6 +159,7 @@ const Field: ProviderAdapter['Field'] = ({
       testID={testID}
       options={savedCard ? { savedCard } : undefined}
       cvcIcon={elementType === 'cardCvc' ? cvcIcon : undefined}
+      cardBrandIcon={elementType === 'cardNumber' ? cardBrandIcon : undefined}
       onChange={(event: any) =>
         onChange?.(
           fieldChange(elementType, {

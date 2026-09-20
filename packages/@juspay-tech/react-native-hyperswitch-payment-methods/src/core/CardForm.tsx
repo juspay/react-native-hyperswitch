@@ -204,6 +204,42 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
         listener(buildChange(fieldsRef.current, detailsRef.current));
     }, []);
 
+    // const aliveRef = useRef(true);
+    // useEffect(() => {
+    //   aliveRef.current = true;
+    //   return () => {
+    //     aliveRef.current = false;
+    //   };
+    // }, []);
+    // const flushScheduledRef = useRef(false);
+    // const lastEmittedRef = useRef('');
+    // const sessionKey = details ? JSON.stringify(details) : '';
+    // useEffect(() => {
+    //   lastEmittedRef.current = '';
+    // }, [sessionKey]);
+    // const flushChange = useCallback(() => {
+    //   flushScheduledRef.current = false;
+    //   if (!aliveRef.current) return;
+    //   const listener = onChangeRef.current;
+    //   if (!listener) return;
+    //   const change = buildChange(fieldsRef.current, detailsRef.current);
+    //   const serialized = JSON.stringify(change);
+    //   if (serialized === lastEmittedRef.current) return;
+    //   lastEmittedRef.current = serialized;
+    //   try {
+    //     listener(change);
+    //   } catch (error) {
+    //     setTimeout(() => {
+    //   throw error;
+    //     }, 0);
+    //   }
+    // }, []);
+    // const emitChange = useCallback(() => {
+    //   if (flushScheduledRef.current) return;
+    //   flushScheduledRef.current = true;
+    //   Promise.resolve().then(flushChange);
+    // }, [flushChange]);
+
     const reportChange = useCallback(
       (change: FieldChange) => {
         fieldsRef.current[change.elementType] = change;
