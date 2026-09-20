@@ -11,8 +11,6 @@ import { resolveFieldStyles } from '../core/appearance';
 import {
   CARD_BRAND_ICONS,
   CVC_ICONS,
-  ERROR_DISPLAYS,
-  LABEL_BEHAVIORS,
   pickAllowed,
   pickString,
 } from '../core/validate';
@@ -44,6 +42,7 @@ export function createCardField<P extends FieldProps = FieldProps>(
       placeholder: ownPlaceholder,
       cvcIcon: ownCvcIcon,
       unstyled,
+      ...rest
     } = props as AliasProps;
     const ctx = useFormBinding(form);
 
@@ -73,17 +72,6 @@ export function createCardField<P extends FieldProps = FieldProps>(
 
     const placeholder =
       pickString(ownPlaceholder) ?? pickString(options?.placeholder);
-    const label = pickString(options?.label);
-    const labelBehavior = pickAllowed(
-      options?.labelBehavior,
-      LABEL_BEHAVIORS,
-      'options.labelBehavior'
-    );
-    const errorDisplay = pickAllowed(
-      options?.errorDisplay,
-      ERROR_DISPLAYS,
-      'options.errorDisplay'
-    );
     const cvcIcon =
       elementType === 'cardCvc'
         ? (pickAllowed(ownCvcIcon, CVC_ICONS, 'cvcIcon') ??
@@ -142,15 +130,12 @@ export function createCardField<P extends FieldProps = FieldProps>(
     const Field = ctx.adapter.Field;
     return (
       <Field
+        {...rest}
         elementType={elementType}
         collector={ctx.collector}
         fieldRef={fieldRef}
         styles={styles}
         placeholder={placeholder}
-        label={label}
-        labelBehavior={labelBehavior}
-        errorDisplay={errorDisplay}
-        unstyled={typeof unstyled === 'boolean' ? unstyled : undefined}
         cvcIcon={cvcIcon}
         cardBrandIcon={cardBrandIcon}
         savedCard={savedCard}

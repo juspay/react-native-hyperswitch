@@ -2,8 +2,6 @@ import type {
   AppearanceLabels,
   CardBrandIconDisplay,
   CvcIconDisplay,
-  ErrorDisplay,
-  LabelBehavior,
 } from './types';
 
 export const CVC_ICONS: readonly CvcIconDisplay[] = ['hidden', 'default'];
@@ -17,16 +15,6 @@ export const APPEARANCE_LABELS: readonly AppearanceLabels[] = [
   'above',
   'floating',
   'never',
-];
-export const LABEL_BEHAVIORS: readonly LabelBehavior[] = [
-  'above',
-  'floating',
-  'never',
-];
-export const ERROR_DISPLAYS: readonly ErrorDisplay[] = [
-  'none',
-  'colorOnly',
-  'inline',
 ];
 
 function warnUnknownValue(

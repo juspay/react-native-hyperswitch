@@ -54,8 +54,6 @@ export type {
   FieldOptions,
   CvcIconDisplay,
   CardBrandIconDisplay,
-  LabelBehavior,
-  ErrorDisplay,
   ElementType,
   FieldEvent,
   FieldChange,

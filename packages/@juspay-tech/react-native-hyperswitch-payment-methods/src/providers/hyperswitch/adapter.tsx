@@ -119,7 +119,6 @@ const Host: ProviderAdapter['Host'] = ({
       // customEndpoints={customEndpoints}
       locale={locale}
       appearance={appearance}
-      unstyled={form?.unstyled}
       onChange={(event: any) => {
         const payload = event?.payload ?? {};
         const details: Partial<CardDetails> = {
