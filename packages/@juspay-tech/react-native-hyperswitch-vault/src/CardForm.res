@@ -28,6 +28,10 @@ let make = React.forwardRef((
 
     "cardholderName": option<CardFieldOptions.cardholderNameMode>,
 
+    /* PMM parity with the web SDK: when set, the save stamps the
+       payment-method-session confirm with a fresh `customer_acceptance`. */
+    "alwaysSendCustomerAcceptance": option<bool>,
+
     "onReady": option<VaultPublicState.cardFormEvent => unit>,
     "onChange": option<VaultPublicState.cardFormChange => unit>,
 
@@ -53,6 +57,7 @@ let make = React.forwardRef((
     ~onReady=props["onReady"],
     ~onChange=props["onChange"],
     ~unstyled=props["unstyled"]->Option.getOr(CardFieldOptions.defaultUnstyled),
+    ~alwaysSendCustomerAcceptance=props["alwaysSendCustomerAcceptance"]->Option.getOr(false),
 
     ~defaultErrorDisplay=CardFieldOptions.defaultErrorDisplayComposable,
   )

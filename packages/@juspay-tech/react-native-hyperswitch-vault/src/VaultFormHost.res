@@ -45,6 +45,7 @@ let useHost = (
   ~onChange: option<VaultPublicState.cardFormChange => unit>,
 
   ~unstyled: bool,
+  ~alwaysSendCustomerAcceptance: bool,
 
   ~defaultErrorDisplay: CardFieldOptions.errorDisplay,
 ): host => {
@@ -196,6 +197,7 @@ let useHost = (
     ~eligibilityVerdict=controller.eligibilityVerdict,
     ~recordEligibility=controller.recordEligibility,
     ~markSubmitAttempted=controller.markSubmitAttempted,
+    ~alwaysSendCustomerAcceptance,
     ~presenceGate,
     ~clearLocal=controller.reset,
     ~savedCardKey=controller.values.savedCard->Option.mapOr("", saved => saved.token),

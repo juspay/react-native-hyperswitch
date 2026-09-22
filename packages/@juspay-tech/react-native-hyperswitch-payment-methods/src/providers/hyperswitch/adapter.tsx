@@ -195,10 +195,11 @@ const SHARED_CODES = new Set<string>([
 ]);
 
 const tokenize: ProviderAdapter['tokenize'] = async (
-  collector
+  collector,
+  providerData
 ): Promise<TokenizeResult> => {
   try {
-    const result = await (collector as any).tokenize();
+    const result = await (collector as any).tokenize(providerData);
 
     if (result?.status === 'success') {
       const success: TokenizeResult = {
