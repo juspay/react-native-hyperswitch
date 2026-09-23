@@ -93,9 +93,11 @@
   },
   "peerDependencies": {
     "@sentry/react-native": "*",
+    "@vgs/collect-react-native": "*",
     "react": "*",
     "react-native": "*",
     "react-native-inappbrowser-reborn": "*",
+    "react-native-safe-area-context": "*",
     "react-native-svg": "*",
     "react-native-webview": "*"
   },

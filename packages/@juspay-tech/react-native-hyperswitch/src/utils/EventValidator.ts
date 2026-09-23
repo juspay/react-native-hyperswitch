@@ -1,10 +1,11 @@
 const validEventStrings = [
-  'PAYMENT_METHOD_INFO_CARD',
-  'PAYMENT_METHOD_STATUS',
-  'FORM_STATUS',
-  'PAYMENT_METHOD_INFO_ADDRESS',
-  'PAYMENT_METHOD_INFO_BILLING_ADDRESS',
-  'CVC_STATUS',
+  'cardDetailsChange',
+  'paymentMethodChange',
+  'formStatusChange',
+  'billingDetailsChange',
+  'cvcStatusChange',
+  'surchargeInfo',
+  'appliedOffersInfo',
 ];
 
 export function getValidEventsString(): string {

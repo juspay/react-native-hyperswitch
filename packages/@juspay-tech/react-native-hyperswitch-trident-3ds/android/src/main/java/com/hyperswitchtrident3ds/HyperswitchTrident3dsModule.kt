@@ -39,7 +39,7 @@ class HyperswitchTrident3dsModule(reactContext: ReactApplicationContext) : React
     cardNetwork: String,
     callback: Callback
   ) {
-    hsTridentUtils.generateAReqParams(currentActivity, messageVersion, directoryServerId, cardNetwork, callback)
+    hsTridentUtils.generateAReqParams(reactApplicationContext.currentActivity, messageVersion, directoryServerId, cardNetwork, callback)
   }
 
   @ReactMethod
@@ -63,6 +63,6 @@ class HyperswitchTrident3dsModule(reactContext: ReactApplicationContext) : React
 
   @ReactMethod
   fun generateChallenge(callback: Callback) {
-    hsTridentUtils.generateChallenge(currentActivity, 5, callback)
+    hsTridentUtils.generateChallenge(reactApplicationContext.currentActivity, 5, callback)
   }
 }

@@ -18,9 +18,9 @@ export const secretKey =
 export const serverURL = process.env.SERVER_URL ?? "";
 export const getCustomisationOptions = (layout: LayoutType = "tabs") : PaymentSheetConfiguration => ({
   subscribedEvents: [
-    "PAYMENT_METHOD_INFO_CARD",
-    "PAYMENT_METHOD_STATUS",
-    "FORM_STATUS",
+    "cardDetailsChange",
+    "paymentMethodChange",
+    "formStatusChange",
   ] as SubscriptionEvent[],
   merchantDisplayName: "Hyperswitch Example",
   displayDefaultSavedPaymentIcon: false,
@@ -77,7 +77,7 @@ export const getCustomisationOptions = (layout: LayoutType = "tabs") : PaymentSh
 });
 
 export const getCvcInputOptions = () => ({
-  subscribedEvents: ["CVC_STATUS"],
+  subscribedEvents: ["cvcStatusChange"],
   appearance: {
     colors: {
       light: {

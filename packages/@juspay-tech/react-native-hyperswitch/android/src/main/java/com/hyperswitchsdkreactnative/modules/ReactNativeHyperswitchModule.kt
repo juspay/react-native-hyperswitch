@@ -1,5 +1,6 @@
 package com.hyperswitchsdkreactnative.modules
 
+import android.util.Log
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReadableMap
@@ -126,12 +127,24 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
         PaymentSheetCallbackManager.setCallback(resultCallback, isFragment == true)
       }
     } catch (e: Exception) {
-      val map = mutableMapOf<String, Any>().apply {
-        put("code", "failed")
-        put("message", "failed to open")
-        put("reason", e.message.toString())
-      }
-      promise?.resolve(map)
+      // The codegen spec declares Promise<string>, and JSI can only convert
+      // WritableMap/WritableArray/primitives. Resolving a raw Kotlin map here
+      // (mutableMapOf -> java.util.LinkedHashMap) threw
+      // "Cannot convert argument of type class java.util.LinkedHashMap",
+      // masking whatever actually failed above. Match the file's other error
+      // paths and resolve a JSON string.
+      // mapNativeResponseToPaymentResult only forwards status/type/message, so the
+      // cause has to ride in `message` or it never reaches JS. Log it too — an error
+      // path that hides what actually failed is how this took three rounds to find.
+      val cause = e.message ?: e::class.java.simpleName
+      Log.e("HyperswitchSDK", "presentPaymentSheet failed: $cause", e)
+      promise?.resolve(
+        StandardResult.Failed(
+          code = "failed",
+          message = "failed to open: $cause",
+          error = Throwable(cause)
+        ).toJSONString()
+      )
     }
   }
 

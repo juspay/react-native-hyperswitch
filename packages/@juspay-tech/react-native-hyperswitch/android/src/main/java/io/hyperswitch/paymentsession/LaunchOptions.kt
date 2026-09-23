@@ -186,7 +186,11 @@ class LaunchOptions(
                 is Map<*, *> -> bundle.putBundle(k, toBundle(value))
                 is Array<*> -> bundle.putSerializable(k, value)
                 is List<*> -> bundle.putSerializable(k, toSerializableArrayList(value))
-                else -> throw IllegalArgumentException("Could not convert object with key: $k.")
+                // Name the offending type — "could not convert" alone says nothing
+                // about which prop or which class actually failed.
+                else -> throw IllegalArgumentException(
+                    "Could not convert object with key: $k (type ${value::class.java.name}, value=$value)."
+                )
             }
         }
         return bundle
