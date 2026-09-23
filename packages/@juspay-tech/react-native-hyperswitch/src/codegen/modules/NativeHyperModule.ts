@@ -35,6 +35,14 @@ export type UpdateIntentEvent = {
   sdkAuthorization?: string;
 };
 
+/** Exit result object sent by the shared JS bundle (post #569 contract). */
+export type PaymentExitResult = {
+  status: string;
+  type?: string;
+  code?: string;
+  message?: string;
+};
+
 export interface Spec extends TurboModule {
   // --- EventEmitter (required for NativeEventEmitter support) ---
   addListener(eventName: string): void;
@@ -64,23 +72,23 @@ export interface Spec extends TurboModule {
   ): void;
 
   // --- Payment sheet ---
-  exitPaymentsheet(rootTag: number, result: string, reset: boolean): void;
+  exitPaymentsheet(rootTag: number, result: PaymentExitResult, reset: boolean): void;
   exitPaymentMethodManagement(
     rootTag: number,
-    result: string,
+    result: PaymentExitResult,
     reset: boolean
   ): void;
 
   // --- Widget ---
-  exitWidget(result: string, widgetType: string): void;
-  exitCardForm(result: string): void;
+  exitWidget(result: PaymentExitResult, widgetType: string): void;
+  exitCardForm(result: PaymentExitResult): void;
   launchWidgetPaymentSheet(
     requestObj: string,
     callback: (result: Object) => void
   ): void;
-  exitWidgetPaymentsheet(rootTag: number, result: string, reset: boolean): void;
+  exitWidgetPaymentsheet(rootTag: number, result: PaymentExitResult, reset: boolean): void;
   updateWidgetHeight(height: number): void;
-  notifyWidgetPaymentResult(rootTag: number, result: string): void;
+  notifyWidgetPaymentResult(rootTag: number, result: PaymentExitResult): void;
 
   // --- Payment method management ---
   onAddPaymentMethod(data: string): void;
@@ -91,7 +99,7 @@ export interface Spec extends TurboModule {
     eventType: string,
     payload: Object
   ): void;
-  onUpdateIntentEvent(rootTag: number, type: string, result: string): void;
+  onUpdateIntentEvent(rootTag: number, type: string, result: PaymentExitResult): void;
   onPaymentConfirmButtonClick(
     rootTag: number,
     payload: string,

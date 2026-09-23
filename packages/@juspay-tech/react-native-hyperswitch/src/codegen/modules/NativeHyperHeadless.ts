@@ -7,6 +7,15 @@ import { TurboModuleRegistry } from 'react-native';
  * Naming convention: Native<ModuleName>.ts — required by the RN codegen.
  * number → Double on Android; Object → ReadableMap; Array<Object> → ReadableArray.
  */
+
+/** Exit result object sent by the shared JS bundle (post #569 contract). */
+export type PaymentExitResult = {
+  status: string;
+  type?: string;
+  code?: string;
+  message?: string;
+};
+
 export interface Spec extends TurboModule {
   getPaymentSession(
     rootTag: number,
@@ -22,7 +31,7 @@ export interface Spec extends TurboModule {
     callback: (result: Object) => void
   ): void;
 
-  exitHeadless(rootTag: number, status: string): void;
+  exitHeadless(rootTag: number, status: PaymentExitResult): void;
 }
 
 export default TurboModuleRegistry.get<Spec>('HyperHeadless');

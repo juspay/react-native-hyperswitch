@@ -148,10 +148,10 @@ const PAYMENT_ELEMENT_OPTIONS = {
   splitCardFields: true,
 
   subscribedEvents: [
-    "PAYMENT_METHOD_STATUS",
-    "PAYMENT_METHOD_INFO_BILLING_ADDRESS",
-    "PAYMENT_METHOD_INFO_CARD",
-    'FORM_STATUS',
+    "paymentMethodChange",
+    "billingDetailsChange",
+    "cardDetailsChange",
+    "formStatusChange",
   ] as SubscriptionEvent[],
 };
 
@@ -307,12 +307,12 @@ export function HyperContent(props: SharedProps) {
     (event: PaymentEventResult) => {
       console.log("[Example] PaymentElement onChange:", JSON.stringify(event));
 
-      if (event.eventName !== "PAYMENT_METHOD_STATUS") {
+      if (event.eventName !== "paymentMethodChange") {
         return;
       }
 
       console.log(
-        "[Example] PaymentElement ready from PAYMENT_METHOD_STATUS",
+        "[Example] PaymentElement ready from paymentMethodChange",
         JSON.stringify(event.payload),
       );
 
@@ -481,7 +481,7 @@ export function HyperContent(props: SharedProps) {
         placeholder: "123",
         appearance: CVC_APPEARANCE,
         cvcIcon: "hidden",
-        subscribedEvents: ["CVC_STATUS"],
+        subscribedEvents: ["cvcStatusChange"],
       }}
       onReady={handleCvcReady}
       onFocus={() => console.log("[Example] CvcWidget focused")}
@@ -498,7 +498,7 @@ export function HyperContent(props: SharedProps) {
    * PAYMENT SCREEN
    * ----------------
    * User cannot confirm until PaymentElement emits
-   * PAYMENT_METHOD_STATUS.
+   * paymentMethodChange.
    *
    * AMOUNT / SAVED METHOD SCREEN
    * ----------------------------
@@ -579,7 +579,7 @@ export function HyperContent(props: SharedProps) {
              * but we intentionally DO NOT enable confirm here.
              *
              * Confirm is enabled only after
-             * PAYMENT_METHOD_STATUS.
+             * paymentMethodChange.
              */
             console.log("[Example] PaymentElement onReady");
           }}

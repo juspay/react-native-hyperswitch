@@ -61,12 +61,20 @@ export interface Font {
   cardTextSizeAdjust?: number;
 }
 
+/*
+ * Event names as emitted by the shared JS bundle. Legacy SCREAMING_SNAKE
+ * names are still accepted at runtime and transparently normalized to these
+ * (see utils/EventValidator.ts), but they are intentionally not part of the
+ * public type.
+ */
 export type SubscriptionEvent =
-  | 'PAYMENT_METHOD_INFO_CARD'
-  | 'PAYMENT_METHOD_STATUS'
-  | 'FORM_STATUS'
-  | 'PAYMENT_METHOD_INFO_BILLING_ADDRESS'
-  | 'CVC_STATUS';
+  | 'cardDetailsChange'
+  | 'paymentMethodChange'
+  | 'formStatusChange'
+  | 'billingDetailsChange'
+  | 'cvcStatusChange'
+  | 'surchargeInfo'
+  | 'appliedOffersInfo';
 
 export type Theme =
   | 'Default'

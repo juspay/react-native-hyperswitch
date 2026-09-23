@@ -7,6 +7,7 @@ import {
   isSheetPresented,
   setSheetPresented,
 } from '../native/InitializationState';
+import { normalizeSubscribedEvents } from '../utils/EventValidator';
 
 /**
  * Low-level wrapper over `NativeHyperswitchModule.presentPaymentSheet`.
@@ -43,10 +44,24 @@ export async function presentPaymentSheetWithPayload(
   }
   setSheetPresented(true);
   try {
+    const configuration = payload.configuration
+      ? {
+          ...payload.configuration,
+          /* Normalize legacy subscription names to the bundle's camelCase
+             taxonomy before they reach native. */
+          ...(payload.configuration.subscribedEvents
+            ? {
+                subscribedEvents: normalizeSubscribedEvents(
+                  payload.configuration.subscribedEvents as string[]
+                ),
+              }
+            : {}),
+        }
+      : payload.configuration;
     const raw = await NativeHyperswitchModule.presentPaymentSheet({
       hyperswitchConfig: payload.hyperswitchConfig,
       paymentSessionConfig: payload.paymentSessionConfig,
-      configuration: payload.configuration,
+      configuration,
     });
     return mapNativeResponseToPaymentResult(raw);
   } finally {

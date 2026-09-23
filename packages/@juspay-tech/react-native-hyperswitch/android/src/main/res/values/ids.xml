@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tag key used by SurfaceOwners to mark the owning object of a React surface's root view. -->
+    <item name="hs_surface_owner" type="id"/>
+</resources>

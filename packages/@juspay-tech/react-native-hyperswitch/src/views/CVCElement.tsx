@@ -11,6 +11,7 @@ import type { SavedMethodCustomization } from '../types/PaymentSheetConfiguratio
 import NativePaymentWidgetImpl from './PaymentWidgetBridge';
 import { useNativeViewTag } from './useNativeViewTag';
 import { PaymentResult } from '../types/paymentresult';
+import { normalizeSubscribedEvents } from '../utils/EventValidator';
 
 type CVCElementProps = {
   id?: string;
@@ -69,6 +70,15 @@ export const CVCElement = forwardRef<CVCWidgetRef, CVCElementProps>(
       const layout = opts?.paymentMethodLayout;
       return {
         ...opts,
+        /* Normalize legacy subscription names to the bundle's camelCase
+           taxonomy before they reach native. */
+        ...(opts?.subscribedEvents
+          ? {
+              subscribedEvents: normalizeSubscribedEvents(
+                opts.subscribedEvents as string[]
+              ),
+            }
+          : {}),
         paymentMethodLayout: {
           ...layout,
           savedMethodCustomization: {
@@ -82,7 +92,7 @@ export const CVCElement = forwardRef<CVCWidgetRef, CVCElementProps>(
     const onPaymentEventInternal = (event: PaymentEventNative) => {
       onChange?.(event.nativeEvent);
 
-      if (event.nativeEvent.eventName === 'CVC_STATUS') {
+      if (event.nativeEvent.eventName === 'cvcStatusChange') {
         try {
           const payloadString = event.nativeEvent.payload;
           const outerDict = (

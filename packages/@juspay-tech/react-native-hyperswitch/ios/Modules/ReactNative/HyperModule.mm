@@ -27,6 +27,19 @@
 
 RCT_EXPORT_MODULE(HyperModule)
 
+/* The shared JS bundle sends exit results as objects (post #569); convert to
+   the JSON string contract consumed by the Swift impl layer. */
+static NSString *HyperExitResultJSON(NSDictionary *result)
+{
+    if (![result isKindOfClass:[NSDictionary class]] ||
+        ![NSJSONSerialization isValidJSONObject:result]) {
+        return @"{\"status\":\"failed\",\"message\":\"unknown\"}";
+    }
+    NSData *data = [NSJSONSerialization dataWithJSONObject:result options:0 error:nil];
+    return data ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]
+                : @"{\"status\":\"failed\",\"message\":\"unknown\"}";
+}
+
 static BOOL HyperModuleDelegateAttachUnsupported(void)
 {
     static BOOL unsupported;
@@ -136,24 +149,24 @@ static BOOL HyperModuleDelegateAttachUnsupported(void)
     [self.impl presentApplePay:requestObj callback:callback];
 }
 
-- (void)exitPaymentsheet:(double)rootTag result:(NSString *)result reset:(BOOL)reset
+- (void)exitPaymentsheet:(double)rootTag result:(NSDictionary *)result reset:(BOOL)reset
 {
-    [self.impl exitPaymentsheet:@(rootTag) result:result reset:reset];
+    [self.impl exitPaymentsheet:@(rootTag) result:HyperExitResultJSON(result) reset:reset];
 }
 
-- (void)exitPaymentMethodManagement:(double)rootTag result:(NSString *)result reset:(BOOL)reset
+- (void)exitPaymentMethodManagement:(double)rootTag result:(NSDictionary *)result reset:(BOOL)reset
 {
-    [self.impl exitPaymentMethodManagement:@(rootTag) result:result reset:reset];
+    [self.impl exitPaymentMethodManagement:@(rootTag) result:HyperExitResultJSON(result) reset:reset];
 }
 
-- (void)exitWidget:(NSString *)result widgetType:(NSString *)widgetType
+- (void)exitWidget:(NSDictionary *)result widgetType:(NSString *)widgetType
 {
-    [self.impl exitWidget:result widgetType:widgetType];
+    [self.impl exitWidget:HyperExitResultJSON(result) widgetType:widgetType];
 }
 
-- (void)exitCardForm:(NSString *)result
+- (void)exitCardForm:(NSDictionary *)result
 {
-    [self.impl exitCardForm:result];
+    [self.impl exitCardForm:HyperExitResultJSON(result)];
 }
 
 - (void)launchWidgetPaymentSheet:(NSString *)requestObj callback:(RCTResponseSenderBlock)callback
@@ -161,9 +174,9 @@ static BOOL HyperModuleDelegateAttachUnsupported(void)
     [self.impl launchWidgetPaymentSheet:requestObj callback:callback];
 }
 
-- (void)exitWidgetPaymentsheet:(double)rootTag result:(NSString *)result reset:(BOOL)reset
+- (void)exitWidgetPaymentsheet:(double)rootTag result:(NSDictionary *)result reset:(BOOL)reset
 {
-    [self.impl exitWidgetPaymentsheet:@(rootTag) result:result reset:reset];
+    [self.impl exitWidgetPaymentsheet:@(rootTag) result:HyperExitResultJSON(result) reset:reset];
 }
 
 - (void)updateWidgetHeight:(double)height
@@ -171,9 +184,9 @@ static BOOL HyperModuleDelegateAttachUnsupported(void)
     [self.impl updateWidgetHeight:@(height)];
 }
 
-- (void)notifyWidgetPaymentResult:(double)rootTag result:(NSString *)result
+- (void)notifyWidgetPaymentResult:(double)rootTag result:(NSDictionary *)result
 {
-    [self.impl notifyWidgetPaymentResult:@(rootTag) result:result];
+    [self.impl notifyWidgetPaymentResult:@(rootTag) result:HyperExitResultJSON(result)];
 }
 
 - (void)onAddPaymentMethod:(NSString *)data
@@ -186,9 +199,9 @@ static BOOL HyperModuleDelegateAttachUnsupported(void)
     [self.impl emitPaymentEvent:@(rootTag) eventType:eventType payload:payload];
 }
 
-- (void)onUpdateIntentEvent:(double)rootTag type:(NSString *)type result:(NSString *)result
+- (void)onUpdateIntentEvent:(double)rootTag type:(NSString *)type result:(NSDictionary *)result
 {
-    [self.impl onUpdateIntentEvent:@(rootTag) type:type result:result];
+    [self.impl onUpdateIntentEvent:@(rootTag) type:type result:HyperExitResultJSON(result)];
 }
 
 - (void)onPaymentConfirmButtonClick:(double)rootTag payload:(NSString *)payload callback:(RCTResponseSenderBlock)callback
