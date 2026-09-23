@@ -1,10 +1,10 @@
 {
   "name": "@juspay-tech/react-native-hyperswitch-scancard",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "React Native Hyperswitch ScanCard",
-  "main": "lib/commonjs/index",
-  "module": "lib/module/index",
-  "types": "lib/typescript/src/index.d.ts",
+  "main": "./lib/module/index.js",
+  "module": "./lib/module/index.js",
+  "types": "./lib/typescript/src/index.d.ts",
   "exports": {
     ".": {
       "source": "./src/index.tsx",
@@ -85,7 +85,7 @@
   },
   "peerDependencies": {
     "react": "*",
-    "react-native": "*",
+    "react-native": ">=0.72.0",
     "react-native-webview": "*"
   },
   "jest": {
@@ -148,5 +148,13 @@
     "languages": "kotlin-objc",
     "type": "turbo-module",
     "version": "0.54.5"
+  },
+  "codegenConfig": {
+    "name": "RNHyperswitchScancardSpec",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "com.reactnativehyperswitchscancard"
+    }
   }
 }

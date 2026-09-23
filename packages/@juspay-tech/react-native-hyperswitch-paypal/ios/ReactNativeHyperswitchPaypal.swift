@@ -1,17 +1,11 @@
+import Foundation
 import PayPal
 
-@objc(HyperswitchPaypal)
-class ReactNativeHyperswitchPaypal: NSObject {
+@objc public class HyperswitchPaypalImpl: NSObject {
 
   private static let TAG = "HyperswitchPaypal"
 
-  @objc
-  static func requiresMainQueueSetup() -> Bool {
-    return true
-  }
-
-  @objc(launchPayPal:callback:)
-  func launchPayPal(_ requestObj: String, callback: @escaping RCTResponseSenderBlock) {
+  @objc public func launchPayPal(_ requestObj: String, callback: @escaping ([Any]) -> Void) {
 
     guard let data = requestObj.data(using: .utf8),
           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {

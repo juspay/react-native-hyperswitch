@@ -1,53 +1,9 @@
-import { NativeModules } from 'react-native';
+import NativeHyperswitchNetcetera3ds from './NativeHyperswitchNetcetera3ds';
 
-const HyperswitchNetcetera3ds = NativeModules.HyperswitchNetcetera3ds || null;
-const isAvailable =
-  HyperswitchNetcetera3ds && HyperswitchNetcetera3ds.initialiseNetceteraSDK;
-
-function initialiseNetceteraSDK(
-  apiKey: string,
-  hsSDKEnvironment: string,
-  callback: (status: statusType) => void
-) {
-  return HyperswitchNetcetera3ds.initialiseNetceteraSDK(
-    apiKey,
-    hsSDKEnvironment,
-    callback
-  );
-}
-
-function generateAReqParams(
-  messageVersion: string,
-  directoryServerId: string,
-  callback: (aReqParams: AReqParams, status: statusType) => void
-) {
-  return HyperswitchNetcetera3ds.generateAReqParams(
-    messageVersion,
-    directoryServerId,
-    callback
-  );
-}
-
-function recieveChallengeParamsFromRN(
-  acsSignedContent: String,
-  acsRefNumber: String,
-  acsTransactionId: String,
-  threeDSServerTransId: String,
-  callback: (status: statusType) => void,
-  threeDSRequestorAppURL?: String
-) {
-  return HyperswitchNetcetera3ds.recieveChallengeParamsFromRN(
-    acsSignedContent,
-    acsRefNumber,
-    acsTransactionId,
-    threeDSRequestorAppURL,
-    threeDSServerTransId,
-    callback
-  );
-}
-function generateChallenge(callback: (status: statusType) => void) {
-  return HyperswitchNetcetera3ds.generateChallenge(callback);
-}
+// TurboModuleRegistry.get resolves the TurboModule on the new architecture
+// and falls back to the legacy NativeModules entry on the old architecture,
+// so this single code path supports both.
+const isAvailable = NativeHyperswitchNetcetera3ds != null;
 
 export type statusType = {
   status: string;
@@ -62,6 +18,52 @@ export type AReqParams = {
   sdkEphemeralKey: any;
   sdkReferenceNo: string;
 };
+
+function initialiseNetceteraSDK(
+  apiKey: string,
+  hsSDKEnvironment: string,
+  callback: (status: statusType) => void
+) {
+  return NativeHyperswitchNetcetera3ds?.initialiseNetceteraSDK(
+    apiKey,
+    hsSDKEnvironment,
+    callback
+  );
+}
+
+function generateAReqParams(
+  messageVersion: string,
+  directoryServerId: string,
+  callback: (status: statusType, aReqParams: AReqParams) => void
+) {
+  return NativeHyperswitchNetcetera3ds?.generateAReqParams(
+    messageVersion,
+    directoryServerId,
+    callback
+  );
+}
+
+function recieveChallengeParamsFromRN(
+  acsSignedContent: string,
+  acsRefNumber: string,
+  acsTransactionId: string,
+  threeDSServerTransId: string,
+  callback: (status: statusType) => void,
+  threeDSRequestorAppURL?: string
+) {
+  return NativeHyperswitchNetcetera3ds?.recieveChallengeParamsFromRN(
+    acsSignedContent,
+    acsRefNumber,
+    acsTransactionId,
+    threeDSRequestorAppURL ?? null,
+    threeDSServerTransId,
+    callback
+  );
+}
+
+function generateChallenge(callback: (status: statusType) => void) {
+  return NativeHyperswitchNetcetera3ds?.generateChallenge(callback);
+}
 
 export {
   isAvailable,

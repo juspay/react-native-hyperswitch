@@ -10,10 +10,10 @@ import ThreeDS_SDK
 
 
 class HyperswitchChallengeManager: ChallengeStatusReceiver {
-    var postChallengeCallback: RCTResponseSenderBlock?
+    var postChallengeCallback: (([String: Any]) -> Void)?
     var map: [String: Any] = [:]
     
-    func setPostHSChallengeCallback(_ callback: @escaping RCTResponseSenderBlock) {
+    func setPostHSChallengeCallback(_ callback: @escaping ([String: Any]) -> Void) {
         self.postChallengeCallback = callback
     }
     
@@ -21,21 +21,21 @@ class HyperswitchChallengeManager: ChallengeStatusReceiver {
         // Handle successful or unsuccessful completion of challenge flow
         map["status"] = "success";
         map["message"] = "challenge completed successfully";
-        postChallengeCallback?([map]);
+        postChallengeCallback?(map);
     }
     
     func cancelled() {
         // Handle challenge canceled by the user
         map["status"] = "error";
         map["message"] = "challenge cancelled by user";
-        postChallengeCallback?([map]);
+        postChallengeCallback?(map);
     }
     
     func timedout() {
         // Handle challenge timeout
         map["status"] = "error";
         map["message"] = "challenge timeout";
-        postChallengeCallback?([map]);
+        postChallengeCallback?(map);
     }
     
     func protocolError(protocolErrorEvent: ProtocolErrorEvent) {
@@ -69,7 +69,7 @@ class HyperswitchChallengeManager: ChallengeStatusReceiver {
         
         map["status"] = "error";
         map["message"] = message;
-        postChallengeCallback?([map]);
+        postChallengeCallback?(map);
     }
     
     func runtimeError(runtimeErrorEvent: RuntimeErrorEvent) {
@@ -83,7 +83,7 @@ class HyperswitchChallengeManager: ChallengeStatusReceiver {
         
         map["status"] = "error";
         map["message"] = message;
-        postChallengeCallback?([map]);
+        postChallengeCallback?(map);
     }
 }
 
