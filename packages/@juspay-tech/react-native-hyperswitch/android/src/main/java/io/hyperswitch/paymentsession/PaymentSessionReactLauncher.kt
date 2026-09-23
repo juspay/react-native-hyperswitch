@@ -20,10 +20,17 @@ import com.facebook.react.jstasks.HeadlessJsTaskContext
 import com.facebook.react.modules.core.DefaultHardwareBackBtnHandler
 import com.facebook.react.uimanager.PixelUtil
 import com.hyperswitchsdkreactnative.BuildConfig
+import com.proyecto26.inappbrowser.ChromeTabsDismissedEvent
+import com.proyecto26.inappbrowser.ChromeTabsManagerActivity
 import io.hyperswitch.react.HyperActivity
 import io.hyperswitch.react.HyperEventEmitter
 import io.hyperswitch.react.HyperFragment
+import io.hyperswitch.react.HyperReactRuntime
 import io.hyperswitch.react.ReactNativeController
+import io.hyperswitch.redirect.RedirectEvent
+import java.lang.ref.WeakReference
+import org.greenrobot.eventbus.EventBus
+import org.greenrobot.eventbus.Subscribe
 
 /**
  * React Native backed engine for presenting the payment sheet and running headless tasks.
@@ -48,6 +55,9 @@ class PaymentSessionReactLauncher(
       if (!ReactNativeController.getIsInitialized()) {
         ReactNativeController.initialize(activity.application)
       }
+      // The host runs this session's JS only while its Activity is resumed.
+      HyperReactRuntime.follow(activity)
+      RedirectBridge.install(activity)
       reactNativeHost = ReactNativeController.getReactNativeHost()
       reactHost = ReactNativeController.getReactHost()
 
@@ -252,5 +262,36 @@ class PaymentSessionReactLauncher(
       sdkParamsBundle.putFloat("bottomInset", PixelUtil.toDIPFromPixel(dipValue))
     }
     return bundle
+  }
+
+  /**
+   * The in-app browser returns through RedirectActivity, which posts a [RedirectEvent]. Only
+   * HyperFragment and HyperActivity turn that into the browser's own dismiss event, and the
+   * wallet-button and saved-methods flows have neither on screen, so the tab stayed open and the
+   * confirm never resumed. Registered once per process; a duplicate post while a sheet is up is
+   * ignored, because the browser drops it when no open call is pending.
+   */
+  private object RedirectBridge {
+    /* Weak: this object outlives the session, and the dismiss intent must be started from the
+       Activity, as HyperFragment does, so it lands in the task holding the browser tab. */
+    private var activityRef: WeakReference<Activity>? = null
+
+    fun install(activity: Activity) {
+      activityRef = WeakReference(activity)
+      val eventBus = EventBus.getDefault()
+      if (!eventBus.isRegistered(this)) {
+        eventBus.register(this)
+      }
+    }
+
+    @Subscribe
+    fun onEvent(event: RedirectEvent) {
+      Log.d("HyperswitchRedirect", "RedirectBridge got redirect: ${event.message}")
+      EventBus.getDefault().post(
+        ChromeTabsDismissedEvent(event.message, event.resultType, event.isError)
+      )
+      val activity = activityRef?.get() ?: return
+      activity.startActivity(ChromeTabsManagerActivity.createDismissIntent(activity))
+    }
   }
 }

@@ -144,10 +144,8 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       put("type", "payment")
     }
 
-    val map: Map<String, Any?> = mapOf(
-      "props" to props
-    )
-    val bundle = launchOptions?.toBundle(map)
+    // sdkParams carries appId, which the headless confirm needs to send a return_url.
+    val bundle = launchOptions?.getBundleWithHyperParams(props)
     bundle?.let {
       val savedPaymentMethodCallback: (PaymentSessionHandler) -> Unit = { it ->
         handler = it
@@ -414,8 +412,8 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       put("type", "walletWidget")
     }
 
-    val map: Map<String, Any?> = mapOf("props" to props)
-    val bundle = launchOptions?.toBundle(map)
+    // sdkParams carries appId, which the headless confirm needs to send a return_url.
+    val bundle = launchOptions?.getBundleWithHyperParams(props)
 
     if (bundle == null) {
       promise.resolve(
