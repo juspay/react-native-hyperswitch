@@ -160,9 +160,17 @@ export function readVaultDetails(
 //   1. overrideEndpoints.customBackendEndpoint — used exactly as given.
 //   2. commonEndpoint — a bare host; `/api` is appended.
 //   3. the environment's default host, plus `/api`.
+// Linear scan instead of /\/+$/: that regex backtracks polynomially on input with many
+// non-trailing '/' (CodeQL js/polynomial-redos), and endpoints are caller-supplied.
+function stripTrailingSlashes(url: string): string {
+  const trimmed = url.trim();
+  let end = trimmed.length;
+  while (end > 0 && trimmed.charCodeAt(end - 1) === 47 /* '/' */) end--;
+  return trimmed.slice(0, end);
+}
+
 function resolveBaseUrl(options: FetchVaultDetailsOptions): string | undefined {
   const custom = options.customEndpoints;
-  const stripTrailingSlashes = (url: string) => url.trim().replace(/\/+$/, '');
 
   const override =
     custom && 'overrideEndpoints' in custom

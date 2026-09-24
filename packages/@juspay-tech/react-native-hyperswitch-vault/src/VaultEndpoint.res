@@ -20,11 +20,21 @@ type customEndpoints = {
 // `/api` appended, while `overrideEndpoints.customBackendEndpoint` is used exactly as given.
 let backendPath = "/api"
 
+// Linear scan instead of /\/+$/: that regex backtracks polynomially on input with many
+// non-trailing '/' (CodeQL js/polynomial-redos), and endpoints are caller-supplied.
+let stripTrailingSlashes = (value: string) => {
+  let end = ref(value->String.length)
+  while end.contents > 0 && value->String.charCodeAt(end.contents - 1) == 47.0 {
+    end := end.contents - 1
+  }
+  value->String.slice(~start=0, ~end=end.contents)
+}
+
 let configOf = (custom: option<customEndpoints>): option<vaultEndpointConfig> =>
   custom->Option.flatMap(entry =>
     switch entry.commonEndpoint {
     | Some(url) if url->String.trim->String.length > 0 =>
-      Some({baseUrl: url->String.trim->String.replaceRegExp(%re("/\/+$/"), "") ++ backendPath})
+      Some({baseUrl: url->String.trim->stripTrailingSlashes ++ backendPath})
     | Some(url) => Some({baseUrl: url})
     | None =>
       entry.overrideEndpoints
@@ -54,7 +64,7 @@ let allowsCleartext = (environment: VaultConfirm.vaultEnvironment) =>
   | #PROD => false
   }
 
-let normalisePath = (path: string) => path->String.replaceRegExp(%re("/\/+$/"), "")
+let normalisePath = stripTrailingSlashes
 
 let validateEndpoint = (
   endpoint: option<vaultEndpointConfig>,

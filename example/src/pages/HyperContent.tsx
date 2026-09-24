@@ -290,9 +290,7 @@ export function HyperContent(props: SharedProps) {
       }
     };
 
-    // TEMP: disabled while the wallet flow and the saved-methods flow contend
-    // for the shared headless surface on iOS. Uncomment to restore last-used.
-    // void loadSavedPaymentMethods();
+    void loadSavedPaymentMethods();
 
     return () => {
       cancelled = true;
