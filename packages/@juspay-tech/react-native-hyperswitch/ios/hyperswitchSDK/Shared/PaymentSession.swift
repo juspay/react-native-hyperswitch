@@ -38,7 +38,11 @@ public class PaymentSession {
         if let hyperswitchConfiguration = hyperswitchConfiguration {
             #if canImport(HyperOTA)
             OTAServices.shared.initialize(publishableKey: hyperswitchConfiguration.publishableKey)
-            LogManager.initialize(publishableKey: hyperswitchConfiguration.publishableKey)
+            LogManager.initialize(
+                publishableKey: hyperswitchConfiguration.publishableKey,
+                environment: hyperswitchConfiguration.environment,
+                customEndpoints: hyperswitchConfiguration.customEndpoints
+            )
             #endif
         }
     }

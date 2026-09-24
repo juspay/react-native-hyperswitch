@@ -135,13 +135,15 @@ public class NativeHyperswitchModuleImpl: NSObject {
             endpointsConfig = .commonEndpoint(common)
         }
 
-        // Map environment string (Android uses "PROD"/"SANDBOX") to the Swift enum
+        // Map environment string (Android uses "PROD"/"SANDBOX"/"INTEG") to the Swift enum
         let envEnum: HyperswitchEnvironment?
         switch environment.uppercased() {
         case "PROD", "PRODUCTION":
             envEnum = .production
         case "SANDBOX":
             envEnum = .sandbox
+        case "INTEG":
+            envEnum = .integ
         default:
             envEnum = nil
         }
