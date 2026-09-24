@@ -25,10 +25,18 @@ final class LogManager {
         return logBatch.compactMap { $0.toJson() }
     }
 
-    static func initialize(publishableKey: String) {
+    static func initialize(
+        publishableKey: String,
+        environment: HyperswitchEnvironment? = nil,
+        customEndpoints: CustomEndpointConfiguration? = nil
+    ) {
         queue.async {
             self.publishableKey = publishableKey
-            self.loggingEndPoint = SDKEnvironment.loggingURL(for: publishableKey)
+            self.loggingEndPoint = SDKEnvironment.loggingURL(
+                for: publishableKey,
+                environment: environment,
+                customEndpoints: customEndpoints
+            )
         }
         if !publishableKey.isEmpty {
             sendLogsFromFile()

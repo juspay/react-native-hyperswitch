@@ -56,6 +56,19 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     return NAME
   }
 
+  /**
+   * Accepts the same spellings as the iOS module ("PROD"/"PRODUCTION", "SANDBOX", "INTEG",
+   * case-insensitive). Anything else yields null (SDK picks the environment from the
+   * publishable key) instead of throwing from `valueOf`.
+   */
+  private fun parseEnvironment(value: String?): HyperswitchEnvironment? =
+    when (value?.trim()?.uppercase()) {
+      "PROD", "PRODUCTION" -> HyperswitchEnvironment.PROD
+      "SANDBOX" -> HyperswitchEnvironment.SANDBOX
+      "INTEG" -> HyperswitchEnvironment.INTEG
+      else -> HyperswitchEnvironment.PROD
+    }
+
   override fun initialise(
     publishableKey: String?,
     platformPublishableKey: String?,
@@ -98,7 +111,7 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     hyperswitchConfig = HyperswitchConfiguration(
       publishableKey = publishableKey,
       profileId = profileId,
-      environment = environment?.let { HyperswitchEnvironment.valueOf(it) },
+      environment = parseEnvironment(environment),
       customConfig = customConfig
     )
     activity.let {

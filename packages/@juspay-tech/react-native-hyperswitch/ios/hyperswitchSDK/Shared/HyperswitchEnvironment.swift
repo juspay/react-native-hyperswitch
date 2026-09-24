@@ -8,4 +8,5 @@
 public enum HyperswitchEnvironment: String, Codable {
     case production
     case sandbox
+    case integ
 }

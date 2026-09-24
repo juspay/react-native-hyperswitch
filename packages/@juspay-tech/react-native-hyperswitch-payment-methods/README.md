@@ -117,7 +117,7 @@ configures either package:
 | `platformPublishableKey` | Carried for parity; unused by this package. |
 | `profileId` | Carried for parity with the checkout SDK; unused by this package. |
 | `environment` | `'PROD'` (default), `'SANDBOX'` or `'INTEG'` — the checkout SDK's spelling and its default. |
-| `customEndpoints` | `{commonEndpoint}` or `{overrideEndpoints: {customBackendEndpoint}}`. Wins over `environment`, and is the only way to reach `INTEG`. |
+| `customEndpoints` | `{commonEndpoint}` (a bare host — `/api` is appended) or `{overrideEndpoints: {customBackendEndpoint}}` (used exactly as given, so include `/api` yourself). Wins over `environment`. |
 
 Already using `@juspay-tech/react-native-hyperswitch`? Its `Hyperswitch.init(...)` promise is
 accepted directly — it resolves to a `{publishableKey}`. Pass this package's own instance when
@@ -167,9 +167,10 @@ While the lookup is in flight the fields render their placeholders and `tokenize
 `sdk_not_ready`. If it fails, `onError` fires, `usePaymentMethodsSession().error` holds the
 reason, and `tokenize()` answers `unsupported_configuration` quoting it.
 
-Default hosts: `https://live.hyperswitch.io/api` for `PROD` (the default) and
-`https://app.hyperswitch.io/api` for `SANDBOX` — the route is appended after the `/api` prefix.
-`INTEG` and self-hosted deployments have no default and are reached through `customEndpoints`.
+Default hosts: `https://live.hyperswitch.io/api` for `PROD` (the default),
+`https://app.hyperswitch.io/api` for `SANDBOX` and `https://integ.hyperswitch.io/api` for `INTEG` —
+the route is appended after the `/api` prefix. Self-hosted deployments are reached through
+`customEndpoints`, resolved the same way as in the checkout SDK.
 
 ### `vaultDetails`
 

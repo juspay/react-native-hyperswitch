@@ -16,9 +16,15 @@ type customEndpoints = {
   overrideEndpoints?: overrideEndpointConfiguration,
 }
 
+// Mirrors GlobalHooks.res in hyperswitch-client-core: `commonEndpoint` is a bare host and gets
+// `/api` appended, while `overrideEndpoints.customBackendEndpoint` is used exactly as given.
+let backendPath = "/api"
+
 let configOf = (custom: option<customEndpoints>): option<vaultEndpointConfig> =>
   custom->Option.flatMap(entry =>
     switch entry.commonEndpoint {
+    | Some(url) if url->String.trim->String.length > 0 =>
+      Some({baseUrl: url->String.trim->String.replaceRegExp(%re("/\/+$/"), "") ++ backendPath})
     | Some(url) => Some({baseUrl: url})
     | None =>
       entry.overrideEndpoints
