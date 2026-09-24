@@ -64,13 +64,14 @@ export function HyperElements({
   const [sdkAuthorization, setSdkAuthorization] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [walletSession, setWalletSession] = useState<WalletSessionHandle | null>(
-    null
+  const [walletSession, setWalletSession] =
+    useState<WalletSessionHandle | null>(null);
+  const [walletEligibility, setWalletEligibility] = useState<WalletEligibility>(
+    {
+      googlePay: false,
+      applePay: false,
+    }
   );
-  const [walletEligibility, setWalletEligibility] = useState<WalletEligibility>({
-    googlePay: false,
-    applePay: false,
-  });
   const [walletLoading, setWalletLoading] = useState(false);
 
   const loadWalletSession = useCallback(async () => {

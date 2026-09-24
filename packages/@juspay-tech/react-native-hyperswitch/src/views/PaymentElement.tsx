@@ -1,5 +1,10 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import { UIManager, findNodeHandle, type ViewStyle, Platform } from 'react-native';
+import {
+  UIManager,
+  findNodeHandle,
+  type ViewStyle,
+  Platform,
+} from 'react-native';
 import NativePaymentWidgetImpl from './PaymentWidgetBridge';
 import { registerWidget, unregisterWidget } from '../widget/WidgetRegistry';
 import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfiguration';
@@ -111,16 +116,20 @@ export const PaymentElement = forwardRef<
     }
   }, [options, onChange]);
 
-  const onPaymentResultInternal = (event: NativeEventEnvelope & { nativeEvent: {
-  eventName: string;
-  payload: string;
-  target: number;
-}}) => {
+  const onPaymentResultInternal = (
+    event: NativeEventEnvelope & {
+      nativeEvent: {
+        eventName: string;
+        payload: string;
+        target: number;
+      };
+    }
+  ) => {
     onPaymentResult(
       mapNativeResponseToPaymentResult(
         Platform.OS === 'ios'
-          ? event.nativeEvent.result ?? ""
-          : event.nativeEvent.payload ?? ""
+          ? (event.nativeEvent.result ?? '')
+          : (event.nativeEvent.payload ?? '')
       )
     );
   };

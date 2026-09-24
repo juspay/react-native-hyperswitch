@@ -42,9 +42,15 @@ sealed class PaymentResult : Parcelable {
       }
 
       is Failed -> {
+        val text = throwable.message?.takeIf { it.isNotEmpty() }
+        val code = throwable.cause?.message?.takeIf { it.isNotEmpty() }
         JSONObject()
           .put("status", "failed")
-          .put("error", throwable.message)
+          // `error` is kept for existing consumers; `message`/`code` match StandardResult
+          // and what the JS layer reads.
+          .put("error", text)
+          .put("message", text)
+          .put("code", code)
           .put("type", throwable::class.java.name)
           .toString()
       }

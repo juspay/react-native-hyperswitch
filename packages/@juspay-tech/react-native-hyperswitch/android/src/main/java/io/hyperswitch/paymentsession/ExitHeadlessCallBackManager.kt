@@ -36,8 +36,10 @@ object ExitHeadlessCallBackManager {
         return when (val status = message.getString("status")) {
             "cancelled" -> PaymentResult.Canceled(status)
             "failed", "requires_payment_method" -> {
-                val throwable = Throwable(message.getString("message"))
-                throwable.initCause(Throwable(message.getString("code")))
+                // optString: the core doesn't always send both keys, and getString would throw.
+                val throwable = Throwable(message.optString("message", ""))
+                message.optString("code", "").takeIf { it.isNotEmpty() }
+                    ?.let { throwable.initCause(Throwable(it)) }
                 PaymentResult.Failed(throwable)
             }
 
