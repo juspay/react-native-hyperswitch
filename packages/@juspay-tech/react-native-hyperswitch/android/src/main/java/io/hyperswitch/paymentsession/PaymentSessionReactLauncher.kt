@@ -25,7 +25,6 @@ import com.proyecto26.inappbrowser.ChromeTabsManagerActivity
 import io.hyperswitch.react.HyperActivity
 import io.hyperswitch.react.HyperEventEmitter
 import io.hyperswitch.react.HyperFragment
-import io.hyperswitch.react.HyperReactRuntime
 import io.hyperswitch.react.ReactNativeController
 import io.hyperswitch.redirect.RedirectEvent
 import java.lang.ref.WeakReference
@@ -55,8 +54,6 @@ class PaymentSessionReactLauncher(
       if (!ReactNativeController.getIsInitialized()) {
         ReactNativeController.initialize(activity.application)
       }
-      // The host runs this session's JS only while its Activity is resumed.
-      HyperReactRuntime.follow(activity)
       RedirectBridge.install(activity)
       reactNativeHost = ReactNativeController.getReactNativeHost()
       reactHost = ReactNativeController.getReactHost()
@@ -155,10 +152,26 @@ class PaymentSessionReactLauncher(
 
     val headlessJsTaskContext = HeadlessJsTaskContext.getInstance(reactContext)
     UiThreadUtil.runOnUiThread {
+      resumeHost()
       headlessTaskId?.let {
         headlessJsTaskContext.finishTask(it)
       }
       headlessTaskId = headlessJsTaskContext.startTask(taskConfig)
+    }
+  }
+
+  /**
+   * Headless flows (wallet buttons, saved methods) have no ReactFragment/ReactActivity to resume
+   * the SDK host, and React Native runs JS timers (so every `fetch`) and sets `currentActivity`
+   * only for a resumed host. The headless task itself ends immediately, so resume it here.
+   */
+  private fun resumeHost() {
+    val backHandler = activity as? DefaultHardwareBackBtnHandler
+    if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
+      ReactNativeController.getReactHost().onHostResume(activity, backHandler)
+    } else {
+      val manager = ReactNativeController.getReactNativeHost().reactInstanceManager
+      if (backHandler != null) manager.onHostResume(activity, backHandler) else manager.onHostResume(activity)
     }
   }
 

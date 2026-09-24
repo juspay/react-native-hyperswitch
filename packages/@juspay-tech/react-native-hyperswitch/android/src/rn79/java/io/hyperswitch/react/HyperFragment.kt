@@ -495,7 +495,6 @@ class HyperFragment : ReactFragment() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    HyperReactRuntime.follow(currentReactContext?.currentActivity ?: requireActivity())
     registerEventBus()
   }
 
