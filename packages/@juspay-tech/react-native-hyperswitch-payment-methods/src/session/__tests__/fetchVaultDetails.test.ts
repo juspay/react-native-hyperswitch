@@ -182,14 +182,17 @@ describe('fetchVaultDetails', () => {
     );
   });
 
-  it('refuses INTEG without customEndpoints, since it has no public host', async () => {
-    const result = await fetchVaultDetails({
+  it('uses the INTEG host by default', async () => {
+    fetchMock.mockResolvedValue(
+      okResponse(sessionBody({ vgs: { external_vault_id: 'x' } }))
+    );
+    await fetchVaultDetails({
       sdkAuthorization: VALID_AUTH,
       environment: 'INTEG',
     });
-    expect(result.ok).toBe(false);
-    expect(!result.ok && result.message).toMatch(/no public host/);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      'https://integ.hyperswitch.io/api/v1/payment-method-sessions/0a_pms_0192'
+    );
   });
 
   it('reads an overrideEndpoints backend endpoint', async () => {
@@ -224,10 +227,34 @@ describe('fetchVaultDetails', () => {
     await fetchVaultDetails({
       sdkAuthorization: VALID_AUTH,
       environment: 'PROD',
-      customEndpoints: { commonEndpoint: 'https://vault.acme.test/api/' },
+      customEndpoints: { commonEndpoint: 'https://vault.acme.test/' },
     });
     expect(fetchMock.mock.calls[1]![0]).toBe(
       'https://vault.acme.test/api/v1/payment-method-sessions/0a_pms_0192'
+    );
+  });
+
+  it('appends /api to commonEndpoint but uses overrideEndpoints as given', async () => {
+    fetchMock.mockResolvedValue(
+      okResponse(sessionBody({ vgs: { external_vault_id: 'x' } }))
+    );
+    await fetchVaultDetails({
+      sdkAuthorization: VALID_AUTH,
+      customEndpoints: { commonEndpoint: 'https://vault.acme.test' },
+    });
+    await fetchVaultDetails({
+      sdkAuthorization: VALID_AUTH,
+      customEndpoints: {
+        overrideEndpoints: {
+          customBackendEndpoint: 'https://vault.acme.test/custom/',
+        },
+      },
+    });
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      'https://vault.acme.test/api/v1/payment-method-sessions/0a_pms_0192'
+    );
+    expect(fetchMock.mock.calls[1]![0]).toBe(
+      'https://vault.acme.test/custom/v1/payment-method-sessions/0a_pms_0192'
     );
   });
 

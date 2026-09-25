@@ -19,9 +19,14 @@ export interface OverrideEndpoints {
   overrideEndpoints: OverrideEndpointConfiguration;
 }
 
-const DEFAULT_BASE_URL: Partial<Record<HyperswitchEnvironment, string>> = {
-  SANDBOX: 'https://app.hyperswitch.io/api',
-  PROD: 'https://live.hyperswitch.io/api',
+// Bare hosts; `API_PATH` is appended separately, mirroring `GlobalHooks.res`
+// in hyperswitch-client-core so both layers resolve the same URL.
+const API_PATH = '/api';
+
+const DEFAULT_HOST: Record<HyperswitchEnvironment, string> = {
+  PROD: 'https://live.hyperswitch.io',
+  SANDBOX: 'https://app.hyperswitch.io',
+  INTEG: 'https://integ.hyperswitch.io',
 };
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -151,16 +156,36 @@ export function readVaultDetails(
   };
 }
 
+// Precedence (same as hyperswitch-client-core):
+//   1. overrideEndpoints.customBackendEndpoint — used exactly as given.
+//   2. commonEndpoint — a bare host; `/api` is appended.
+//   3. the environment's default host, plus `/api`.
+// Linear scan instead of /\/+$/: that regex backtracks polynomially on input with many
+// non-trailing '/' (CodeQL js/polynomial-redos), and endpoints are caller-supplied.
+function stripTrailingSlashes(url: string): string {
+  const trimmed = url.trim();
+  let end = trimmed.length;
+  while (end > 0 && trimmed.charCodeAt(end - 1) === 47 /* '/' */) end--;
+  return trimmed.slice(0, end);
+}
+
 function resolveBaseUrl(options: FetchVaultDetailsOptions): string | undefined {
   const custom = options.customEndpoints;
-  const explicit =
-    custom && 'commonEndpoint' in custom
-      ? custom.commonEndpoint
-      : custom?.overrideEndpoints?.customBackendEndpoint;
 
-  const trimmed = explicit?.trim();
-  if (trimmed) return trimmed.replace(/\/+$/, '');
-  return DEFAULT_BASE_URL[options.environment ?? 'PROD'];
+  const override =
+    custom && 'overrideEndpoints' in custom
+      ? custom.overrideEndpoints?.customBackendEndpoint?.trim()
+      : undefined;
+  if (override) return stripTrailingSlashes(override);
+
+  const common =
+    custom && 'commonEndpoint' in custom
+      ? custom.commonEndpoint?.trim()
+      : undefined;
+  if (common) return stripTrailingSlashes(common) + API_PATH;
+
+  const host = DEFAULT_HOST[options.environment ?? 'PROD'];
+  return host ? host + API_PATH : undefined;
 }
 
 export async function fetchVaultDetails(
