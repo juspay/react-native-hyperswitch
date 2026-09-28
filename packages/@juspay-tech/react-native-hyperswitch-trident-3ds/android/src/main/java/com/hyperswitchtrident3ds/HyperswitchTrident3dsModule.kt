@@ -1,23 +1,20 @@
 package com.hyperswitchtrident3ds
 
 import android.app.Application
-import androidx.annotation.Nullable
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Callback
 import com.facebook.react.bridge.ReactApplicationContext
-import com.facebook.react.bridge.ReactContextBaseJavaModule
-import com.facebook.react.bridge.ReactMethod
 
-class HyperswitchTrident3dsModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
+class HyperswitchTrident3dsModule(reactContext: ReactApplicationContext) :
+  NativeHyperswitchTrident3dsSpec(reactContext) {
   private val hsTridentUtils = HsTridentUtils()
   private val applicationContext = reactApplicationContext.applicationContext as Application
 
   override fun getName(): String {
-    return "HyperswitchTrident3ds"
+    return NAME
   }
 
-  @ReactMethod
-  fun initialiseSDK(
+  override fun initialiseSDK(
     apiKey: String,
     hsSDKEnvironment: String,
     callback: Callback
@@ -32,22 +29,20 @@ class HyperswitchTrident3dsModule(reactContext: ReactApplicationContext) : React
     }
   }
 
-  @ReactMethod
-  fun generateAReqParams(
+  override fun generateAReqParams(
     messageVersion: String,
     directoryServerId: String,
     cardNetwork: String,
     callback: Callback
   ) {
-    hsTridentUtils.generateAReqParams(currentActivity, messageVersion, directoryServerId, cardNetwork, callback)
+    hsTridentUtils.generateAReqParams(reactApplicationContext.currentActivity, messageVersion, directoryServerId, cardNetwork, callback)
   }
 
-  @ReactMethod
-  fun receiveChallengeParamsFromRN(
+  override fun receiveChallengeParamsFromRN(
     acsSignedContent: String,
     acsRefNumber: String,
     acsTransactionId: String,
-    @Nullable threeDSRequestorAppURL: String?,
+    threeDSRequestorAppURL: String?,
     threeDSServerTransId: String,
     callback: Callback
   ) {
@@ -61,8 +56,11 @@ class HyperswitchTrident3dsModule(reactContext: ReactApplicationContext) : React
     hsTridentUtils.setChallengeParameter(challengeParameters, callback)
   }
 
-  @ReactMethod
-  fun generateChallenge(callback: Callback) {
-    hsTridentUtils.generateChallenge(currentActivity, 5, callback)
+  override fun generateChallenge(callback: Callback) {
+    hsTridentUtils.generateChallenge(reactApplicationContext.currentActivity, 5, callback)
+  }
+
+  companion object {
+    const val NAME = "HyperswitchTrident3ds"
   }
 }

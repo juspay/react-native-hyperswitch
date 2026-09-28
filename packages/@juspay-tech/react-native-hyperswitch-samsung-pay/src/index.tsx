@@ -1,66 +1,39 @@
+import NativeHyperswitchSamsungPay from './NativeHyperswitchSamsungPay';
+
 export type statusType = {
   status: String;
   message: String;
 };
 
-type cardBrandType = {
-  cardBrands: Array<String>;
-};
+// TurboModuleRegistry.get returns null when the native module is not linked
+// into the host app (or on iOS), which lets consumers treat this package as
+// optional.
+export const isAvailable = NativeHyperswitchSamsungPay != null;
 
-import { NativeModules, Platform } from 'react-native';
-
-const LINKING_ERROR =
-  `The package 'react-native-hyperswitch-samsung-pay' doesn't seem to be linked. Make sure: \n\n` +
-  Platform.select({ ios: "- You have run 'pod install'\n", default: '' }) +
-  '- You rebuilt the app after installing the package\n' +
-  '- You are not using Expo managed workflow\n';
-
-const HyperswitchSamsungPay = NativeModules.HyperswitchSamsungPay
-  ? NativeModules.HyperswitchSamsungPay
-  : new Proxy(
-      {},
-      {
-        get() {
-          throw new Error(LINKING_ERROR);
-        },
-      }
+// Calls must not silently no-op when the module is missing: the callback would
+// never fire and a caller awaiting it would hang. Check isAvailable first.
+function nativeModule() {
+  if (NativeHyperswitchSamsungPay == null) {
+    throw new Error(
+      "The package '@juspay-tech/react-native-hyperswitch-samsung-pay' is not linked (it is Android only). Rebuild the app after installing it, with the React Native New Architecture enabled."
     );
-
-export function samsungPayInit(
-  serviceId: string,
-  requestObject: string,
-  callback: (status: statusType) => void
-) {
-  return HyperswitchSamsungPay.samsungPayInit(
-    serviceId,
-    requestObject,
-    callback
-  );
+  }
+  return NativeHyperswitchSamsungPay;
 }
 
 export function checkSamsungPayValidity(
   requestObj: string,
   callback: (status: statusType) => void
-): Promise<boolean> {
-  return HyperswitchSamsungPay.checkSamsungPayValidity(requestObj, callback);
+) {
+  return nativeModule().checkSamsungPayValidity(requestObj, callback);
 }
 
 export function activateSamsungPay(callback: (status: statusType) => void) {
-  return HyperswitchSamsungPay.activateSamsungPay(callback);
-}
-
-export function requestCardInfo(
-  callback: (status: statusType, cardBrands: cardBrandType) => void
-) {
-  return HyperswitchSamsungPay.requestCardInfo(callback);
+  return nativeModule().activateSamsungPay(callback);
 }
 
 export function presentSamsungPayPaymentSheet(
-  callback: (status: statusType) => void
+  callback: (status: statusType, details?: Object) => void
 ) {
-  return HyperswitchSamsungPay.presentSamsungPayPaymentSheet(callback);
+  return nativeModule().presentSamsungPayPaymentSheet(callback);
 }
-
-export const isAvailable = Boolean(
-  HyperswitchSamsungPay && HyperswitchSamsungPay.checkSamsungPayValidity
-);

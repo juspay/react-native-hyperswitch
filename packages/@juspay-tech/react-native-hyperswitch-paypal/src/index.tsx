@@ -1,8 +1,13 @@
-import { NativeModules } from 'react-native';
+import NativeHyperswitchPaypal from './NativeHyperswitchPaypal';
 
-const { HyperswitchPaypal } = NativeModules;
+// TurboModuleRegistry.get returns null when the native module is not linked
+// into the host app, which lets consumers treat this package as optional.
+export const isAvailable = NativeHyperswitchPaypal != null;
 
-export const isAvailable = !!HyperswitchPaypal;
+import PaypalButtonNativeComponent from './PaypalButtonNativeComponent';
+
+export const PaypalButton = PaypalButtonNativeComponent;
+export type { NativeProps as PaypalButtonProps } from './PaypalButtonNativeComponent';
 
 export type PayPalResult = {
   status: string;
@@ -23,12 +28,12 @@ export function launchPayPal(
   requestObj: string,
   callback: (result: PayPalResult) => void
 ): void {
-  if (!HyperswitchPaypal) {
+  if (!NativeHyperswitchPaypal) {
     callback({
       status: 'failed',
       error_message: 'PayPal module not available',
     });
     return;
   }
-  return HyperswitchPaypal.launchPayPal(requestObj, callback);
+  return NativeHyperswitchPaypal.launchPayPal(requestObj, callback);
 }

@@ -1,28 +1,35 @@
-import { NativeModules } from 'react-native';
+import NativeHyperswitchTrident3ds from './NativeHyperswitchTrident3ds';
 
-const HyperswitchTrident3ds = NativeModules.HyperswitchTrident3ds || null;
-const isAvailable =
-  HyperswitchTrident3ds && HyperswitchTrident3ds.initialiseSDK;
+// TurboModuleRegistry.get returns null when the native module is not linked
+// into the host app, which lets consumers treat this package as optional.
+const isAvailable = NativeHyperswitchTrident3ds != null;
+
+// Calls must not silently no-op when the module is missing: the callback would
+// never fire and a caller awaiting it would hang. Check isAvailable first.
+function nativeModule() {
+  if (NativeHyperswitchTrident3ds == null) {
+    throw new Error(
+      "The package '@juspay-tech/react-native-hyperswitch-trident-3ds' is not linked. Rebuild the app after installing it, with the React Native New Architecture enabled."
+    );
+  }
+  return NativeHyperswitchTrident3ds;
+}
 
 function initialiseSDK(
   apiKey: string,
   hsSDKEnvironment: string,
   callback: (status: statusType) => void
 ) {
-  return HyperswitchTrident3ds.initialiseSDK(
-    apiKey,
-    hsSDKEnvironment,
-    callback
-  );
+  return nativeModule().initialiseSDK(apiKey, hsSDKEnvironment, callback);
 }
 
 function generateAReqParams(
   messageVersion: string,
   directoryServerId: string,
   cardNetwork: string,
-  callback: (aReqParams: AReqParams, status: statusType) => void
+  callback: (status: statusType, aReqParams: AReqParams) => void
 ) {
-  return HyperswitchTrident3ds.generateAReqParams(
+  return nativeModule().generateAReqParams(
     messageVersion,
     directoryServerId,
     cardNetwork,
@@ -31,25 +38,25 @@ function generateAReqParams(
 }
 
 function receiveChallengeParamsFromRN(
-  acsSignedContent: String,
-  acsRefNumber: String,
-  acsTransactionId: String,
-  threeDSServerTransId: String,
+  acsSignedContent: string,
+  acsRefNumber: string,
+  acsTransactionId: string,
+  threeDSServerTransId: string,
   callback: (status: statusType) => void,
-  threeDSRequestorAppURL?: String
+  threeDSRequestorAppURL?: string
 ) {
-  return HyperswitchTrident3ds.receiveChallengeParamsFromRN(
+  return nativeModule().receiveChallengeParamsFromRN(
     acsSignedContent,
     acsRefNumber,
     acsTransactionId,
-    threeDSRequestorAppURL,
+    threeDSRequestorAppURL ?? null,
     threeDSServerTransId,
     callback
   );
 }
 
 function generateChallenge(callback: (status: statusType) => void) {
-  return HyperswitchTrident3ds.generateChallenge(callback);
+  return nativeModule().generateChallenge(callback);
 }
 
 export type statusType = {

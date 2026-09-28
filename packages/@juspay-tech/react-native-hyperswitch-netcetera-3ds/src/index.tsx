@@ -1,52 +1,18 @@
-import { NativeModules } from 'react-native';
+import NativeHyperswitchNetcetera3ds from './NativeHyperswitchNetcetera3ds';
 
-const HyperswitchNetcetera3ds = NativeModules.HyperswitchNetcetera3ds || null;
-const isAvailable =
-  HyperswitchNetcetera3ds && HyperswitchNetcetera3ds.initialiseNetceteraSDK;
+// TurboModuleRegistry.get returns null when the native module is not linked
+// into the host app, which lets consumers treat this package as optional.
+const isAvailable = NativeHyperswitchNetcetera3ds != null;
 
-function initialiseNetceteraSDK(
-  apiKey: string,
-  hsSDKEnvironment: string,
-  callback: (status: statusType) => void
-) {
-  return HyperswitchNetcetera3ds.initialiseNetceteraSDK(
-    apiKey,
-    hsSDKEnvironment,
-    callback
-  );
-}
-
-function generateAReqParams(
-  messageVersion: string,
-  directoryServerId: string,
-  callback: (aReqParams: AReqParams, status: statusType) => void
-) {
-  return HyperswitchNetcetera3ds.generateAReqParams(
-    messageVersion,
-    directoryServerId,
-    callback
-  );
-}
-
-function recieveChallengeParamsFromRN(
-  acsSignedContent: String,
-  acsRefNumber: String,
-  acsTransactionId: String,
-  threeDSServerTransId: String,
-  callback: (status: statusType) => void,
-  threeDSRequestorAppURL?: String
-) {
-  return HyperswitchNetcetera3ds.recieveChallengeParamsFromRN(
-    acsSignedContent,
-    acsRefNumber,
-    acsTransactionId,
-    threeDSRequestorAppURL,
-    threeDSServerTransId,
-    callback
-  );
-}
-function generateChallenge(callback: (status: statusType) => void) {
-  return HyperswitchNetcetera3ds.generateChallenge(callback);
+// Calls must not silently no-op when the module is missing: the callback would
+// never fire and a caller awaiting it would hang. Check isAvailable first.
+function nativeModule() {
+  if (NativeHyperswitchNetcetera3ds == null) {
+    throw new Error(
+      "The package '@juspay-tech/react-native-hyperswitch-netcetera-3ds' is not linked. Rebuild the app after installing it, with the React Native New Architecture enabled."
+    );
+  }
+  return NativeHyperswitchNetcetera3ds;
 }
 
 export type statusType = {
@@ -62,6 +28,52 @@ export type AReqParams = {
   sdkEphemeralKey: any;
   sdkReferenceNo: string;
 };
+
+function initialiseNetceteraSDK(
+  apiKey: string,
+  hsSDKEnvironment: string,
+  callback: (status: statusType) => void
+) {
+  return nativeModule().initialiseNetceteraSDK(
+    apiKey,
+    hsSDKEnvironment,
+    callback
+  );
+}
+
+function generateAReqParams(
+  messageVersion: string,
+  directoryServerId: string,
+  callback: (status: statusType, aReqParams: AReqParams) => void
+) {
+  return nativeModule().generateAReqParams(
+    messageVersion,
+    directoryServerId,
+    callback
+  );
+}
+
+function recieveChallengeParamsFromRN(
+  acsSignedContent: string,
+  acsRefNumber: string,
+  acsTransactionId: string,
+  threeDSServerTransId: string,
+  callback: (status: statusType) => void,
+  threeDSRequestorAppURL?: string
+) {
+  return nativeModule().recieveChallengeParamsFromRN(
+    acsSignedContent,
+    acsRefNumber,
+    acsTransactionId,
+    threeDSRequestorAppURL ?? null,
+    threeDSServerTransId,
+    callback
+  );
+}
+
+function generateChallenge(callback: (status: statusType) => void) {
+  return nativeModule().generateChallenge(callback);
+}
 
 export {
   isAvailable,

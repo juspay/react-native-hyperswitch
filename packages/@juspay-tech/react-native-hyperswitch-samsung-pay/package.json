@@ -75,7 +75,7 @@
   },
   "peerDependencies": {
     "react": "*",
-    "react-native": "*"
+    "react-native": ">=0.76.0"
   },
   "jest": {
     "preset": "react-native",
@@ -100,5 +100,13 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "codegenConfig": {
+    "name": "RNHyperswitchSamsungPaySpec",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "com.hyperswitchsamsungpay"
+    }
   }
 }

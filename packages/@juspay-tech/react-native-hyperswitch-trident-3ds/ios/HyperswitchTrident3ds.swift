@@ -1,8 +1,8 @@
 import Foundation
+import UIKit
 import Trident
 
-@objc(HyperswitchTrident3ds)
-class HyperswitchTrident3ds: NSObject {
+@objc public class HyperswitchTrident3dsImpl: NSObject {
   private lazy var tridentSdk = {
     TridentSDK()
   }()
@@ -12,9 +12,9 @@ class HyperswitchTrident3ds: NSObject {
   private let doChallengeTimeOut: Int = 5
   
   @objc
-  func initialiseSDK(_ apiKey: String,
-                            _ hsSDKEnvironment: String,
-                            _ callback: @escaping RCTResponseSenderBlock) {
+  public func initialiseSDK(_ apiKey: String,
+                            hsSDKEnvironment: String,
+                            callback: @escaping ([Any]) -> Void) {
     do {
       try tridentSdk.initialize(configParameters: ConfigParameters(), locale: nil, uiCustomization: UICustomization(), certificateDelegate: nil)
     } catch let error as NSError {
@@ -33,10 +33,10 @@ class HyperswitchTrident3ds: NSObject {
   }
   
   @objc
-  func generateAReqParams(_ messageVersion: String,
-                          _ directoryServerId: String,
-                          _ cardNetwork: String,
-                          _ callback: @escaping RCTResponseSenderBlock) {
+  public func generateAReqParams(_ messageVersion: String,
+                                 directoryServerId: String,
+                                 cardNetwork: String,
+                                 callback: @escaping ([Any]) -> Void) {
     do {
       let _directoryServerId = try tridentSdk.getDirectoryServerId(cardNetwork: cardNetwork.uppercased(with: .autoupdatingCurrent))
       let transaction = try tridentSdk.createTransaction(
@@ -67,12 +67,12 @@ class HyperswitchTrident3ds: NSObject {
   }
   
   @objc
-  func receiveChallengeParamsFromRN(_ acsSignedContent: String,
-                                    _ acsRefNumber: String,
-                                    _ acsTransactionId: String,
-                                    _ threeDSRequestorAppURL: String?,
-                                    _ threeDSServerTransId: String,
-                                    _ callback: @escaping RCTResponseSenderBlock) {
+  public func receiveChallengeParamsFromRN(_ acsSignedContent: String,
+                                           acsRefNumber: String,
+                                           acsTransactionId: String,
+                                           threeDSRequestorAppURL: String?,
+                                           threeDSServerTransId: String,
+                                           callback: @escaping ([Any]) -> Void) {
     self.challengeParameters.acsSignedContent = acsSignedContent
     self.challengeParameters.acsRefNumber = acsRefNumber
     self.challengeParameters.acsTransactionID = acsTransactionId
@@ -88,10 +88,11 @@ class HyperswitchTrident3ds: NSObject {
   }
   
   @objc
-  func generateChallenge(_ callback: @escaping RCTResponseSenderBlock) {
+  public func generateChallenge(from viewController: UIViewController?,
+                                callback: @escaping ([Any]) -> Void) {
     DispatchQueue.main.async {
       do {
-        guard let viewController = RCTPresentedViewController() else {
+        guard let viewController = viewController else {
           var errResponse: [String: String] = [:]
           errResponse["status"] = "error"
           errResponse["message"] = "doChallenge call unsuccessful, viewController not found."
