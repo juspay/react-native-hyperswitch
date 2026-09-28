@@ -3,64 +3,53 @@ package com.juspaytech.reactnativehyperswitchpaypal
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.uimanager.SimpleViewManager
 import com.facebook.react.uimanager.ThemedReactContext
+import com.facebook.react.uimanager.ViewManagerDelegate
 import com.facebook.react.uimanager.annotations.ReactProp
-import com.paypal.android.paymentbuttons.PayPalButtonColor
-import com.paypal.android.paymentbuttons.PayPalButtonLabel
-import com.paypal.android.paymentbuttons.PaymentButtonSize
+import com.facebook.react.viewmanagers.PaypalButtonManagerDelegate
+import com.facebook.react.viewmanagers.PaypalButtonManagerInterface
 
-@ReactModule(name = PaypalButtonViewManager.NAME)
-class PaypalButtonViewManager : SimpleViewManager<PaypalButtonView>() {
+@ReactModule(name = PaypalButtonViewManagerImpl.NAME)
+class PaypalButtonViewManager :
+  SimpleViewManager<PaypalButtonView>(),
+  PaypalButtonManagerInterface<PaypalButtonView> {
+
+  private val delegate: ViewManagerDelegate<PaypalButtonView> =
+    PaypalButtonManagerDelegate(this)
+
+  override fun getDelegate(): ViewManagerDelegate<PaypalButtonView> {
+    return delegate
+  }
 
   override fun getName(): String {
-    return NAME
+    return PaypalButtonViewManagerImpl.NAME
   }
 
   public override fun createViewInstance(context: ThemedReactContext): PaypalButtonView {
-    return PaypalButtonView(context)
+    return PaypalButtonViewManagerImpl.createViewInstance(context)
   }
 
   public override fun onAfterUpdateTransaction(view: PaypalButtonView) {
     super.onAfterUpdateTransaction(view)
-    view.addButton()
+    PaypalButtonViewManagerImpl.onAfterUpdateTransaction(view)
   }
 
   @ReactProp(name = "buttonColor")
-  fun setButtonColor(view: PaypalButtonView, value: String?) {
-    view.buttonColor = when (value) {
-      "GOLD" -> PayPalButtonColor.GOLD
-      "BLUE" -> PayPalButtonColor.BLUE
-      "SILVER" -> PayPalButtonColor.SILVER
-      "WHITE" -> PayPalButtonColor.WHITE
-      "BLACK" -> PayPalButtonColor.BLACK
-      else -> PayPalButtonColor.GOLD
-    }
+  override fun setButtonColor(view: PaypalButtonView, value: String?) {
+    PaypalButtonViewManagerImpl.setButtonColor(view, value)
   }
 
   @ReactProp(name = "buttonLabel")
-  fun setButtonLabel(view: PaypalButtonView, value: String?) {
-    view.buttonLabel = when (value) {
-      "CHECKOUT" -> PayPalButtonLabel.CHECKOUT
-      "BUY_NOW" -> PayPalButtonLabel.BUY_NOW
-      "PAY" -> PayPalButtonLabel.PAY
-      else -> PayPalButtonLabel.PAYPAL
-    }
+  override fun setButtonLabel(view: PaypalButtonView, value: String?) {
+    PaypalButtonViewManagerImpl.setButtonLabel(view, value)
   }
 
   @ReactProp(name = "buttonSize")
-  fun setButtonSize(view: PaypalButtonView, value: String?) {
-    view.buttonSize = when (value) {
-      "SMALL" -> PaymentButtonSize.SMALL
-      "LARGE" -> PaymentButtonSize.LARGE
-      else -> PaymentButtonSize.MEDIUM
-    }
+  override fun setButtonSize(view: PaypalButtonView, value: String?) {
+    PaypalButtonViewManagerImpl.setButtonSize(view, value)
   }
 
   @ReactProp(name = "borderRadius", defaultDouble = 0.0)
-  fun setBorderRadius(view: PaypalButtonView, value: Double) {
-    view.customCornerRadius = value.toFloat()
-  }
-
-  companion object {
-    const val NAME = "PaypalButton"
+  override fun setBorderRadius(view: PaypalButtonView, value: Double) {
+    PaypalButtonViewManagerImpl.setBorderRadius(view, value)
   }
 }

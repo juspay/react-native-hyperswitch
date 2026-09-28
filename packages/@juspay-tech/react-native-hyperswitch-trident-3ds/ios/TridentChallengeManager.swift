@@ -10,10 +10,10 @@ import Trident
 
 class TridentChallengeStatusReceiver : ChallengeStatusReceiver {
   let transactionRef: Transaction
-  let postChallengeCallback: RCTResponseSenderBlock
+  let postChallengeCallback: ([Any]) -> Void
   var response: [String: Any] = [:]
   
-  init(transactionRef: Transaction, completion: @escaping RCTResponseSenderBlock) {
+  init(transactionRef: Transaction, completion: @escaping ([Any]) -> Void) {
     self.transactionRef = transactionRef
     self.postChallengeCallback = completion
   }

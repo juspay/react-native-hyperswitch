@@ -6,13 +6,11 @@ import android.os.Looper
 import android.util.Log
 import com.facebook.react.bridge.Callback
 import com.facebook.react.bridge.ReactApplicationContext
-import com.facebook.react.bridge.ReactContextBaseJavaModule
-import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.WritableNativeMap
 import org.json.JSONObject
 
 class ReactNativeHyperswitchPaypalModule(reactContext: ReactApplicationContext) :
-  ReactContextBaseJavaModule(reactContext),
+  NativeHyperswitchPaypalSpec(reactContext),
   PayPalPendingResult.PayPalResultCallback {
 
   private var currentCallback: Callback? = null
@@ -20,8 +18,7 @@ class ReactNativeHyperswitchPaypalModule(reactContext: ReactApplicationContext) 
 
   override fun getName(): String = NAME
 
-  @ReactMethod
-  fun launchPayPal(requestObj: String, callback: Callback) {
+  override fun launchPayPal(requestObj: String, callback: Callback) {
 
     try {
       val json = JSONObject(requestObj)

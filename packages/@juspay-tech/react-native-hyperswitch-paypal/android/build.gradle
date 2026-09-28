@@ -15,9 +15,9 @@ buildscript {
   }
 }
 
-
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
+apply plugin: "com.facebook.react"
 
 
 def getExtOrIntegerDefault(name) {
@@ -66,4 +66,10 @@ dependencies {
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
   implementation "com.paypal.android:paypal-web-payments:2.3.0"
   implementation "com.paypal.android:payment-buttons:2.3.0"
+}
+
+react {
+  jsRootDir = file("../src/")
+  libraryName = "HyperswitchPaypal"
+  codegenJavaPackageName = "com.juspaytech.reactnativehyperswitchpaypal"
 }

@@ -1,8 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-  package="com.hyperswitchsamsungpay">
-  <uses-sdk
-    android:minSdkVersion="21"
-    android:targetSdkVersion="33" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <queries>
     <package android:name="com.samsung.android.spay" />
     <package android:name="com.samsung.android.samsungpay.gear" />

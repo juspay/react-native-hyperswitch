@@ -1,18 +1,47 @@
-#import <React/RCTBridgeModule.h>
-#import <React/RCTViewManager.h>
+#if __has_include(<ReactCodegen/RNHyperswitchPaypalSpec/RNHyperswitchPaypalSpec.h>)
+#import <ReactCodegen/RNHyperswitchPaypalSpec/RNHyperswitchPaypalSpec.h>
+#else
+#import <RNHyperswitchPaypalSpec/RNHyperswitchPaypalSpec.h>
+#endif
 
-@interface RCT_EXTERN_MODULE(HyperswitchPaypal, NSObject)
+#if __has_include(<ReactNativeHyperswitchPaypal/ReactNativeHyperswitchPaypal-Swift.h>)
+#import <ReactNativeHyperswitchPaypal/ReactNativeHyperswitchPaypal-Swift.h>
+#else
+#import "ReactNativeHyperswitchPaypal-Swift.h"
+#endif
 
-RCT_EXTERN_METHOD(launchPayPal:(NSString *)requestObj
-                  callback:(RCTResponseSenderBlock)callback)
-
+@interface HyperswitchPaypal : NSObject <NativeHyperswitchPaypalSpec>
 @end
 
-@interface RCT_EXTERN_MODULE(PaypalButton, RCTViewManager)
+@implementation HyperswitchPaypal {
+  HyperswitchPaypalImpl *_impl;
+}
 
-RCT_EXPORT_VIEW_PROPERTY(buttonColor, NSString)
-RCT_EXPORT_VIEW_PROPERTY(buttonLabel, NSString)
-RCT_EXPORT_VIEW_PROPERTY(buttonSize, NSString)
-RCT_EXPORT_VIEW_PROPERTY(borderRadius, double)
+RCT_EXPORT_MODULE()
+
+- (instancetype)init
+{
+  if (self = [super init]) {
+    _impl = [HyperswitchPaypalImpl new];
+  }
+  return self;
+}
+
++ (BOOL)requiresMainQueueSetup
+{
+  return YES;
+}
+
+- (void)launchPayPal:(NSString *)requestObj
+            callback:(RCTResponseSenderBlock)callback
+{
+  [self->_impl launchPayPal:requestObj callback:callback];
+}
+
+- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
+    (const facebook::react::ObjCTurboModule::InitParams &)params
+{
+  return std::make_shared<facebook::react::NativeHyperswitchPaypalSpecJSI>(params);
+}
 
 @end
