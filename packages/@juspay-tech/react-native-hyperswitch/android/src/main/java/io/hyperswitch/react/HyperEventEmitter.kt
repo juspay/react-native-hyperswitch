@@ -46,7 +46,7 @@ object HyperEventEmitter {
      */
     fun emitPaymentEvent(
         eventType: String,
-        payload: Map<String, Any>
+        payload: Map<String, Any?>
     ) {
 //        val shouldEmit = isSubscribed(eventType)
 

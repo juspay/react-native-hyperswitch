@@ -9,12 +9,9 @@ const RETRY_INTERVAL_MS = 100;
  * native view tag. Retries up to {@link MAX_ATTEMPTS} times spaced
  * {@link RETRY_INTERVAL_MS}ms apart to give Fabric time to attach the
  * shadow node on slower devices.
- *
- * Calls `onReady` exactly once — on the first successful poll.
  */
 export function useNativeViewTag(
-  viewRef: React.RefObject<unknown>,
-  onReady?: () => void
+  viewRef: React.RefObject<unknown>
 ): number | undefined {
   const [viewTag, setViewTag] = useState<number | undefined>(undefined);
 
@@ -37,7 +34,6 @@ export function useNativeViewTag(
           viewRef.current as Parameters<typeof findNodeHandle>[0]
         ) ?? -1;
       if (tag !== -1) {
-        onReady?.();
         setViewTag(tag);
       } else if (attempt < MAX_ATTEMPTS) {
         timer = setTimeout(() => poll(attempt + 1), RETRY_INTERVAL_MS);

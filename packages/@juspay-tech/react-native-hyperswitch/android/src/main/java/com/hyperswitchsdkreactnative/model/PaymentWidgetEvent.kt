@@ -12,11 +12,12 @@ class PaymentWidgetEvent(
 
   override fun getEventName() = "onPaymentEvent"
 
+  // Events arrive back to back (e.g. ready + paymentMethodChange); none may merge.
+  override fun canCoalesce() = false
+
   override fun getEventData() = Arguments.createMap().apply {
     putString("eventName", event.type)
-    putMap(
-      "payload",
-      Arguments.makeNativeMap(event.payload)
-    )
+    // Codegen types the payload as a string on every platform; JS parses it.
+    putString("payload", event.data.optJSONObject("payload")?.toString() ?: "{}")
   }
 }

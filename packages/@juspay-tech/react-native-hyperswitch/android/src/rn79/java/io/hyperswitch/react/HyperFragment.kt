@@ -25,7 +25,6 @@ import io.hyperswitch.model.ElementUpdateIntentResult
 import io.hyperswitch.paymentsession.ExitHeadlessCallBackManager
 import io.hyperswitch.paymentsheet.PaymentResult
 import io.hyperswitch.redirect.RedirectEvent
-import io.hyperswitch.utils.ConversionUtils
 import io.hyperswitch.utils.StandardResult
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
@@ -402,8 +401,8 @@ class HyperFragment : ReactFragment() {
     result: ReadableMap
   ) {
     try {
-      val payload =
-        ConversionUtils.readableMapToMap(result)
+      // toHashMap keeps null fields (e.g. `bin: null` before a card is typed).
+      val payload = result.toHashMap()
 
       val listener = paymentEventListener
 

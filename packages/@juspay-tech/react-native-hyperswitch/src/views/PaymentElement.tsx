@@ -5,14 +5,13 @@ import { registerWidget, unregisterWidget } from '../widget/WidgetRegistry';
 import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfiguration';
 import { useHyperElementsContext } from '../context/HyperElements';
 import {
-  makeUnknownEventWarningPayload,
-  normalizeSubscribedEvents,
-  validateSubscribedEventStrings,
+  routeWidgetEvent,
+  withNativeSubscription,
 } from '../utils/EventValidator';
 import type {
+  PaymentEvent,
   PaymentEventNative,
   NativeEventEnvelope,
-  PaymentEventResult,
 } from '../types/NativeEventTypes';
 import type { PaymentElementHandle } from '../types/definitions';
 import type { PaymentResult } from '../types/paymentresult';
@@ -24,8 +23,14 @@ type PaymentElementProps = {
   widgetId: string;
   options?: PaymentSheetConfiguration;
   onPaymentResult: (result: PaymentResult) => void;
-  onChange?: (event: PaymentEventResult) => void;
+  /** Receives every event listed in `options.subscriptionEvents`; branch on `event.eventName`. */
+  onChange?: (event: PaymentEvent) => void;
+  /** Fires once the element has finished its initial loading (success or error); no subscription needed. */
   onReady?: () => void;
+  /** Fires when focus enters the element (moving between its fields does not re-fire); no subscription needed. */
+  onFocus?: () => void;
+  /** Fires when focus leaves the element entirely (moving between its fields does not fire); no subscription needed. */
+  onBlur?: () => void;
   style?: ViewStyle;
 };
 
@@ -33,11 +38,19 @@ export const PaymentElement = forwardRef<
   PaymentElementHandle,
   PaymentElementProps
 >((props, ref) => {
-  const { widgetId, options, onPaymentResult, onChange, onReady, style } =
-    props;
+  const {
+    widgetId,
+    options,
+    onPaymentResult,
+    onChange,
+    onReady,
+    onFocus,
+    onBlur,
+    style,
+  } = props;
   const { paymentSessionConfig, hyperswitchConfig } = useHyperElementsContext();
   const viewRef = useRef(null);
-  const viewTag = useNativeViewTag(viewRef, onReady);
+  const viewTag = useNativeViewTag(viewRef);
 
   useEffect(() => {
     if (viewTag === undefined) return undefined;
@@ -89,31 +102,6 @@ export const PaymentElement = forwardRef<
     [viewTag]
   );
 
-  const warningEmitted = useRef(false);
-
-  useEffect(() => {
-    if (!options || !onChange || warningEmitted.current) {
-      return;
-    }
-    const subscribedEvents = normalizeSubscribedEvents(
-      options.subscribedEvents as string[] | undefined
-    );
-
-    const invalidEvents = validateSubscribedEventStrings(subscribedEvents);
-    if (invalidEvents.length > 0) {
-      warningEmitted.current = true;
-      const warningPayload = makeUnknownEventWarningPayload(invalidEvents);
-      onChange({
-        eventName: 'UNKNOWN_EVENT_SUBSCRIBED',
-        payload: JSON.stringify({
-          message: warningPayload.message,
-          invalidEvents: warningPayload.invalidEvents,
-          validEvents: warningPayload.validEvents,
-        }),
-      });
-    }
-  }, [options, onChange]);
-
   const onPaymentResultInternal = (event: NativeEventEnvelope & { nativeEvent: {
   eventName: string;
   payload: string;
@@ -129,22 +117,11 @@ export const PaymentElement = forwardRef<
   };
 
   const onPaymentEventInternal = (event: PaymentEventNative) => {
-    onChange?.(event.nativeEvent);
+    routeWidgetEvent(event.nativeEvent, { onChange, onReady, onFocus, onBlur });
   };
 
-  /* Normalize legacy subscription names to the bundle's camelCase taxonomy
-     before they reach native. */
   const configuration = options
-    ? {
-        ...(options as Record<string, unknown>),
-        ...(options.subscribedEvents
-          ? {
-              subscribedEvents: normalizeSubscribedEvents(
-                options.subscribedEvents as string[]
-              ),
-            }
-          : {}),
-      }
+    ? (withNativeSubscription(options) as Record<string, unknown>)
     : undefined;
 
   return (
