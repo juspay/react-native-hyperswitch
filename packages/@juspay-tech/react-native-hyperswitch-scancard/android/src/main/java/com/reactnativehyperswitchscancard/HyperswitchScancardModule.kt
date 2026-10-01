@@ -18,7 +18,7 @@ class HyperswitchScancardModule(reactContext: ReactApplicationContext) :
 
   @ReactMethod
   fun launchScanCard(scanCardRequest: String, callBack: Callback) {
-    (currentActivity as? FragmentActivity)?.let {
+    (reactApplicationContext.currentActivity as? FragmentActivity)?.let {
       ScanCardManager.launch(it, object : ScanCardCallback {
         override fun onScanResult(result: Map<String, Any?>) {
           val data = (result["data"] as? Map<*, *>)?.let { map ->

@@ -88,6 +88,12 @@ static NSDictionary * _Nullable dynamicToDict(const folly::dynamic &dyn)
     return self;
 }
 
+// Recycling would drop the event forwarding and keep the previous PaymentWidget (and its fired `ready`).
++ (BOOL)shouldBeRecycled
+{
+    return NO;
+}
+
 - (void)prepareForRecycle
 {
     [super prepareForRecycle];
@@ -160,9 +166,13 @@ static NSDictionary * _Nullable dynamicToDict(const folly::dynamic &dyn)
         if (!em) return;
 
         NSString *eventName = event[@"eventName"] ?: @"";
+        // The Swift listener already serializes the payload (codegen types it as a string).
+        id rawPayload = event[@"payload"];
+        NSString *payload = [rawPayload isKindOfClass:[NSString class]] ? rawPayload : @"{}";
 
         RCTNativePaymentWidgetEventEmitter::OnPaymentEvent paymentEvent;
         paymentEvent.eventName = std::string([eventName UTF8String]);
+        paymentEvent.payload = std::string([payload UTF8String]);
         em->onPaymentEvent(std::move(paymentEvent));
     };
 }

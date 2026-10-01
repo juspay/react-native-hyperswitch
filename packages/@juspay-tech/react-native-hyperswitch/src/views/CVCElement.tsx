@@ -4,21 +4,28 @@ import { useHyperElementsContext } from '../context/HyperElements';
 import type { CvcWidgetOptions } from '../types/definitions';
 import { registerWidget, unregisterWidget } from '../widget/WidgetRegistry';
 import type {
+  PaymentEvent,
   PaymentEventNative,
-  PaymentEventResult,
 } from '../types/NativeEventTypes';
 import type { SavedMethodCustomization } from '../types/PaymentSheetConfiguration';
 import NativePaymentWidgetImpl from './PaymentWidgetBridge';
 import { useNativeViewTag } from './useNativeViewTag';
 import { PaymentResult } from '../types/paymentresult';
-import { normalizeSubscribedEvents } from '../utils/EventValidator';
+import {
+  routeWidgetEvent,
+  withNativeSubscription,
+} from '../utils/EventValidator';
 
 type CVCElementProps = {
   id?: string;
   options?: CvcWidgetOptions;
-  onChange?: (event: PaymentEventResult) => void;
+  /** Receives every event listed in `options.subscriptionEvents`; branch on `event.eventName`. */
+  onChange?: (event: PaymentEvent) => void;
+  /** Fires when the CVC input gains focus; no subscription needed. */
   onFocus?: () => void;
+  /** Fires once the widget has rendered (it makes no API calls); no subscription needed. */
   onReady?: () => void;
+  /** Fires when the CVC input loses focus; no subscription needed. */
   onBlur?: () => void;
   onPaymentResult?: (result: PaymentResult) => void;
   style?: ViewStyle;
@@ -47,7 +54,7 @@ export const CVCElement = forwardRef<CVCWidgetRef, CVCElementProps>(
     const { paymentSessionConfig, hyperswitchConfig } =
       useHyperElementsContext();
     const viewRef = useRef(null);
-    const viewTag = useNativeViewTag(viewRef, onReady);
+    const viewTag = useNativeViewTag(viewRef);
 
     const shouldRegister = id !== undefined && viewTag !== undefined;
     useEffect(() => {
@@ -69,16 +76,7 @@ export const CVCElement = forwardRef<CVCWidgetRef, CVCElementProps>(
         | undefined;
       const layout = opts?.paymentMethodLayout;
       return {
-        ...opts,
-        /* Normalize legacy subscription names to the bundle's camelCase
-           taxonomy before they reach native. */
-        ...(opts?.subscribedEvents
-          ? {
-              subscribedEvents: normalizeSubscribedEvents(
-                opts.subscribedEvents as string[]
-              ),
-            }
-          : {}),
+        ...withNativeSubscription(opts ?? {}),
         paymentMethodLayout: {
           ...layout,
           savedMethodCustomization: {
@@ -90,36 +88,12 @@ export const CVCElement = forwardRef<CVCWidgetRef, CVCElementProps>(
     }, [options]);
 
     const onPaymentEventInternal = (event: PaymentEventNative) => {
-      onChange?.(event.nativeEvent);
-
-      if (event.nativeEvent.eventName === 'cvcStatusChange') {
-        try {
-          const payloadString = event.nativeEvent.payload;
-          const outerDict = (
-            typeof payloadString === 'string'
-              ? JSON.parse(payloadString)
-              : payloadString
-          ) as Record<string, unknown> | undefined;
-          if (!outerDict) {
-            return;
-          }
-          const cvcStatus = outerDict.cvcStatus as
-            Record<string, unknown> | undefined;
-          if (!cvcStatus) {
-            return;
-          }
-          const isCvcFocused = Boolean(cvcStatus.isCvcFocused);
-          const isCvcBlur = Boolean(cvcStatus.isCvcBlur);
-          if (isCvcFocused) {
-            onFocus?.();
-          }
-          if (isCvcBlur) {
-            onBlur?.();
-          }
-        } catch {
-          // Ignore malformed native events
-        }
-      }
+      routeWidgetEvent(event.nativeEvent, {
+        onChange,
+        onReady,
+        onFocus,
+        onBlur,
+      });
     };
 
     const onPaymentResultInternal = (event: {

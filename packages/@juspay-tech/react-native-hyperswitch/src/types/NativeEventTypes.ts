@@ -5,6 +5,7 @@ import type {
   HyperswitchConfiguration,
   PaymentSessionConfiguration,
 } from './definitions';
+import type { SubscriptionEvent } from './PaymentSheetConfiguration';
 
 /** Result payload delivered by the widget bridge for a single payment attempt. */
 export type PaymentResultNative = {
@@ -18,9 +19,10 @@ export type paymentResult = PaymentResultNative;
 /** @deprecated Use {@link PaymentResultNative}. */
 export type paymentResultEvent = PaymentResultNative;
 
-/** Card metadata emitted by the card widget for `CARD_STATUS`-style events. */
+/** Payload of `cardDetailsChange`. */
 export type CardInfo = {
   bin: string | undefined;
+  extendedBin?: string;
   last4: string | undefined;
   brand: string | undefined;
   expiryMonth: string | undefined;
@@ -56,24 +58,41 @@ export type PaymentMethodInfoAddress = {
 /** @deprecated Use {@link PaymentMethodInfoAddress}. */
 export type paymentMethodInfoAddress = PaymentMethodInfoAddress;
 
+/** Payload of `cvcStatusChange`; the status is nested under `cvcStatus`. */
 export type CvcStatusEvent = {
-  isCvcFocused: boolean;
-  isCvcBlur: boolean;
-  isCvcEmpty: boolean;
+  cvcStatus: {
+    isCvcEmpty: boolean;
+    isCvcComplete: boolean;
+  };
 };
 /** @deprecated Use {@link CvcStatusEvent}. */
 export type cvcStatusEvent = CvcStatusEvent;
 
-/** Structured payload delivered via the widget's `onPaymentEvent` callback. */
-export type PaymentEventResult = {
+/**
+ * Delivered to `onChange` for every event listed in `subscriptionEvents`;
+ * branch on `eventName`.
+ */
+export type PaymentEvent = {
+  eventName: SubscriptionEvent | (string & {});
+  payload: Record<string, unknown>;
+};
+
+/**
+ * @deprecated Use {@link PaymentEvent}. Breaking: `payload` is now a parsed
+ * object, no longer a JSON string, so drop any `JSON.parse(event.payload)`.
+ */
+export type PaymentEventResult = PaymentEvent;
+/** @deprecated Use {@link PaymentEvent}. Breaking: `payload` is now an object. */
+export type paymentEventResult = PaymentEvent;
+
+/** Wire shape from native: `payload` is a JSON string (codegen constraint). */
+export type PaymentEventWire = {
   eventName: string;
   payload: string;
 };
-/** @deprecated Use {@link PaymentEventResult}. */
-export type paymentEventResult = PaymentEventResult;
 
-/** React Native codegen envelope wrapping {@link PaymentEventResult}. */
-export type PaymentEventNative = { nativeEvent: PaymentEventResult };
+/** React Native codegen envelope wrapping {@link PaymentEventWire}. */
+export type PaymentEventNative = { nativeEvent: PaymentEventWire };
 /** @deprecated Use {@link PaymentEventNative}. */
 export type paymentEventNative = PaymentEventNative;
 

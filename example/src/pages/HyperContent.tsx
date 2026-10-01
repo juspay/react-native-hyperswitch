@@ -19,7 +19,7 @@ import {
   type CustomerLastUsedPaymentMethod,
   type CustomerSavedPaymentMethodsSession,
   type PaymentElementHandle,
-  type PaymentEventResult,
+  type PaymentEvent,
   type PaymentResult,
 } from "@juspay-tech/react-native-hyperswitch";
 
@@ -147,7 +147,7 @@ const PAYMENT_ELEMENT_OPTIONS = {
 
   splitCardFields: true,
 
-  subscribedEvents: [
+  subscriptionEvents: [
     "paymentMethodChange",
     "billingDetailsChange",
     "cardDetailsChange",
@@ -304,19 +304,29 @@ export function HyperContent(props: SharedProps) {
   }, [lastUsed]);
 
   const handlePaymentElementChange = useCallback(
-    (event: PaymentEventResult) => {
-      console.log("[Example] PaymentElement onChange:", JSON.stringify(event));
-
-      if (event.eventName !== "paymentMethodChange") {
-        return;
+    (event: PaymentEvent) => {
+      // One handler for every subscribed event; branch on its name.
+      switch (event.eventName) {
+        case "paymentMethodChange":
+          console.log(
+            "[Example] payment method:",
+            event.payload.paymentMethod,
+            event.payload.paymentMethodType,
+          );
+          setPaymentElementReady(true);
+          break;
+        case "cardDetailsChange":
+          console.log("[Example] card:", event.payload.brand, event.payload.bin);
+          break;
+        case "formStatusChange":
+          console.log("[Example] form status:", event.payload.status);
+          break;
+        case "billingDetailsChange":
+          console.log("[Example] billing:", JSON.stringify(event.payload));
+          break;
+        default:
+          console.log("[Example] PaymentElement onChange:", JSON.stringify(event));
       }
-
-      console.log(
-        "[Example] PaymentElement ready from paymentMethodChange",
-        JSON.stringify(event.payload),
-      );
-
-      setPaymentElementReady(true);
     },
     [],
   );
@@ -481,9 +491,12 @@ export function HyperContent(props: SharedProps) {
         placeholder: "123",
         appearance: CVC_APPEARANCE,
         cvcIcon: "hidden",
-        subscribedEvents: ["cvcStatusChange"],
+        subscriptionEvents: ["cvcStatusChange"],
       }}
       onReady={handleCvcReady}
+      onChange={(event) =>
+        console.log("[Example] CvcWidget onChange:", event.eventName, JSON.stringify(event.payload))
+      }
       onFocus={() => console.log("[Example] CvcWidget focused")}
       onBlur={() => console.log("[Example] CvcWidget blurred")}
       style={{
@@ -574,15 +587,11 @@ export function HyperContent(props: SharedProps) {
           onPaymentResult={handlePaymentResult}
           onChange={handlePaymentElementChange}
           onReady={() => {
-            /**
-             * onReady tells us the native widget exists,
-             * but we intentionally DO NOT enable confirm here.
-             *
-             * Confirm is enabled only after
-             * paymentMethodChange.
-             */
+            // Confirm stays gated on paymentMethodChange (a method actually selected).
             console.log("[Example] PaymentElement onReady");
           }}
+          onFocus={() => console.log("[Example] PaymentElement focused")}
+          onBlur={() => console.log("[Example] PaymentElement blurred")}
           style={{
             width: "100%",
             height: "100%",
