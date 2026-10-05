@@ -51,7 +51,6 @@ open class PaymentWidgetView : FrameLayout {
   private var resultListener: PaymentResultListener? = null
 
   private var confirmPaymentClickListener: ConfirmPaymentClickListener? = null
-  private var subscribedEvents: List<String> = emptyList()
 
   private var onEventCallback: PaymentEventListener? = null
   private var activeLayoutChangeListener: OnLayoutChangeListener? = null
@@ -170,10 +169,6 @@ open class PaymentWidgetView : FrameLayout {
   fun onEvent(listener: PaymentEventListener) {
     this.onEventCallback = listener
     this.fragment?.setOnEventCallback(listener)
-  }
-
-  fun setSubscribedEvents(events: List<String>) {
-    this.subscribedEvents = events
   }
 
   fun getLaunchOptions(): Bundle {

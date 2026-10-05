@@ -11,6 +11,8 @@ class PaymentWidgetResult(
 
   override fun getEventName() = "onPaymentResult"
 
+  override fun canCoalesce() = false
+
   override fun getEventData() = Arguments.createMap().apply {
     putString("eventName", "onPaymentResult")
     putString(

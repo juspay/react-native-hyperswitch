@@ -62,19 +62,24 @@ export interface Font {
 }
 
 /*
- * Event names as emitted by the shared JS bundle. Legacy SCREAMING_SNAKE
- * names are still accepted at runtime and transparently normalized to these
- * (see utils/EventValidator.ts), but they are intentionally not part of the
- * public type.
+ * Event names emitted by the shared JS bundle. Legacy names
+ * (LegacySubscriptionEvent) are accepted only in the deprecated `subscribedEvents`.
  */
 export type SubscriptionEvent =
   | 'cardDetailsChange'
   | 'paymentMethodChange'
   | 'formStatusChange'
   | 'billingDetailsChange'
-  | 'cvcStatusChange'
-  | 'surchargeInfo'
-  | 'appliedOffersInfo';
+  | 'cvcStatusChange';
+
+/** @deprecated Old event names, accepted only in deprecated `subscribedEvents`. */
+export type LegacySubscriptionEvent =
+  | 'PAYMENT_METHOD_INFO_CARD'
+  | 'PAYMENT_METHOD_STATUS'
+  | 'FORM_STATUS'
+  | 'PAYMENT_METHOD_INFO_ADDRESS'
+  | 'PAYMENT_METHOD_INFO_BILLING_ADDRESS'
+  | 'CVC_STATUS';
 
 export type Theme =
   | 'Default'
@@ -343,7 +348,13 @@ export interface PaymentSheetConfiguration {
   savedPaymentSheetHeaderLabel?: string;
   netceteraSDKApiKey?: string;
   locale?: Locale;
-  subscribedEvents?: SubscriptionEvent[];
+  /**
+   * Events delivered to the PaymentElement's `onChange`; nothing is emitted
+   * for events not listed. `presentPaymentSheet` ignores it (no sheet events on RN).
+   */
+  subscriptionEvents?: SubscriptionEvent[];
+  /** @deprecated Use `subscriptionEvents`. */
+  subscribedEvents?: (SubscriptionEvent | LegacySubscriptionEvent)[];
   customer?: CustomerConfiguration;
   placeholder?: Placeholder;
   billingDetails?: AddressDetails;

@@ -195,10 +195,6 @@ public class NativePaymentWidgetView: UIView {
         )
     }
 
-    private func subscribedEvents() -> [String] {
-        return options?["subscribedEvents"] as? [String] ?? []
-    }
-
     private func clearWidget() {
         paymentWidget?.removeFromSuperview()
         cvcWidget?.removeFromSuperview()
@@ -265,9 +261,14 @@ public class NativePaymentWidgetView: UIView {
         configuration["type"] = widgetType
 
         let listener = PaymentEventListener { [weak self] event in
+            // Codegen types the payload as a string on every platform; JS parses it.
+            let payloadData = JSONSerialization.isValidJSONObject(event.payload)
+                ? try? JSONSerialization.data(withJSONObject: event.payload)
+                : nil
+            let payload = payloadData.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
             self?.onPaymentEvent?([
                 "eventName": event.type,
-                "payload": event.payload,
+                "payload": payload,
             ])
         }
 
