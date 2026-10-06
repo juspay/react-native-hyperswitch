@@ -28,6 +28,8 @@ type confirmRequest = {
   timeoutMs?: int,
 
   signal?: abortSignal,
+
+  log?: LoggerTypes.apiLogEvent => unit,
 }
 
 type vaultCardMetadata = {
@@ -132,7 +134,7 @@ let publicMessageForCode = (code: string) =>
   | _ => None
   }
 
-let readSessionId = (decoded: string): option<string> =>
+let readClaim = (decoded: string, claim: string): option<string> =>
   decoded
   ->String.split(",")
   ->Array.reduce(None, (found, pair) =>
@@ -145,10 +147,13 @@ let readSessionId = (decoded: string): option<string> =>
       } else {
         let key = pair->String.slice(~start=0, ~end=separator)->String.trim
         let value = pair->String.sliceToEnd(~start=separator + 1)->String.trim
-        key === "payment_method_session_id" && value->String.length > 0 ? Some(value) : None
+        key === claim && value->String.length > 0 ? Some(value) : None
       }
     }
   )
+
+let readSessionId = (decoded: string): option<string> =>
+  decoded->readClaim("payment_method_session_id")
 
 let resolveSessionId = (sdkAuthorization: string): result<string, confirmOutcome> =>
   if sdkAuthorization->String.trim->String.length === 0 {
@@ -212,8 +217,15 @@ let validateCard = (card: cardDetails): option<confirmOutcome> => {
   }
 }
 
+let normalizeEnvironment = (environment: vaultEnvironment): vaultEnvironment =>
+  switch (environment :> string) {
+  | "SANDBOX" => #SANDBOX
+  | "INTEG" => #INTEG
+  | _ => #PROD
+  }
+
 let vaultBaseUrl = (environment: vaultEnvironment) =>
-  switch environment {
+  switch environment->normalizeEnvironment {
   | #PROD => "https://live.hyperswitch.io/api"
   | #SANDBOX => "https://app.hyperswitch.io/api"
   | #INTEG => "https://integ.hyperswitch.io/api"
@@ -370,6 +382,16 @@ type timerId
 @val external setTimeout: (unit => unit, int) => timerId = "setTimeout"
 @val external clearTimeout: timerId => unit = "clearTimeout"
 
+// Why a request produced no response, for the 504 log line. Never the exception's text.
+let failureReason = (~timedOut: bool, ~signal: option<abortSignal>) =>
+  if timedOut {
+    "timeout"
+  } else if signal->Option.mapOr(false, signalAborted) {
+    "aborted"
+  } else {
+    "network_error"
+  }
+
 let confirmPaymentMethodSession = async (request: confirmRequest): confirmOutcome => {
   switch request.card->validateCard {
   | Some(invalid) => invalid
@@ -420,6 +442,12 @@ let confirmPaymentMethodSession = async (request: confirmRequest): confirmOutcom
         signal: ?Some(controller->controllerSignal),
       }
 
+      let startedAt = VaultApiLog.request(
+        request.log,
+        ~initEvent=PAYMENT_METHOD_SESSION_CONFIRM_CALL_INIT,
+        ~url,
+      )
+
       let attempted = try {
         Ok(await fetch(url, options))
       } catch {
@@ -430,6 +458,13 @@ let confirmPaymentMethodSession = async (request: confirmRequest): confirmOutcom
 
       switch attempted {
       | Error() =>
+        VaultApiLog.failed(
+          request.log,
+          ~eventName=PAYMENT_METHOD_SESSION_CONFIRM_CALL,
+          ~url,
+          ~startedAt,
+          ~reason=failureReason(~timedOut=timedOut.contents, ~signal=request.signal),
+        )
 
         unknownOutcomeError(
           timedOut.contents
@@ -443,6 +478,16 @@ let confirmPaymentMethodSession = async (request: confirmRequest): confirmOutcom
         } catch {
         | _ => None
         }
+
+        VaultApiLog.responded(
+          request.log,
+          ~eventName=PAYMENT_METHOD_SESSION_CONFIRM_CALL,
+          ~url,
+          ~startedAt,
+          ~status,
+          ~ok=response->responseOk,
+          ~body=parsed,
+        )
 
         if response->responseOk {
           switch parsed {

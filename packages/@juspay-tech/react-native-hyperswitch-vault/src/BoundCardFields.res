@@ -1,5 +1,29 @@
 open ReactNative
 
+let fieldName = (kind: VaultCardController.widgetKind) =>
+  switch kind {
+  | CardNumberKind => "cardNumber"
+  | ExpiryKind => "cardExpiry"
+  | CvcKind => "cardCvc"
+  | CardholderNameKind => "cardholderName"
+  }
+
+// FIELD_MOUNTED when the field mounts; FIELD_RENDERED once its first frame is drawn.
+let useFieldTelemetry = (ctx: VaultWidgetContext.contextValue, kind) => {
+  let telemetry = ctx.telemetry
+  React.useEffect0(() => {
+    let value = fieldName(kind)
+    telemetry.fieldMounted(value)
+    let cancelFrame = VaultTelemetry.afterNextFrame(() => telemetry.fieldRendered(value))
+    Some(
+      () => {
+        cancelFrame()
+        telemetry.fieldUnmounted(value)
+      },
+    )
+  })
+}
+
 let useBinding = (
   ctx: VaultWidgetContext.contextValue,
   kind: VaultCardController.widgetKind,
@@ -8,6 +32,7 @@ let useBinding = (
 ) => {
   let register = ctx.controller.register
   React.useEffect0(() => Some(register(kind)))
+  useFieldTelemetry(ctx, kind)
   message =>
     <VaultWidgetContext.ErrorText
       message
@@ -60,32 +85,34 @@ module Number = {
       ~errorStyle=?styles->CardFieldStyles.errorOf,
     )
     let controller = ctx.controller
-    <CardFields.Number
-      ?styles
-      value=controller.values.cardNumber
-      onChange=controller.onNumberChange
-      currentBrand=controller.values.brand
-      onFocus={() => {
-        controller.onFocus(#cardNumber)
-        fire(onFocus, #cardNumber)
-      }}
-      onBlur={() => {
-        controller.onBlur(#cardNumber)
-        fire(onBlur, #cardNumber)
-      }}
-      onBackspace={action => controller.onBackspace(#cardNumber, action)}
-      error=?controller.visibleErrors.cardNumber
-      isValid=controller.fieldOk.cardNumber
-      renderError={renderError->Option.getOr(defaultRenderError)}
-      options=resolved
-      common={ctx->VaultWidgetContext.commonFor}
-      onAnalytics=ctx.onAnalytics
-      reference=controller.cardRef
-      iconRight
-      ?borderBottomWidth
-      ?borderBottomLeftRadius
-      ?borderBottomRightRadius
-    />
+    <LoggerCrashBoundary onCrash=ctx.telemetry.crash>
+      <CardFields.Number
+        ?styles
+        value=controller.values.cardNumber
+        onChange=controller.onNumberChange
+        currentBrand=controller.values.brand
+        onFocus={() => {
+          controller.onFocus(#cardNumber)
+          fire(onFocus, #cardNumber)
+        }}
+        onBlur={() => {
+          controller.onBlur(#cardNumber)
+          fire(onBlur, #cardNumber)
+        }}
+        onBackspace={action => controller.onBackspace(#cardNumber, action)}
+        error=?controller.visibleErrors.cardNumber
+        isValid=controller.fieldOk.cardNumber
+        renderError={renderError->Option.getOr(defaultRenderError)}
+        options=resolved
+        common={ctx->VaultWidgetContext.commonFor}
+        onAnalytics=ctx.onAnalytics
+        reference=controller.cardRef
+        iconRight
+        ?borderBottomWidth
+        ?borderBottomLeftRadius
+        ?borderBottomRightRadius
+      />
+    </LoggerCrashBoundary>
   }
 }
 
@@ -113,27 +140,30 @@ module CardholderName = {
 
     let controller = ctx.controller
     React.useEffect0(() => Some(controller.register(VaultCardController.CardholderNameKind)))
-    <CardFields.CardholderName
-      ?styles
-      value=controller.values.cardholderName
-      onChange=controller.onCardholderNameChange
-      onFocus={() => {
-        controller.onFocus(#cardholderName)
-        fire(onFocus, #cardholderName)
-      }}
-      onBlur={() => {
-        controller.onBlur(#cardholderName)
-        fire(onBlur, #cardholderName)
-      }}
-      renderError=?renderError
-      options=resolved
-      common={ctx->VaultWidgetContext.commonFor}
-      onAnalytics=ctx.onAnalytics
-      reference=controller.cardholderRef
-      ?borderBottomWidth
-      ?borderBottomLeftRadius
-      ?borderBottomRightRadius
-    />
+    useFieldTelemetry(ctx, VaultCardController.CardholderNameKind)
+    <LoggerCrashBoundary onCrash=ctx.telemetry.crash>
+      <CardFields.CardholderName
+        ?styles
+        value=controller.values.cardholderName
+        onChange=controller.onCardholderNameChange
+        onFocus={() => {
+          controller.onFocus(#cardholderName)
+          fire(onFocus, #cardholderName)
+        }}
+        onBlur={() => {
+          controller.onBlur(#cardholderName)
+          fire(onBlur, #cardholderName)
+        }}
+        renderError=?renderError
+        options=resolved
+        common={ctx->VaultWidgetContext.commonFor}
+        onAnalytics=ctx.onAnalytics
+        reference=controller.cardholderRef
+        ?borderBottomWidth
+        ?borderBottomLeftRadius
+        ?borderBottomRightRadius
+      />
+    </LoggerCrashBoundary>
   }
 }
 
@@ -169,34 +199,36 @@ module Expiry = {
       ~errorStyle=?styles->CardFieldStyles.errorOf,
     )
     let controller = ctx.controller
-    <CardFields.Expiry
-      ?styles
-      value=controller.values.expiryDisplay
-      onChange=controller.onExpiryChange
-      onFocus={() => {
-        controller.onFocus(#cardExpiry)
-        fire(onFocus, #cardExpiry)
-      }}
-      onBlur={() => {
-        controller.onBlur(#cardExpiry)
-        fire(onBlur, #cardExpiry)
-      }}
-      onBackspace={action => controller.onBackspace(#cardExpiry, action)}
-      error=?controller.visibleErrors.cardExpiry
-      isValid=controller.fieldOk.cardExpiry
-      renderError={renderError->Option.getOr(defaultRenderError)}
-      options=resolved
-      common={ctx->VaultWidgetContext.commonFor}
-      onAnalytics=ctx.onAnalytics
-      reference=controller.expiryRef
-      ?borderTopWidth
-      ?borderRightWidth
-      ?borderTopLeftRadius
-      ?borderTopRightRadius
-      ?borderBottomRightRadius
-      ?borderBottomWidth
-      ?borderBottomLeftRadius
-    />
+    <LoggerCrashBoundary onCrash=ctx.telemetry.crash>
+      <CardFields.Expiry
+        ?styles
+        value=controller.values.expiryDisplay
+        onChange=controller.onExpiryChange
+        onFocus={() => {
+          controller.onFocus(#cardExpiry)
+          fire(onFocus, #cardExpiry)
+        }}
+        onBlur={() => {
+          controller.onBlur(#cardExpiry)
+          fire(onBlur, #cardExpiry)
+        }}
+        onBackspace={action => controller.onBackspace(#cardExpiry, action)}
+        error=?controller.visibleErrors.cardExpiry
+        isValid=controller.fieldOk.cardExpiry
+        renderError={renderError->Option.getOr(defaultRenderError)}
+        options=resolved
+        common={ctx->VaultWidgetContext.commonFor}
+        onAnalytics=ctx.onAnalytics
+        reference=controller.expiryRef
+        ?borderTopWidth
+        ?borderRightWidth
+        ?borderTopLeftRadius
+        ?borderTopRightRadius
+        ?borderBottomRightRadius
+        ?borderBottomWidth
+        ?borderBottomLeftRadius
+      />
+    </LoggerCrashBoundary>
   }
 }
 
@@ -253,56 +285,58 @@ module Cvc = {
     let borderTopLeftRadius = borderTopLeftRadius->Option.getOr(ctx.theme.borderRadius)
     let borderTopRightRadius = borderTopRightRadius->Option.getOr(ctx.theme.borderRadius)
     let borderBottomLeftRadius = borderBottomLeftRadius->Option.getOr(ctx.theme.borderRadius)
-    <CardFields.Cvc
-      ?styles
-      value=controller.values.cvc
-      onChange=controller.onCvcChange
-      brand=controller.values.brand
-      onFocus={() => {
-        controller.onFocus(#cardCvc)
-        fire(onFocus, #cardCvc)
-      }}
-      onBlur={() => {
-        controller.onBlur(#cardCvc)
-        fire(onBlur, #cardCvc)
-      }}
-      onBackspace={action => controller.onBackspace(#cardCvc, action)}
-      error=?controller.visibleErrors.cardCvc
-      isValid=controller.fieldOk.cardCvc
-      renderError={renderError->Option.getOr(defaultRenderError)}
-      options=resolved
-      common={ctx->VaultWidgetContext.commonFor}
-      onAnalytics=ctx.onAnalytics
-      reference=controller.cvcRef
-      borderTopWidth
-      borderLeftWidth
-      borderTopLeftRadius
-      borderTopRightRadius
-      borderBottomLeftRadius
-      borderBottomRightRadius=ctx.theme.borderRadius
-      borderBottomWidth=ctx.theme.borderWidth
-      borderRightWidth=ctx.theme.borderWidth
-      iconRight={switch CardFieldOptions.cvcIconOf(options, ~unstyled=resolved.unstyled) {
-      | #hidden => CardInput.NoIcon
-      | #default =>
-        CardInput.CustomIcon(
-          <View
-            style={Style.s({
-              height: 46.->Style.dp,
-              display: #flex,
-              flexDirection: #row,
-              justifyContent: #center,
-              alignItems: #center,
-            })}>
-            <CardIcons.Cvc
-              size=32.
-              color={Validation.checkCardCVC(controller.values.cvc, controller.values.brand)
-                ? ctx.theme.primaryColor
-                : CardIcons.Cvc.restingColor}
-            />
-          </View>,
-        )
-      }}
-    />
+    <LoggerCrashBoundary onCrash=ctx.telemetry.crash>
+      <CardFields.Cvc
+        ?styles
+        value=controller.values.cvc
+        onChange=controller.onCvcChange
+        brand=controller.values.brand
+        onFocus={() => {
+          controller.onFocus(#cardCvc)
+          fire(onFocus, #cardCvc)
+        }}
+        onBlur={() => {
+          controller.onBlur(#cardCvc)
+          fire(onBlur, #cardCvc)
+        }}
+        onBackspace={action => controller.onBackspace(#cardCvc, action)}
+        error=?controller.visibleErrors.cardCvc
+        isValid=controller.fieldOk.cardCvc
+        renderError={renderError->Option.getOr(defaultRenderError)}
+        options=resolved
+        common={ctx->VaultWidgetContext.commonFor}
+        onAnalytics=ctx.onAnalytics
+        reference=controller.cvcRef
+        borderTopWidth
+        borderLeftWidth
+        borderTopLeftRadius
+        borderTopRightRadius
+        borderBottomLeftRadius
+        borderBottomRightRadius=ctx.theme.borderRadius
+        borderBottomWidth=ctx.theme.borderWidth
+        borderRightWidth=ctx.theme.borderWidth
+        iconRight={switch CardFieldOptions.cvcIconOf(options, ~unstyled=resolved.unstyled) {
+        | #hidden => CardInput.NoIcon
+        | #default =>
+          CardInput.CustomIcon(
+            <View
+              style={Style.s({
+                height: 46.->Style.dp,
+                display: #flex,
+                flexDirection: #row,
+                justifyContent: #center,
+                alignItems: #center,
+              })}>
+              <CardIcons.Cvc
+                size=32.
+                color={Validation.checkCardCVC(controller.values.cvc, controller.values.brand)
+                  ? ctx.theme.primaryColor
+                  : CardIcons.Cvc.restingColor}
+              />
+            </View>,
+          )
+        }}
+      />
+    </LoggerCrashBoundary>
   }
 }

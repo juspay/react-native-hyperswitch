@@ -28,6 +28,7 @@
     "src/jsx-global.ts",
     "src/merchantTypes.ts",
     "src/styleTypes.ts",
+    "src/telemetryTypes.ts",
     "src/*.gen.tsx",
     "src/bs-modules.d.ts"
   ]

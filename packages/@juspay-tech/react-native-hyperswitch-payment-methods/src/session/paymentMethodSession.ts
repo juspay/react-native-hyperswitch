@@ -3,6 +3,11 @@ import { attachCore } from '../core/formRegistry';
 import { resolveAdapter } from '../providers/registry';
 import { fetchVaultDetails } from './fetchVaultDetails';
 import type { HyperswitchConfiguration } from './config';
+import {
+  createTelemetry,
+  paymentMethodSessionIdOf,
+} from '../telemetry/telemetry';
+import type { Telemetry } from '../telemetry/telemetry';
 import type {
   Appearance,
   CardFormInstance,
@@ -28,7 +33,8 @@ export interface PaymentMethodSession {
 
 function createCardForm(
   vaultDetails: VaultDetails,
-  options: CreateCardFormOptions = {}
+  options: CreateCardFormOptions,
+  telemetry: Telemetry
 ): CardFormInstance {
   const adapter = resolveAdapter(vaultDetails.vaultType);
 
@@ -44,7 +50,8 @@ function createCardForm(
   const core = createFormCore(
     adapter,
     options.appearance ? [options.appearance] : [],
-    options.readyTimeoutMs
+    options.readyTimeoutMs,
+    telemetry
   );
 
   adapter.createCollector(data).then(
@@ -77,6 +84,14 @@ export async function initPaymentMethodSession(
   config: HyperswitchConfiguration,
   options: PaymentMethodSessionOptions
 ): Promise<PaymentMethodSession> {
+  /* One logging session per call: the call is the session's start. */
+  const telemetry = createTelemetry();
+  telemetry.configure(config);
+  telemetry.initiated(
+    'initPaymentMethodSession',
+    paymentMethodSessionIdOf(options.sdkAuthorization, options.vaultDetails)
+  );
+
   const resolved = options.vaultDetails
     ? { ok: true as const, vaultDetails: options.vaultDetails }
     : options.sdkAuthorization
@@ -84,6 +99,7 @@ export async function initPaymentMethodSession(
           sdkAuthorization: options.sdkAuthorization,
           environment: config.environment,
           customEndpoints: config.customEndpoints,
+          telemetry: telemetry.retrieveCall,
         })
       : {
           ok: false as const,
@@ -97,6 +113,6 @@ export async function initPaymentMethodSession(
   return {
     vaultDetails,
     createCardForm: (formOptions?: CreateCardFormOptions) =>
-      createCardForm(vaultDetails, formOptions),
+      createCardForm(vaultDetails, formOptions ?? {}, telemetry),
   };
 }

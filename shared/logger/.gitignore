@@ -1,0 +1,13 @@
+# Build output
+dist/
+*.tgz
+
+# ReScript artifacts: in-source .bs.js output and the build cache under lib/. The .gen.tsx
+# declarations are generated too, but they ARE tracked, as in the vault package.
+*.bs.js
+*.bs.js.map
+.bsb.lock
+lib/
+
+node_modules/
+.DS_Store

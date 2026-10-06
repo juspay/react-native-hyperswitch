@@ -1,0 +1,29 @@
+{
+  "name": "@juspay-tech/hyperswitch-logger",
+  "jsx": {
+    "version": 4
+  },
+  "package-specs": {
+    "module": "esmodule",
+    "in-source": true
+  },
+  "bsc-flags": [
+    "-bs-super-errors",
+    "-open RescriptCore"
+  ],
+  "suffix": ".bs.js",
+  "sources": [
+    {
+      "dir": "src",
+      "subdirs": true
+    }
+  ],
+  "bs-dependencies": [
+    "@rescript/react",
+    "@rescript/core"
+  ],
+  "gentypeconfig": {
+    "module": "esmodule",
+    "generatedFileExtension": ".gen.tsx"
+  }
+}

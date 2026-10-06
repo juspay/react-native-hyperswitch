@@ -607,6 +607,55 @@ describe('resolving the vault from an sdkAuthorization', () => {
     );
   });
 
+  it('picks the backend by priority: customEndpoints, then environment, then PROD, never the key', async () => {
+    installMock({ vaultType: 'vgs' });
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => vgsSession,
+    });
+    const cases: Array<[object, string]> = [
+      [{ publishableKey: 'pk_snd_x' }, 'https://live.hyperswitch.io/api'],
+      [
+        { publishableKey: 'pk_snd_x', environment: 'SANDBOX' },
+        'https://app.hyperswitch.io/api',
+      ],
+      [
+        { publishableKey: 'pk_snd_x', environment: 'INTEG' },
+        'https://integ.hyperswitch.io/api',
+      ],
+      [
+        { publishableKey: 'pk_prd_x', environment: 'production' },
+        'https://live.hyperswitch.io/api',
+      ],
+      [
+        {
+          publishableKey: 'pk_prd_x',
+          environment: 'SANDBOX',
+          customEndpoints: { commonEndpoint: 'https://eu.hyperswitch.io/api' },
+        },
+        'https://eu.hyperswitch.io/api',
+      ],
+    ];
+
+    for (const [config, base] of cases) {
+      fetchMock.mockClear();
+      const view = render(
+        <HyperPaymentMethodSession
+          hyper={config as never}
+          options={{ sdkAuthorization: VALID_AUTH }}
+        >
+          <VaultProbe />
+        </HyperPaymentMethodSession>
+      );
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      expect(fetchMock.mock.calls[0]![0]).toBe(
+        `${base}/v1/payment-method-sessions/0a_pms_0192`
+      );
+      view.unmount();
+    }
+  });
+
   it('skips the lookup entirely when vaultDetails is supplied too', async () => {
     installMock({ vaultType: 'skyflow' });
     const ref = createRef<CardFormHandle>();

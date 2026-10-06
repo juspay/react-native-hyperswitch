@@ -33,6 +33,8 @@ let make = React.forwardRef((
 
     "unstyled": option<bool>,
     "children": React.element,
+
+    "logSink": option<VaultTelemetry.logSink>,
   },
   ref,
 ) => {
@@ -49,6 +51,9 @@ let make = React.forwardRef((
     ~enabledCardSchemes=props["enabledCardSchemes"]->Option.getOr([]),
     ~eligibility=props["eligibility"],
     ~vaultEndpoint=VaultEndpoint.configOf(props["customEndpoints"]),
+    ~customEndpoints=props["customEndpoints"],
+    ~logSink=props["logSink"],
+    ~entry="CardForm",
     ~cardholderNameMode=props["cardholderName"]->Option.getOr(#collect),
     ~onReady=props["onReady"],
     ~onChange=props["onChange"],

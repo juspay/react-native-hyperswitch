@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
 } from 'react';
+import { CrashBoundary } from '../telemetry/vendor/hyperswitch-logger';
 import { useFormBinding } from './useFormBinding';
 import { resolveFieldStyles } from '../core/appearance';
 import {
@@ -24,6 +25,7 @@ import type {
 } from '../core/types';
 import { Placeholder } from './Placeholder';
 import type { FieldProps } from './types';
+import { afterNextFrame } from '../telemetry/telemetry';
 
 type AliasProps = FieldProps & { cvcIcon?: CvcIconDisplay };
 
@@ -138,6 +140,19 @@ export function createCardField<P extends FieldProps = FieldProps>(
       if (mounted) onReadyRef.current?.({ elementType });
     }, [mounted]);
 
+    /* FIELD_MOUNTED when this field mounts; FIELD_RENDERED once the provider's field (not the
+       placeholder) has drawn its first frame. */
+    const telemetry = ctx?.telemetry ?? null;
+    useEffect(() => {
+      if (!telemetry) return;
+      telemetry.fieldMounted(elementType);
+      return () => telemetry.fieldUnmounted(elementType);
+    }, [telemetry]);
+    useEffect(() => {
+      if (!mounted || !telemetry) return;
+      return afterNextFrame(() => telemetry.fieldRendered(elementType));
+    }, [mounted, telemetry]);
+
     if (!ctx) {
       throw new Error(
         `${displayName} needs a form: render it inside <CardForm>, or pass form={cardForm}.`
@@ -145,29 +160,35 @@ export function createCardField<P extends FieldProps = FieldProps>(
     }
 
     if (ctx.adapter === null || ctx.collector === undefined) {
-      return <Placeholder elementType={elementType} styles={styles} />;
+      return (
+        <CrashBoundary onCrash={telemetry?.crash}>
+          <Placeholder elementType={elementType} styles={styles} />
+        </CrashBoundary>
+      );
     }
 
     const Field = ctx.adapter.Field;
     return (
-      <Field
-        {...rest}
-        elementType={elementType}
-        collector={ctx.collector}
-        fieldRef={fieldRef}
-        styles={styles}
-        placeholder={placeholder}
-        label={label}
-        labelBehavior={labelBehavior}
-        errorDisplay={errorDisplay}
-        unstyled={unstyled}
-        cvcIcon={cvcIcon}
-        cardBrandIcon={cardBrandIcon}
-        savedCard={savedCard}
-        onChange={handleChange}
-        onFocus={onFocus}
-        onBlur={onBlur}
-      />
+      <CrashBoundary onCrash={telemetry?.crash}>
+        <Field
+          {...rest}
+          elementType={elementType}
+          collector={ctx.collector}
+          fieldRef={fieldRef}
+          styles={styles}
+          placeholder={placeholder}
+          label={label}
+          labelBehavior={labelBehavior}
+          errorDisplay={errorDisplay}
+          unstyled={unstyled}
+          cvcIcon={cvcIcon}
+          cardBrandIcon={cardBrandIcon}
+          savedCard={savedCard}
+          onChange={handleChange}
+          onFocus={onFocus}
+          onBlur={onBlur}
+        />
+      </CrashBoundary>
     );
   });
 

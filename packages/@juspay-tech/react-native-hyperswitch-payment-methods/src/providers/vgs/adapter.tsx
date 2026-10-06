@@ -174,16 +174,25 @@ async function readResponseBody(response: any): Promise<unknown> {
 
 const tokenize: ProviderAdapter['tokenize'] = async (
   collector,
-  providerData
+  providerData,
+  telemetry
 ): Promise<TokenizeResult> => {
   const options = (providerData ?? {}) as VgsTokenizeOptions;
   const vgs = collector as VGSCollect;
   try {
-    const { status, response } = await vgs.submit(
-      options.path ?? '/post',
-      options.method ?? 'POST',
-      options.extraData
-    );
+    let submitted: { status: number; response: unknown };
+    try {
+      submitted = await vgs.submit(
+        options.path ?? '/post',
+        options.method ?? 'POST',
+        options.extraData
+      );
+    } catch (error) {
+      telemetry?.vgsSubmitStatus(null);
+      throw error;
+    }
+    const { status, response } = submitted;
+    telemetry?.vgsSubmitStatus(status);
     const body = await readResponseBody(response);
 
     if (status >= 200 && status < 300) {
