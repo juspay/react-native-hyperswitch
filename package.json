@@ -14,6 +14,7 @@
   },
   "workspaces": [
     "packages/@juspay-tech/*",
+    "shared/*",
     "example"
   ],
   "devDependencies": {

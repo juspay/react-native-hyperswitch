@@ -83,6 +83,7 @@ export type {
   ProviderHostProps,
   ProviderFieldProps,
 } from './core/ProviderAdapter';
+export type { AdapterTelemetry } from './telemetry/telemetry';
 
 export type { HyperswitchVaultData } from './providers/hyperswitch/types';
 export type { VgsVaultData, VgsTokenizeOptions } from './providers/vgs/types';

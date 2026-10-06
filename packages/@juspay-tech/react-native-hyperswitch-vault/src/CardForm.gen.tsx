@@ -21,6 +21,8 @@ import type {eligibilityConfig as VaultFormOptions_eligibilityConfig} from './Va
 
 import type {localisation as VaultFormOptions_localisation} from './VaultFormOptions.gen';
 
+import type {logSink as VaultTelemetry_logSink} from './VaultTelemetry.gen';
+
 import type {vaultDetails as VaultDetails_vaultDetails} from './VaultDetails.gen';
 
 import type {vaultEnvironment as VaultFormOptions_vaultEnvironment} from './VaultFormOptions.gen';
@@ -45,6 +47,7 @@ export type Props = {
   readonly environment: VaultFormOptions_vaultEnvironment; 
   readonly locale?: string; 
   readonly localisation?: VaultFormOptions_localisation; 
+  readonly logSink?: VaultTelemetry_logSink; 
   readonly onChange?: (_1:VaultPublicState_cardFormChange) => void; 
   readonly onReady?: (_1:VaultPublicState_cardFormEvent) => void; 
   readonly sdkAuthorization?: string; 
@@ -65,6 +68,7 @@ export const make: React.ComponentType<{
   readonly environment: VaultFormOptions_vaultEnvironment; 
   readonly locale?: string; 
   readonly localisation?: VaultFormOptions_localisation; 
+  readonly logSink?: VaultTelemetry_logSink; 
   readonly onChange?: (_1:VaultPublicState_cardFormChange) => void; 
   readonly onReady?: (_1:VaultPublicState_cardFormEvent) => void; 
   readonly sdkAuthorization?: string; 

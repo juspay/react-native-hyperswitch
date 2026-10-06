@@ -3760,6 +3760,25 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@juspay-tech/hyperswitch-logger@workspace:shared/logger":
+  version: 0.0.0-use.local
+  resolution: "@juspay-tech/hyperswitch-logger@workspace:shared/logger"
+  dependencies:
+    "@rescript/core": 1.6.1
+    "@rescript/react": 0.13.1
+    "@rollup/plugin-node-resolve": ^15.3.0
+    "@types/react": 19.0.0
+    react: 19.0.0
+    react-native: 0.79.7
+    rescript: 11.1.4
+    rollup: ^4.24.0
+    typescript: ^5.6.0
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  languageName: unknown
+  linkType: soft
+
 "@juspay-tech/react-native-hyperswitch-click-to-pay@workspace:packages/@juspay-tech/react-native-hyperswitch-click-to-pay":
   version: 0.0.0-use.local
   resolution: "@juspay-tech/react-native-hyperswitch-click-to-pay@workspace:packages/@juspay-tech/react-native-hyperswitch-click-to-pay"

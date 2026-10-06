@@ -6,6 +6,11 @@ import type { PaymentMethodsSession } from './SessionContext';
 import type { HyperswitchConfiguration } from './config';
 import { fetchVaultDetails } from './fetchVaultDetails';
 import type { Appearance, VaultDetails } from '../core/types';
+import {
+  createTelemetry,
+  paymentMethodSessionIdOf,
+} from '../telemetry/telemetry';
+import { TelemetryContext } from '../telemetry/TelemetryContext';
 
 interface CommonOptions {
   appearance?: Appearance;
@@ -49,6 +54,10 @@ export function HyperPaymentMethodSession({
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
 
+  /* One logging session per mount. */
+  const [telemetry] = useState(createTelemetry);
+  useEffect(() => () => telemetry.dispose(), [telemetry]);
+
   const immediateOptions = isPromiseLike(options) ? null : options;
   const [awaitedOptions, setAwaitedOptions] =
     useState<HyperPaymentMethodSessionOptions | null>(null);
@@ -85,6 +94,13 @@ export function HyperPaymentMethodSession({
   const providedVaultDetails = resolvedOptions?.vaultDetails;
   const sdkAuthorization = resolvedOptions?.sdkAuthorization;
 
+  /* During the first render, so it precedes the fields' mount events (it is idempotent). With
+     promised options the session id is not known yet and is logged empty. */
+  telemetry.initiated(
+    'HyperPaymentMethodSession',
+    paymentMethodSessionIdOf(sdkAuthorization, providedVaultDetails)
+  );
+
   const [resolvedHyper, setResolvedHyper] =
     useState<HyperswitchConfiguration | null>(null);
   const [hyperError, setHyperError] = useState<Error | null>(null);
@@ -94,6 +110,10 @@ export function HyperPaymentMethodSession({
   // const [fetchedExpiry, setFetchedExpiry] = useState<string | null>(null);
   const [vaultLoading, setVaultLoading] = useState(false);
   const [vaultError, setVaultError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    if (resolvedHyper) telemetry.configure(resolvedHyper);
+  }, [resolvedHyper, telemetry]);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,6 +161,7 @@ export function HyperPaymentMethodSession({
       environment: resolvedHyper.environment,
       customEndpoints: resolvedHyper.customEndpoints,
       signal: controller.signal,
+      telemetry: telemetry.retrieveCall,
     }).then((result) => {
       if (cancelled) return;
       if (result.ok) {
@@ -161,7 +182,7 @@ export function HyperPaymentMethodSession({
       cancelled = true;
       controller.abort();
     };
-  }, [providedVaultDetails, sdkAuthorization, resolvedHyper]);
+  }, [providedVaultDetails, sdkAuthorization, resolvedHyper, telemetry]);
 
   const optionsPending = resolvedOptions === null && optionsError === null;
 
@@ -193,6 +214,10 @@ export function HyperPaymentMethodSession({
   );
 
   return (
-    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+    <TelemetryContext.Provider value={telemetry}>
+      <SessionContext.Provider value={value}>
+        {children}
+      </SessionContext.Provider>
+    </TelemetryContext.Provider>
   );
 }

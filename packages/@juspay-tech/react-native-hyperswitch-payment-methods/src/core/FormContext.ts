@@ -10,6 +10,7 @@ import type {
   TokenizeResult,
   VaultType,
 } from './types';
+import type { Telemetry } from '../telemetry/telemetry';
 
 export interface FormContextValue {
   vaultType: VaultType | undefined;
@@ -26,6 +27,8 @@ export interface FormContextValue {
   registerField: (elementType: ElementType, options?: FieldOptions) => void;
 
   forgetField: (elementType: ElementType) => void;
+
+  telemetry: Telemetry | null;
 }
 
 export type { MountedField };

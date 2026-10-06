@@ -10,6 +10,8 @@ type updateRequest = {
   appId?: string,
   timeoutMs?: int,
   signal?: VaultConfirm.abortSignal,
+
+  log?: LoggerTypes.apiLogEvent => unit,
 }
 
 let updateUrl = (~baseUrl, ~sessionId) =>
@@ -86,6 +88,12 @@ let updateSavedPaymentMethod = async (
         signal: ?Some(controller->VaultConfirm.controllerSignal),
       }
 
+      let startedAt = VaultApiLog.request(
+        request.log,
+        ~initEvent=PAYMENT_METHOD_SESSION_UPDATE_CALL_INIT,
+        ~url,
+      )
+
       let attempted = try {
         Ok(await VaultConfirm.fetch(url, options))
       } catch {
@@ -96,6 +104,13 @@ let updateSavedPaymentMethod = async (
 
       let outcome = switch attempted {
       | Error() =>
+        VaultApiLog.failed(
+          request.log,
+          ~eventName=PAYMENT_METHOD_SESSION_UPDATE_CALL,
+          ~url,
+          ~startedAt,
+          ~reason=VaultConfirm.failureReason(~timedOut=timedOut.contents, ~signal=request.signal),
+        )
         VaultConfirm.unknownOutcomeError(
           timedOut.contents
             ? "The vault did not respond in time; the outcome is unknown."
@@ -108,6 +123,16 @@ let updateSavedPaymentMethod = async (
         } catch {
         | _ => None
         }
+
+        VaultApiLog.responded(
+          request.log,
+          ~eventName=PAYMENT_METHOD_SESSION_UPDATE_CALL,
+          ~url,
+          ~startedAt,
+          ~status,
+          ~ok=response->VaultConfirm.responseOk,
+          ~body=parsed,
+        )
 
         if response->VaultConfirm.responseOk {
           switch parsed {

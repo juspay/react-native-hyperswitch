@@ -1,0 +1,59 @@
+{
+  "name": "@juspay-tech/hyperswitch-logger",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hyperswitch SDK logger shared by the React Native packages. Never published and never a dependency: the vault carries a copy of its ReScript sources and payment-methods a copy of its built output, each made by that package's scripts/sync-logger.mjs.",
+  "license": "Apache-2.0",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/types/index.d.ts",
+  "react-native": "dist/esm/index.js",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "default": "./dist/esm/index.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/esm/**",
+    "dist/cjs/**",
+    "dist/types/**",
+    "src/*.res",
+    "src/*.mjs",
+    "rescript.json",
+    "!dist/**/*.map",
+    "!src/index.mjs"
+  ],
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "scripts": {
+    "re:build": "rescript",
+    "re:clean": "rescript clean",
+    "types": "tsc -p tsconfig.build.json",
+    "bundle": "rollup -c",
+    "build": "rescript && tsc -p tsconfig.build.json && rollup -c",
+    "clean": "rescript clean",
+    "prepack": "rescript && tsc -p tsconfig.build.json && rollup -c"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*"
+  },
+  "devDependencies": {
+    "@rescript/core": "1.6.1",
+    "@rescript/react": "0.13.1",
+    "@rollup/plugin-node-resolve": "^15.3.0",
+    "@types/react": "19.0.0",
+    "react": "19.0.0",
+    "react-native": "0.79.7",
+    "rescript": "11.1.4",
+    "rollup": "^4.24.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -17,6 +17,7 @@ import type { CreateFormSessionOptions } from './formSession';
 import { registerForm } from './formRegistry';
 import { resolveAdapter } from '../providers/registry';
 import { SessionContext } from '../session/SessionContext';
+import { TelemetryContext } from '../telemetry/TelemetryContext';
 import type { ProviderAdapter } from './ProviderAdapter';
 import { errorResult, tokenizedCardOf } from './results';
 import {
@@ -137,6 +138,7 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
     ref
   ) {
     const session = useContext(SessionContext);
+    const telemetry = useContext(TelemetryContext);
 
     const details = vaultDetails ?? session?.vaultDetails;
     const vaultType = details?.vaultType;
@@ -172,8 +174,11 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
     }, [adapter, details, resolveError]);
 
     const sessionOptions = useMemo<CreateFormSessionOptions>(
-      () => (readyTimeoutMs !== undefined ? { readyTimeoutMs } : {}),
-      [readyTimeoutMs]
+      () => ({
+        ...(readyTimeoutMs !== undefined ? { readyTimeoutMs } : {}),
+        ...(telemetry ? { adapterTelemetry: telemetry.adapter } : {}),
+      }),
+      [readyTimeoutMs, telemetry]
     );
 
     const formSession = useMemo(
@@ -246,9 +251,13 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
     const reportChange = useCallback(
       (change: FieldChange) => {
         fieldsRef.current[change.elementType] = change;
+        telemetry?.dataFilled(
+          Object.keys(mountedRef.current) as ElementType[],
+          (field) => fieldsRef.current[field]?.complete === true
+        );
         emitChange();
       },
-      [emitChange]
+      [emitChange, telemetry]
     );
 
     const registerField = useCallback(
@@ -290,7 +299,7 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
       [formSession, onError]
     );
 
-    const tokenize = useCallback(
+    const runTokenize = useCallback(
       async (providerData?: unknown): Promise<TokenizeResult> => {
         const mounted = mountedRef.current;
 
@@ -312,6 +321,17 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
         );
       },
       [formSession, vaultType]
+    );
+
+    /* Logged per call, including calls refused before reaching the vault. */
+    const tokenize = useCallback(
+      async (providerData?: unknown): Promise<TokenizeResult> => {
+        telemetry?.tokenizeInitiated(vaultType);
+        const result = await runTokenize(providerData);
+        telemetry?.tokenizeOutcome(result, vaultType);
+        return result;
+      },
+      [runTokenize, telemetry, vaultType]
     );
 
     useImperativeHandle(
@@ -355,6 +375,7 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
         reportChange,
         registerField,
         forgetField,
+        telemetry,
       }),
       [
         vaultType,
@@ -367,6 +388,7 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
         reportChange,
         registerField,
         forgetField,
+        telemetry,
       ]
     );
 

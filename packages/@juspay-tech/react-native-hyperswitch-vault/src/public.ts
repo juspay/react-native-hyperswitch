@@ -106,7 +106,11 @@ export type VaultCardFormChange = Omit<CardFormChangeInternal, 'eligibility' | '
   readonly fields: VaultFormFields;
 };
 
-type MerchantProps<P> = Omit<P, 'eligibility' | 'cardholderName' | 'localisation' | 'onChange'> & {
+/* `logSink` is host-only (see telemetryTypes.ts): a merchant's form logs on its own. */
+type MerchantProps<P> = Omit<
+  P,
+  'eligibility' | 'cardholderName' | 'localisation' | 'onChange' | 'logSink'
+> & {
   readonly cardholderName?: VaultCardholderNameMode;
   readonly localisation?: VaultFormLocalisation;
   readonly onChange?: (event: VaultCardFormChange) => void;

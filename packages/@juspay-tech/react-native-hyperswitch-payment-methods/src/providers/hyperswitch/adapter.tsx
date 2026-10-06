@@ -11,7 +11,9 @@ import type {
   TokenizeErrorCode,
   TokenizeResult,
 } from '../../core/types';
+import { environmentOf } from '../../session/config';
 import { SessionContext } from '../../session/SessionContext';
+import { trustVaultMessage } from '../../telemetry/telemetry';
 import { toVaultAppearance } from './appearance';
 import type { HyperswitchVaultData } from './types';
 
@@ -84,11 +86,11 @@ const Host: ProviderAdapter['Host'] = ({
     [layers, scheme]
   );
 
-  // const hyper = session?.hyper;
-  // const environment =
-  //   data.environment ?? hyper?.environment ?? (session ? 'PROD' : 'SANDBOX');
-  // const customEndpoints = hyper?.customEndpoints;
-  const environment = data.environment ?? 'PROD';
+  const environment = environmentOf(
+    data.environment ?? session?.hyper?.environment
+  );
+
+  const customEndpoints = session?.hyper?.customEndpoints;
 
   // const expiresAt = session?.expiresAt ?? undefined;
   // const vaultSession = useMemo(
@@ -119,9 +121,12 @@ const Host: ProviderAdapter['Host'] = ({
         vaultData: { sdkAuthorization: data.sdkAuthorization },
       }}
       environment={environment}
-      // customEndpoints={customEndpoints}
+      customEndpoints={customEndpoints}
       locale={locale}
       appearance={appearance}
+      /* Inside a session the vault logs its CONFIRM / UPDATE calls into this session and nothing
+         else; without one it logs the whole flow itself. */
+      logSink={form?.telemetry?.vaultLogSink}
       onChange={(event: any) => {
         const payload = event?.payload ?? {};
         const details: Partial<CardDetails> = {
@@ -218,10 +223,14 @@ const tokenize: ProviderAdapter['tokenize'] = async (
     const code: TokenizeErrorCode = SHARED_CODES.has(result?.error?.code)
       ? result.error.code
       : 'tokenization_failed';
-    return errorResult(
-      VAULT_TYPE,
-      code,
-      result?.error?.message ?? 'The card could not be tokenized.'
+    /* The vault's messages are its own fixed strings, so the TOKENIZE log may quote them, as
+       web does for this vault. An exception's text below never is. */
+    return trustVaultMessage(
+      errorResult(
+        VAULT_TYPE,
+        code,
+        result?.error?.message ?? 'The card could not be tokenized.'
+      )
     );
   } catch (error) {
     return errorResult(VAULT_TYPE, 'tokenization_failed', messageOf(error));

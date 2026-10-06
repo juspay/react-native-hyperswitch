@@ -39,6 +39,12 @@ let useHost = (
 
   ~vaultEndpoint: option<VaultEndpoint.vaultEndpointConfig>,
 
+  ~customEndpoints: option<VaultEndpoint.customEndpoints>,
+
+  ~logSink: option<VaultTelemetry.logSink>,
+
+  ~entry: string,
+
   ~cardholderNameMode: CardFieldOptions.cardholderNameMode,
 
   ~onReady: option<VaultPublicState.cardFormEvent => unit>,
@@ -48,6 +54,7 @@ let useHost = (
 
   ~defaultErrorDisplay: CardFieldOptions.errorDisplay,
 ): host => {
+  let environment = environment->VaultConfirm.normalizeEnvironment
 
   let sessionState = React.useMemo3(
     () =>
@@ -61,6 +68,18 @@ let useHost = (
       },
     (session, vaultDetails, sdkAuthorization),
   )
+  let telemetry = VaultTelemetry.use(
+    ~logSink,
+    ~entry,
+    ~environment,
+    ~customEndpoints,
+    ~authorization=switch sessionState {
+    | Ready(ready) => Some(ready.authorization)
+    | Unusable(_) => None
+    },
+    ~fallbackPublishableKey=eligibility->Option.flatMap(config => config.publishableKey),
+  )
+
   let theme = React.useMemo1(() => appearance->VaultFormOptions.buildTheme, [appearance])
   let bundle = React.useMemo1(() => LocaleBundles.resolve(locale), [locale])
   let labels = React.useMemo2(
@@ -199,6 +218,7 @@ let useHost = (
     ~presenceGate,
     ~clearLocal=controller.reset,
     ~savedCardKey=controller.values.savedCard->Option.mapOr("", saved => saved.token),
+    ~telemetry,
   )
 
   let sessionStatus: VaultPublicState.vaultSessionStatus = switch sessionState {
@@ -250,6 +270,46 @@ let useHost = (
     ~notify=onChange,
   )
 
+  let dataFilledRef = React.useRef(false)
+  let nameFilledRef = React.useRef(false)
+  let fillState = () => {
+    let snapshot = controller.publicSnapshot()
+    let required =
+      [
+        (VaultCardController.CardNumberKind, "cardNumber", snapshot.cardNumber.complete),
+        (VaultCardController.ExpiryKind, "cardExpiry", snapshot.cardExpiry.complete),
+        (VaultCardController.CvcKind, "cardCvc", snapshot.cardCvc.complete),
+      ]->Array.filter(((kind, _, _)) => countOf(kind) > 0)
+    let requiredComplete =
+      required->Array.length > 0 && required->Array.every(((_, _, complete)) => complete)
+    let nameComplete =
+      countOf(VaultCardController.CardholderNameKind) > 0 && snapshot.cardholderName.complete
+    (requiredComplete, nameComplete, required->Array.map(((_, name, _)) => name)->Array.join(","))
+  }
+  VaultStateEmitter.use(
+    ~build=fillState,
+    ~equal=(a, b) => a == b,
+    ~notify=Some(
+      ((requiredComplete, nameComplete, requiredNames)) => {
+        let logFilled = () =>
+          telemetry.log(
+            ~logType=INFO,
+            ~eventName=PAYMENT_METHOD_SESSION_DATA_FILLED,
+            ~value=nameComplete ? requiredNames ++ ",cardholderName" : requiredNames,
+            (),
+          )
+        if requiredComplete && !dataFilledRef.current {
+          dataFilledRef.current = true
+          nameFilledRef.current = nameComplete
+          logFilled()
+        } else if requiredComplete && nameComplete && !nameFilledRef.current {
+          nameFilledRef.current = true
+          logFilled()
+        }
+      },
+    ),
+  )
+
   VaultStateEmitter.use(
     ~build=() => buildFormChange().complete,
     ~equal=(a, b) => a === b,
@@ -265,6 +325,7 @@ let useHost = (
       iconBaseUrl: CardIconUrls.host(environment),
       controller,
       publicSnapshot: controller.publicSnapshot,
+      telemetry,
       theme,
       labels,
       errorFontSize,

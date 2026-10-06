@@ -176,6 +176,8 @@ let useMachinery = (
   ~clearLocal: unit => unit,
 
   ~savedCardKey: string,
+
+  ~telemetry: VaultTelemetry.t,
 ): machinery => {
 
   let latestRef = React.useRef((sessionState, environment, cardholderNameMode, vaultEndpoint))
@@ -291,6 +293,7 @@ let useMachinery = (
         cardNetwork: ?VaultConfirmBody.cardNetworkToWire(cardNetwork()),
         nickName: ?nickName,
         signal,
+        log: telemetry.logApi,
       })
       switch outcome {
       | VaultConfirm.Success({result}) =>
@@ -363,6 +366,7 @@ let useMachinery = (
                   paymentMethodToken: saved.token,
                   cvc: cardDetails().cvc,
                   signal,
+                  log: telemetry.logApi,
                 })
                 closeRequest(controller)
                 if result.status === #success {
@@ -629,12 +633,19 @@ let useMachinery = (
     tracked
   }
 
-  let tokenize = () =>
-    switch inFlightRef.current {
+  // Logged per call, including calls that join an in-flight tokenize or are refused outright.
+  let tokenize = () => {
+    telemetry->VaultTelemetry.tokenizeInitiated
+    let pending = switch inFlightRef.current {
     | Some(TokenizeInFlight(pending)) => pending
     | Some(ConfirmInFlight(_)) => Promise.resolve(VaultResult.tokenizeConfirmInProgress())
     | None => trackTokenize(runTokenize())
     }
+    pending->Promise.then(result => {
+      telemetry->VaultTelemetry.tokenizeOutcome(result)
+      Promise.resolve(result)
+    })
+  }
 
   let confirmPayment = (args: paymentConfirmInput) =>
     switch inFlightRef.current {

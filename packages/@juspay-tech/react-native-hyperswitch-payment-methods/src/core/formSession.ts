@@ -2,11 +2,14 @@ import { createDeferred } from './deferred';
 import type { ProviderAdapter } from './ProviderAdapter';
 import { errorResult, messageOf } from './results';
 import type { FormStatus, TokenizeResult } from './types';
+import type { AdapterTelemetry } from '../telemetry/telemetry';
 
 const DEFAULT_READY_TIMEOUT_MS = 10_000;
 
 export interface CreateFormSessionOptions {
   readyTimeoutMs?: number;
+
+  adapterTelemetry?: AdapterTelemetry;
 }
 
 export interface FormSession {
@@ -75,7 +78,10 @@ export function createFormSession(
 
     status = 'tokenizing';
     try {
-      const result = await adapter.tokenize(collector, providerData);
+      const telemetry = options.adapterTelemetry;
+      const result = telemetry
+        ? await adapter.tokenize(collector, providerData, telemetry)
+        : await adapter.tokenize(collector, providerData);
       status = 'ready';
       return result;
     } catch (error) {

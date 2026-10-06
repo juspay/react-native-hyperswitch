@@ -5,6 +5,7 @@ import type { MountedFields } from './savedCard';
 import { checkConfiguration } from './savedCard';
 import { tokenizedCardOf } from './results';
 import type { ProviderAdapter } from './ProviderAdapter';
+import type { Telemetry } from '../telemetry/telemetry';
 import type {
   Appearance,
   CardDetails,
@@ -27,6 +28,7 @@ export interface FormCore {
   readonly fields: Partial<Record<ElementType, FieldChange>>;
   readonly mounted: MountedFields;
   details: Partial<CardDetails>;
+  readonly telemetry: Telemetry | null;
   subscribe(listener: () => void): () => void;
   notify(): void;
   registerField(elementType: ElementType, options?: FieldOptions): void;
@@ -38,13 +40,14 @@ export interface FormCore {
 export function createFormCore(
   adapter: ProviderAdapter,
   appearances: readonly Appearance[],
-  readyTimeoutMs?: number
+  readyTimeoutMs?: number,
+  telemetry: Telemetry | null = null
 ): FormCore {
   const listeners = new Set<() => void>();
-  const session = createFormSession(
-    adapter,
-    readyTimeoutMs !== undefined ? { readyTimeoutMs } : {}
-  );
+  const session = createFormSession(adapter, {
+    ...(readyTimeoutMs !== undefined ? { readyTimeoutMs } : {}),
+    ...(telemetry ? { adapterTelemetry: telemetry.adapter } : {}),
+  });
 
   const core: FormCore = {
     vaultType: adapter.vaultType,
@@ -56,6 +59,7 @@ export function createFormCore(
     fields: {},
     mounted: {},
     details: {},
+    telemetry,
 
     subscribe(listener) {
       listeners.add(listener);
@@ -73,24 +77,35 @@ export function createFormCore(
     },
     reportChange(change) {
       core.fields[change.elementType] = change;
+      telemetry?.dataFilled(
+        Object.keys(core.mounted) as ElementType[],
+        (field) => core.fields[field]?.complete === true
+      );
     },
 
     async tokenize(providerData?: unknown) {
-      const problem = checkConfiguration(core.vaultType, core.mounted);
-      if (problem) return problem;
-
-      const result = await session.tokenize(providerData);
-      core.status = session.status;
-      core.notify();
-      if (result.status !== 'success') return result;
-
-      const card = tokenizedCardOf(core.details);
-      return withSavedCard(
-        card ? { ...result, card } : result,
-        savedCardOf(core.mounted)
-      );
+      telemetry?.tokenizeInitiated(core.vaultType);
+      const result = await runTokenize(providerData);
+      telemetry?.tokenizeOutcome(result, core.vaultType);
+      return result;
     },
   };
+
+  async function runTokenize(providerData?: unknown): Promise<TokenizeResult> {
+    const problem = checkConfiguration(core.vaultType, core.mounted);
+    if (problem) return problem;
+
+    const result = await session.tokenize(providerData);
+    core.status = session.status;
+    core.notify();
+    if (result.status !== 'success') return result;
+
+    const card = tokenizedCardOf(core.details);
+    return withSavedCard(
+      card ? { ...result, card } : result,
+      savedCardOf(core.mounted)
+    );
+  }
 
   return core;
 }

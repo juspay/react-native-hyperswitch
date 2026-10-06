@@ -41,6 +41,8 @@ import type {localisationMessages as VaultFormOptions_localisationMessages} from
 
 import type {localisation as VaultFormOptions_localisation} from './VaultFormOptions.gen';
 
+import type {logSink as VaultTelemetry_logSink} from './VaultTelemetry.gen';
+
 import type {paymentCardSource as VaultCardSource_paymentCardSource} from './VaultCardSource.gen';
 
 import type {safeVaultErrorCode as VaultResult_safeVaultErrorCode} from './VaultResult.gen';
@@ -118,6 +120,7 @@ export type Props = {
   readonly layout?: formLayout; 
   readonly locale?: string; 
   readonly localisation?: localisation; 
+  readonly logSink?: VaultTelemetry_logSink; 
   readonly onChange?: (_1:VaultPublicState_cardFormChange) => void; 
   readonly onReady?: (_1:VaultPublicState_cardFormEvent) => void; 
   readonly sdkAuthorization?: string; 
@@ -141,6 +144,7 @@ export const make: React.ComponentType<{
   readonly layout?: formLayout; 
   readonly locale?: string; 
   readonly localisation?: localisation; 
+  readonly logSink?: VaultTelemetry_logSink; 
   readonly onChange?: (_1:VaultPublicState_cardFormChange) => void; 
   readonly onReady?: (_1:VaultPublicState_cardFormEvent) => void; 
   readonly sdkAuthorization?: string; 

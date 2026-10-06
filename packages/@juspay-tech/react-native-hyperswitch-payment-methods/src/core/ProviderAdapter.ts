@@ -14,6 +14,7 @@ import type {
   TokenizeResult,
   VaultType,
 } from './types';
+import type { AdapterTelemetry } from '../telemetry/telemetry';
 
 export interface ProviderHostProps<Collector = unknown, Data = unknown> {
   vaultData: Data;
@@ -57,8 +58,11 @@ export interface ProviderAdapter<Collector = unknown, Data = unknown> {
 
   Field: ComponentType<ProviderFieldProps<Collector>>;
 
+  /* `telemetry` reports provider-level outcomes (VGS_VAULT_FLOW). Status codes only, never the
+     provider's response body. */
   tokenize(
     collector: Collector,
-    providerData?: unknown
+    providerData?: unknown,
+    telemetry?: AdapterTelemetry
   ): Promise<TokenizeResult>;
 }

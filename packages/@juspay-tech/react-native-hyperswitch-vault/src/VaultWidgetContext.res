@@ -20,6 +20,8 @@ type contextValue = {
   defaultLabelBehavior: CardFieldOptions.labelBehavior,
 
   publicSnapshot: unit => VaultPublicState.controllerSnapshot,
+
+  telemetry: VaultTelemetry.t,
 }
 
 let context: React.Context.t<option<contextValue>> = React.createContext(None)

@@ -1,5 +1,8 @@
 import { readAuthorizationClaims } from './sdkAuthorization';
 import type { VaultDetails, VaultType } from '../core/types';
+import type { ApiTelemetry } from '../telemetry/telemetry';
+import { validateEndpoint } from '../telemetry/vendor/hyperswitch-logger';
+import { environmentOf } from './config';
 
 export type HyperswitchEnvironment = 'PROD' | 'SANDBOX' | 'INTEG';
 
@@ -19,9 +22,10 @@ export interface OverrideEndpoints {
   overrideEndpoints: OverrideEndpointConfiguration;
 }
 
-const DEFAULT_BASE_URL: Partial<Record<HyperswitchEnvironment, string>> = {
-  SANDBOX: 'https://app.hyperswitch.io/api',
+const DEFAULT_BASE_URL: Record<HyperswitchEnvironment, string> = {
   PROD: 'https://live.hyperswitch.io/api',
+  SANDBOX: 'https://app.hyperswitch.io/api',
+  INTEG: 'https://integ.hyperswitch.io/api',
 };
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -34,6 +38,10 @@ export interface FetchVaultDetailsOptions {
   customEndpoints?: CommonEndpoint | OverrideEndpoints;
   timeoutMs?: number;
   signal?: AbortSignal;
+
+  /* Logs PAYMENT_METHOD_SESSION_RETRIEVE_CALL_INIT / _CALL. Never the 2xx body: it carries the
+     vault's sdk_authorization. */
+  telemetry?: ApiTelemetry;
 }
 
 export type FetchVaultDetailsResult =
@@ -151,16 +159,38 @@ export function readVaultDetails(
   };
 }
 
-function resolveBaseUrl(options: FetchVaultDetailsOptions): string | undefined {
-  const custom = options.customEndpoints;
-  const explicit =
-    custom && 'commonEndpoint' in custom
+/* The backend in the vault's order: commonEndpoint, then overrideEndpoints.customBackendEndpoint,
+   then the environment's host. A configured endpoint must pass the vault's own check (https, or
+   http to localhost outside PROD; no credentials, query or hash). A blank or failing one is
+   refused, not replaced by the default host, so the authorization only ever goes where the
+   merchant pointed it. */
+function resolveBaseUrl(
+  options: FetchVaultDetailsOptions
+): { ok: true; baseUrl: string } | { ok: false; message: string } {
+  const environment = environmentOf(options.environment);
+  const custom: unknown = options.customEndpoints;
+  const override =
+    isRecord(custom) && isRecord(custom.overrideEndpoints)
+      ? custom.overrideEndpoints
+      : undefined;
+  const configured =
+    isRecord(custom) && typeof custom.commonEndpoint === 'string'
       ? custom.commonEndpoint
-      : custom?.overrideEndpoints?.customBackendEndpoint;
+      : typeof override?.customBackendEndpoint === 'string'
+        ? override.customBackendEndpoint
+        : undefined;
 
-  const trimmed = explicit?.trim();
-  if (trimmed) return trimmed.replace(/\/+$/, '');
-  return DEFAULT_BASE_URL[options.environment ?? 'PROD'];
+  if (configured === undefined) {
+    return { ok: true, baseUrl: DEFAULT_BASE_URL[environment] };
+  }
+  const baseUrl = validateEndpoint(configured, environment);
+  return baseUrl
+    ? { ok: true, baseUrl }
+    : {
+        ok: false,
+        message:
+          'The backend in customEndpoints is blank or not allowed. Use https (http only to localhost outside PROD), with no credentials, query or hash.',
+      };
 }
 
 export async function fetchVaultDetails(
@@ -169,15 +199,10 @@ export async function fetchVaultDetails(
   const claims = readAuthorizationClaims(options.sdkAuthorization);
   if (!claims.ok) return claims;
 
-  const baseUrl = resolveBaseUrl(options);
-  if (!baseUrl) {
-    return {
-      ok: false,
-      message: `The ${options.environment} environment has no public host. Pass customEndpoints.`,
-    };
-  }
+  const resolved = resolveBaseUrl(options);
+  if (!resolved.ok) return resolved;
 
-  const url = `${baseUrl}/v1/payment-method-sessions/${encodeURIComponent(
+  const url = `${resolved.baseUrl}/v1/payment-method-sessions/${encodeURIComponent(
     claims.claims.paymentMethodSessionId
   )}`;
 
@@ -194,6 +219,10 @@ export async function fetchVaultDetails(
     controller.abort();
   }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
+  const telemetry = options.telemetry;
+  const startedAt = telemetry ? telemetry.request(url) : 0;
+  let responded = false;
+
   try {
     const response = await fetch(url, {
       method: 'GET',
@@ -203,13 +232,25 @@ export async function fetchVaultDetails(
       },
       signal: controller.signal,
     });
+    responded = true;
 
     if (!response.ok) {
+      if (telemetry) {
+        let errorBody: unknown = null;
+        try {
+          errorBody = await response.json();
+        } catch {
+          errorBody = null;
+        }
+        telemetry.response(url, startedAt, response.status, errorBody);
+      }
       return {
         ok: false,
         message: `The payment-method-session lookup returned status ${response.status}.`,
       };
     }
+
+    telemetry?.response(url, startedAt, response.status);
 
     let body: unknown;
     try {
@@ -223,6 +264,17 @@ export async function fetchVaultDetails(
 
     return readVaultDetails(body, options.sdkAuthorization);
   } catch (error) {
+    if (telemetry && !responded) {
+      telemetry.failure(
+        url,
+        startedAt,
+        timedOut
+          ? 'timeout'
+          : controller.signal.aborted
+            ? 'aborted'
+            : 'network_error'
+      );
+    }
     if (timedOut) {
       return {
         ok: false,

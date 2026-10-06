@@ -1,6 +1,6 @@
 {
   "name": "@juspay-tech/react-native-hyperswitch-vault",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Hyperswitch card form for React Native. Authored in ReScript, published as JavaScript with genType-generated TypeScript declarations.",
   "license": "Apache-2.0",
   "main": "dist/cjs/index.js",
@@ -55,7 +55,8 @@
     "build": "rescript && tsc -p tsconfig.build.json && rollup -c",
     "build:clean": "rescript clean && rescript && tsc -p tsconfig.build.json && rollup -c",
     "clean": "rescript clean",
-    "prepack": "rescript && tsc -p tsconfig.build.json && rollup -c"
+    "prepack": "rescript && tsc -p tsconfig.build.json && rollup -c",
+    "sync:logger": "node scripts/sync-logger.mjs"
   },
   "peerDependencies": {
     "react": "*",

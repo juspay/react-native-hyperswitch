@@ -94,6 +94,8 @@ let make = React.forwardRef((
     "unstyled": option<bool>,
     "onReady": option<VaultPublicState.cardFormEvent => unit>,
     "onChange": option<VaultPublicState.cardFormChange => unit>,
+
+    "logSink": option<VaultTelemetry.logSink>,
   },
   ref,
 ) => {
@@ -110,6 +112,9 @@ let make = React.forwardRef((
     ~enabledCardSchemes=props["enabledCardSchemes"]->Option.getOr([]),
     ~eligibility=props["eligibility"],
     ~vaultEndpoint=VaultEndpoint.configOf(props["customEndpoints"]),
+    ~customEndpoints=props["customEndpoints"],
+    ~logSink=props["logSink"],
+    ~entry="HyperswitchVaultForm",
     ~cardholderNameMode=props["cardholderName"]->Option.getOr(#collect),
     ~onReady=props["onReady"],
     ~onChange=props["onChange"],
