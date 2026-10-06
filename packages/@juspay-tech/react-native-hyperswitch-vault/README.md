@@ -288,8 +288,8 @@ development-only warning.
 
 ## Self-hosted deployments
 
-`environment` selects a public Hyperswitch host; `customEndpoints` overrides it with your own, and is
-where `tokenize()` posts:
+`environment` selects a public Hyperswitch host (`PROD` when it is missing or unrecognised);
+`customEndpoints` overrides it with your own, and is where `tokenize()` posts:
 
 ```tsx
 <CardForm session={session} environment="SANDBOX" customEndpoints={{commonEndpoint: 'https://payments.your-company.example/api'}} />

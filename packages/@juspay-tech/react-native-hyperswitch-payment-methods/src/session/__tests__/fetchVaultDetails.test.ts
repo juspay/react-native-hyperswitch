@@ -182,14 +182,104 @@ describe('fetchVaultDetails', () => {
     );
   });
 
-  it('refuses INTEG without customEndpoints, since it has no public host', async () => {
-    const result = await fetchVaultDetails({
+  it('uses the INTEG host when asked for it, as the vault does', async () => {
+    fetchMock.mockResolvedValue(
+      okResponse(sessionBody({ vgs: { external_vault_id: 'x' } }))
+    );
+    await fetchVaultDetails({
       sdkAuthorization: VALID_AUTH,
       environment: 'INTEG',
     });
-    expect(result.ok).toBe(false);
-    expect(!result.ok && result.message).toMatch(/no public host/);
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      'https://integ.hyperswitch.io/api/v1/payment-method-sessions/0a_pms_0192'
+    );
+  });
+
+  it('treats an unrecognised environment as PROD', async () => {
+    fetchMock.mockResolvedValue(
+      okResponse(sessionBody({ vgs: { external_vault_id: 'x' } }))
+    );
+    await fetchVaultDetails({
+      sdkAuthorization: VALID_AUTH,
+      environment: 'production' as never,
+    });
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      'https://live.hyperswitch.io/api/v1/payment-method-sessions/0a_pms_0192'
+    );
+  });
+
+  it('refuses a blank or disallowed backend without calling the network', async () => {
+    for (const customEndpoints of [
+      { commonEndpoint: '  ' },
+      { overrideEndpoints: { customBackendEndpoint: '' } },
+      { commonEndpoint: 'http://proxy.acme.test/api' },
+      { commonEndpoint: 'http://localhost:8080/api' },
+      { commonEndpoint: 'https://user:pass@vault.acme.test/api' },
+      { commonEndpoint: 'https://vault.acme.test/api?key=1' },
+      { commonEndpoint: 'https://vault.acme.test/api#key' },
+    ]) {
+      const result = await fetchVaultDetails({
+        sdkAuthorization: VALID_AUTH,
+        environment: 'PROD',
+        customEndpoints,
+      });
+      expect(result.ok).toBe(false);
+      expect(!result.ok && result.message).toMatch(/blank or not allowed/);
+    }
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('reads malformed customEndpoints from JavaScript as absent instead of throwing', async () => {
+    fetchMock.mockResolvedValue(
+      okResponse(sessionBody({ vgs: { external_vault_id: 'x' } }))
+    );
+    for (const customEndpoints of [
+      {},
+      { overrideEndpoints: undefined },
+      { overrideEndpoints: null },
+      { commonEndpoint: 42 },
+      'https://vault.acme.test',
+    ]) {
+      fetchMock.mockClear();
+      const result = await fetchVaultDetails({
+        sdkAuthorization: VALID_AUTH,
+        customEndpoints: customEndpoints as never,
+      });
+      expect(result.ok).toBe(true);
+      expect(fetchMock.mock.calls[0]![0]).toBe(
+        'https://live.hyperswitch.io/api/v1/payment-method-sessions/0a_pms_0192'
+      );
+    }
+  });
+
+  it('allows http to localhost outside PROD, as the vault does', async () => {
+    fetchMock.mockResolvedValue(
+      okResponse(sessionBody({ vgs: { external_vault_id: 'x' } }))
+    );
+    await fetchVaultDetails({
+      sdkAuthorization: VALID_AUTH,
+      environment: 'SANDBOX',
+      customEndpoints: { commonEndpoint: 'http://localhost:8080/api/' },
+    });
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      'http://localhost:8080/api/v1/payment-method-sessions/0a_pms_0192'
+    );
+  });
+
+  it("takes commonEndpoint ahead of an override, in the vault's order", async () => {
+    fetchMock.mockResolvedValue(
+      okResponse(sessionBody({ vgs: { external_vault_id: 'x' } }))
+    );
+    await fetchVaultDetails({
+      sdkAuthorization: VALID_AUTH,
+      customEndpoints: {
+        commonEndpoint: 'https://vault.acme.test/api',
+        overrideEndpoints: { customBackendEndpoint: 'https://other.acme.test' },
+      } as never,
+    });
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      'https://vault.acme.test/api/v1/payment-method-sessions/0a_pms_0192'
+    );
   });
 
   it('reads an overrideEndpoints backend endpoint', async () => {

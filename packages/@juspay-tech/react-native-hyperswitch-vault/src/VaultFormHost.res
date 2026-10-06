@@ -48,6 +48,7 @@ let useHost = (
 
   ~defaultErrorDisplay: CardFieldOptions.errorDisplay,
 ): host => {
+  let environment = environment->VaultConfirm.normalizeEnvironment
 
   let sessionState = React.useMemo3(
     () =>

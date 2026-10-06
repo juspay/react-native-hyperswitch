@@ -49,7 +49,9 @@ let confirmTokenizedCardPayment = async (
       switch input.paymentMethodData->VaultPaymentMethodData.validateHostPaymentMethodData {
       | Error() => VaultResult.forbiddenCardData()
       | Ok() =>
-        switch input.endpoint->VaultEndpoint.resolveBaseUrl(~environment=input.environment) {
+        switch input.endpoint->VaultEndpoint.resolveBaseUrl(
+          ~environment=input.environment->VaultConfirm.normalizeEnvironment,
+        ) {
         | Error() => VaultResult.unsupportedConfiguration()
         | Ok(baseUrl) =>
           let body = VaultConfirmBody.build(

@@ -1,5 +1,7 @@
 import { readAuthorizationClaims } from './sdkAuthorization';
 import type { VaultDetails, VaultType } from '../core/types';
+import { environmentOf } from './config';
+import { validateEndpoint } from './endpoint';
 
 export type HyperswitchEnvironment = 'PROD' | 'SANDBOX' | 'INTEG';
 
@@ -19,9 +21,10 @@ export interface OverrideEndpoints {
   overrideEndpoints: OverrideEndpointConfiguration;
 }
 
-const DEFAULT_BASE_URL: Partial<Record<HyperswitchEnvironment, string>> = {
-  SANDBOX: 'https://app.hyperswitch.io/api',
+const DEFAULT_BASE_URL: Record<HyperswitchEnvironment, string> = {
   PROD: 'https://live.hyperswitch.io/api',
+  SANDBOX: 'https://app.hyperswitch.io/api',
+  INTEG: 'https://integ.hyperswitch.io/api',
 };
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -151,16 +154,33 @@ export function readVaultDetails(
   };
 }
 
-function resolveBaseUrl(options: FetchVaultDetailsOptions): string | undefined {
-  const custom = options.customEndpoints;
-  const explicit =
-    custom && 'commonEndpoint' in custom
+function resolveBaseUrl(
+  options: FetchVaultDetailsOptions
+): { ok: true; baseUrl: string } | { ok: false; message: string } {
+  const environment = environmentOf(options.environment);
+  const custom: unknown = options.customEndpoints;
+  const override =
+    isRecord(custom) && isRecord(custom.overrideEndpoints)
+      ? custom.overrideEndpoints
+      : undefined;
+  const configured =
+    isRecord(custom) && typeof custom.commonEndpoint === 'string'
       ? custom.commonEndpoint
-      : custom?.overrideEndpoints?.customBackendEndpoint;
+      : typeof override?.customBackendEndpoint === 'string'
+        ? override.customBackendEndpoint
+        : undefined;
 
-  const trimmed = explicit?.trim();
-  if (trimmed) return trimmed.replace(/\/+$/, '');
-  return DEFAULT_BASE_URL[options.environment ?? 'PROD'];
+  if (configured === undefined) {
+    return { ok: true, baseUrl: DEFAULT_BASE_URL[environment] };
+  }
+  const baseUrl = validateEndpoint(configured, environment);
+  return baseUrl
+    ? { ok: true, baseUrl }
+    : {
+        ok: false,
+        message:
+          'The backend in customEndpoints is blank or not allowed. Use https (http only to localhost outside PROD), with no credentials, query or hash.',
+      };
 }
 
 export async function fetchVaultDetails(
@@ -169,15 +189,10 @@ export async function fetchVaultDetails(
   const claims = readAuthorizationClaims(options.sdkAuthorization);
   if (!claims.ok) return claims;
 
-  const baseUrl = resolveBaseUrl(options);
-  if (!baseUrl) {
-    return {
-      ok: false,
-      message: `The ${options.environment} environment has no public host. Pass customEndpoints.`,
-    };
-  }
+  const resolved = resolveBaseUrl(options);
+  if (!resolved.ok) return resolved;
 
-  const url = `${baseUrl}/v1/payment-method-sessions/${encodeURIComponent(
+  const url = `${resolved.baseUrl}/v1/payment-method-sessions/${encodeURIComponent(
     claims.claims.paymentMethodSessionId
   )}`;
 

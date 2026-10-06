@@ -11,6 +11,7 @@ import type {
   TokenizeErrorCode,
   TokenizeResult,
 } from '../../core/types';
+import { environmentOf } from '../../session/config';
 import { SessionContext } from '../../session/SessionContext';
 import { toVaultAppearance } from './appearance';
 import type { HyperswitchVaultData } from './types';
@@ -84,11 +85,15 @@ const Host: ProviderAdapter['Host'] = ({
     [layers, scheme]
   );
 
-  // const hyper = session?.hyper;
-  // const environment =
-  //   data.environment ?? hyper?.environment ?? (session ? 'PROD' : 'SANDBOX');
-  // const customEndpoints = hyper?.customEndpoints;
-  const environment = data.environment ?? 'PROD';
+  /* customEndpoints, passed on below, win over this. Otherwise the vault confirms in vaultData's
+     environment, else the session's (the one its lookup used), else PROD. */
+  const environment = environmentOf(
+    data.environment ?? session?.hyper?.environment
+  );
+
+  /* The merchant's endpoints (an EU or self-hosted backend) reach the vault as well, so its
+     confirm / update calls go to the backend the session lives on, not the default host. */
+  const customEndpoints = session?.hyper?.customEndpoints;
 
   // const expiresAt = session?.expiresAt ?? undefined;
   // const vaultSession = useMemo(
@@ -119,7 +124,7 @@ const Host: ProviderAdapter['Host'] = ({
         vaultData: { sdkAuthorization: data.sdkAuthorization },
       }}
       environment={environment}
-      // customEndpoints={customEndpoints}
+      customEndpoints={customEndpoints}
       locale={locale}
       appearance={appearance}
       onChange={(event: any) => {
