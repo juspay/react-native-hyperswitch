@@ -212,8 +212,15 @@ let validateCard = (card: cardDetails): option<confirmOutcome> => {
   }
 }
 
+let normalizeEnvironment = (environment: vaultEnvironment): vaultEnvironment =>
+  switch (environment :> string) {
+  | "SANDBOX" => #SANDBOX
+  | "INTEG" => #INTEG
+  | _ => #PROD
+  }
+
 let vaultBaseUrl = (environment: vaultEnvironment) =>
-  switch environment {
+  switch environment->normalizeEnvironment {
   | #PROD => "https://live.hyperswitch.io/api"
   | #SANDBOX => "https://app.hyperswitch.io/api"
   | #INTEG => "https://integ.hyperswitch.io/api"

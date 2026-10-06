@@ -11,3 +11,9 @@ export interface HyperswitchConfiguration {
   environment?: HyperswitchEnvironment;
   customEndpoints?: CommonEndpoint | OverrideEndpoints;
 }
+
+export function environmentOf(environment: unknown): HyperswitchEnvironment {
+  return environment === 'SANDBOX' || environment === 'INTEG'
+    ? environment
+    : 'PROD';
+}

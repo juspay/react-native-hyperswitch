@@ -170,3 +170,86 @@ describe('hyperswitch adapter — what the vault SDK receives', () => {
     expect(vaultProps.form?.appearance).toBeUndefined();
   });
 });
+
+describe("hyperswitch adapter — the merchant's endpoints", () => {
+  it('passes customEndpoints on to the vault, so an EU or self-hosted backend gets the confirm', async () => {
+    const customEndpoints = { commonEndpoint: 'https://eu.hyperswitch.io/api' };
+    render(
+      <SessionContext.Provider
+        value={session({
+          hyper: { publishableKey: 'pk_prd_eu', customEndpoints },
+        })}
+      >
+        <CardForm vaultDetails={details}>
+          <CardNumberField />
+        </CardForm>
+      </SessionContext.Provider>
+    );
+
+    await waitFor(() => expect(vaultProps.form).toBeDefined());
+    expect(vaultProps.form?.customEndpoints).toEqual(customEndpoints);
+  });
+
+  it('passes none when the merchant set none, leaving the vault on its environment', async () => {
+    render(
+      <SessionContext.Provider
+        value={session({ hyper: { publishableKey: 'pk_snd_x' } })}
+      >
+        <CardForm vaultDetails={details}>
+          <CardNumberField />
+        </CardForm>
+      </SessionContext.Provider>
+    );
+
+    await waitFor(() => expect(vaultProps.form).toBeDefined());
+    expect(vaultProps.form?.customEndpoints).toBeUndefined();
+  });
+});
+
+describe('hyperswitch adapter — the environment', () => {
+  const renderWith = (
+    value: Partial<PaymentMethodsSession> | null,
+    vaultDetails: VaultDetails = details
+  ) => {
+    const form = (
+      <CardForm vaultDetails={vaultDetails}>
+        <CardNumberField />
+      </CardForm>
+    );
+    render(
+      value ? (
+        <SessionContext.Provider value={session({ vaultDetails, ...value })}>
+          {form}
+        </SessionContext.Provider>
+      ) : (
+        form
+      )
+    );
+  };
+
+  it("follows the merchant's environment when vaultData names none, so a sandbox session confirms on sandbox", async () => {
+    renderWith({
+      hyper: { publishableKey: 'pk_snd_x', environment: 'SANDBOX' },
+    });
+    await waitFor(() => expect(vaultProps.form).toBeDefined());
+    expect(vaultProps.form?.environment).toBe('SANDBOX');
+  });
+
+  it("lets vaultData's own environment win", async () => {
+    renderWith(
+      { hyper: { publishableKey: 'pk_snd_x', environment: 'SANDBOX' } },
+      {
+        vaultType: 'hyperswitch',
+        vaultData: { sdkAuthorization: 'sdk_auth_123', environment: 'INTEG' },
+      }
+    );
+    await waitFor(() => expect(vaultProps.form).toBeDefined());
+    expect(vaultProps.form?.environment).toBe('INTEG');
+  });
+
+  it('defaults to PROD when neither names one', async () => {
+    renderWith({ hyper: { publishableKey: 'pk_prd_x' } });
+    await waitFor(() => expect(vaultProps.form).toBeDefined());
+    expect(vaultProps.form?.environment).toBe('PROD');
+  });
+});
