@@ -2,7 +2,8 @@
 // its last branch, so an unrecognised value must become PROD before it gets there.
 let host = (environment: VaultConfirm.vaultEnvironment) =>
   switch environment->VaultConfirm.normalizeEnvironment {
-  | #PROD | #PROD_EU => "https://checkout.hyperswitch.io"
+  | #PROD => "https://checkout.hyperswitch.io"
+  | #PROD_EU => "https://eu.hyperswitch.io/sdk"
   | #SANDBOX => "https://beta.hyperswitch.io"
   | #INTEG => "https://dev.hyperswitch.io"
   }
