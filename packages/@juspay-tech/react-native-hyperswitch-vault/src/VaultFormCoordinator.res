@@ -89,6 +89,7 @@ let isExpired = (session: readySession) =>
 let environmentKey = (environment: VaultConfirm.vaultEnvironment) =>
   switch environment {
   | #PROD => "PROD"
+  | #PROD_EU => "PROD_EU"
   | #SANDBOX => "SANDBOX"
   | #INTEG => "INTEG"
   }

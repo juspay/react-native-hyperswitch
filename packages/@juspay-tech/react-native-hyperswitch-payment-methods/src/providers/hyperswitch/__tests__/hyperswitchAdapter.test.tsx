@@ -247,6 +247,15 @@ describe('hyperswitch adapter — the environment', () => {
     expect(vaultProps.form?.environment).toBe('INTEG');
   });
 
+  it('passes PROD_EU through to the vault', async () => {
+    renderWith({
+      hyper: { publishableKey: 'pk_prd_x', environment: 'PROD_EU' },
+    });
+    await waitFor(() => expect(vaultProps.form).toBeDefined());
+    expect(vaultProps.form?.environment).toBe('PROD_EU');
+    expect(vaultProps.form?.customEndpoints).toBeUndefined();
+  });
+
   it('defaults to PROD when neither names one', async () => {
     renderWith({ hyper: { publishableKey: 'pk_prd_x' } });
     await waitFor(() => expect(vaultProps.form).toBeDefined());

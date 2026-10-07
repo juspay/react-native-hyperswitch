@@ -24,13 +24,13 @@ npm install @juspay-tech/react-native-hyperswitch-payment-methods
 Then install **only** the provider SDK(s) you actually use (they are optional peer
 dependencies, so you only pay for — and natively link — what you configure):
 
-| `vaultType`    | Peer dependency to install                          |
-| -------------- | --------------------------------------------------- |
-| `hyperswitch`  | `@juspay-tech/react-native-hyperswitch-vault`       |
-| `vgs`          | `@vgs/collect-react-native`                         |
-| `skyflow`      | `skyflow-react-native`                              |
-| `basis_theory` | `@basis-theory/react-native-elements` (v3+)         |
-| `evervault`    | `@evervault/react-native` (+ `react-native-webview`)|
+| `vaultType`    | Peer dependency to install                             |
+| -------------- | ------------------------------------------------------ |
+| `hyperswitch`  | `@juspay-tech/react-native-hyperswitch-vault` (1.0.3+) |
+| `vgs`          | `@vgs/collect-react-native`                            |
+| `skyflow`      | `skyflow-react-native`                                 |
+| `basis_theory` | `@basis-theory/react-native-elements` (v3+)            |
+| `evervault`    | `@evervault/react-native` (+ `react-native-webview`)   |
 
 If a `vaultType` is configured without its SDK installed, the form surfaces an
 actionable "install X" error via `onError`.
@@ -62,7 +62,7 @@ import {
 const hyper = Hyperswitch.init({
   publishableKey: 'pk_snd_…',
   profileId: 'pro_…',      // optional; falls back to the one in sdkAuthorization
-  environment: 'SANDBOX',  // 'PROD' (default) | 'SANDBOX' | 'INTEG'
+  environment: 'SANDBOX',  // 'PROD' (default) | 'PROD_EU' | 'SANDBOX' | 'INTEG'
 });
 
 function Checkout({ sdkAuthorization, appearance }) {
@@ -116,7 +116,7 @@ configures either package:
 | `publishableKey` | **Required.** |
 | `platformPublishableKey` | Carried for parity; unused by this package. |
 | `profileId` | Carried for parity with the checkout SDK; unused by this package. |
-| `environment` | `'PROD'` (default), `'SANDBOX'` or `'INTEG'`. Picks the Hyperswitch host when `customEndpoints` name no backend; a missing or unrecognised value is `PROD`. |
+| `environment` | `'PROD'` (default), `'PROD_EU'`, `'SANDBOX'` or `'INTEG'`. Picks the Hyperswitch host when `customEndpoints` name no backend; a missing or unrecognised value is `PROD`. |
 | `customEndpoints` | `{commonEndpoint}` or `{overrideEndpoints: {customBackendEndpoint}}`. Wins over `environment`. It must be `https` (`http` only to localhost outside `PROD`), with no credentials, query or hash; a blank or invalid one fails the session instead of falling back to a default host. |
 
 Already using `@juspay-tech/react-native-hyperswitch`? Its `Hyperswitch.init(...)` promise is
@@ -168,7 +168,8 @@ While the lookup is in flight the fields render their placeholders and `tokenize
 reason, and `tokenize()` answers `unsupported_configuration` quoting it.
 
 Default hosts, used when `customEndpoints` name no backend: `https://live.hyperswitch.io/api` for
-`PROD` (also a missing or unrecognised `environment`), `https://app.hyperswitch.io/api` for
+`PROD` (also a missing or unrecognised `environment`), `https://eu.hyperswitch.io/api` for
+`PROD_EU`, `https://app.hyperswitch.io/api` for
 `SANDBOX` and `https://integ.hyperswitch.io/api` for `INTEG` — the route is appended after the
 `/api` prefix. Self-hosted deployments are reached through `customEndpoints`.
 

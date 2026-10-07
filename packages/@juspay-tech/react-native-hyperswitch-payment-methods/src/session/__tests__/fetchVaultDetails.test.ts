@@ -182,6 +182,19 @@ describe('fetchVaultDetails', () => {
     );
   });
 
+  it('uses the EU host for PROD_EU', async () => {
+    fetchMock.mockResolvedValue(
+      okResponse(sessionBody({ vgs: { external_vault_id: 'x' } }))
+    );
+    await fetchVaultDetails({
+      sdkAuthorization: VALID_AUTH,
+      environment: 'PROD_EU',
+    });
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      'https://eu.hyperswitch.io/api/v1/payment-method-sessions/0a_pms_0192'
+    );
+  });
+
   it('uses the INTEG host when asked for it, as the vault does', async () => {
     fetchMock.mockResolvedValue(
       okResponse(sessionBody({ vgs: { external_vault_id: 'x' } }))

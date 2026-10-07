@@ -1,4 +1,4 @@
-type vaultEnvironment = [#PROD | #SANDBOX | #INTEG]
+type vaultEnvironment = [#PROD | #PROD_EU | #SANDBOX | #INTEG]
 
 type cardDetails = {
   cardNumber: string,
@@ -214,6 +214,7 @@ let validateCard = (card: cardDetails): option<confirmOutcome> => {
 
 let normalizeEnvironment = (environment: vaultEnvironment): vaultEnvironment =>
   switch (environment :> string) {
+  | "PROD_EU" => #PROD_EU
   | "SANDBOX" => #SANDBOX
   | "INTEG" => #INTEG
   | _ => #PROD
@@ -222,6 +223,7 @@ let normalizeEnvironment = (environment: vaultEnvironment): vaultEnvironment =>
 let vaultBaseUrl = (environment: vaultEnvironment) =>
   switch environment->normalizeEnvironment {
   | #PROD => "https://live.hyperswitch.io/api"
+  | #PROD_EU => "https://eu.hyperswitch.io/api"
   | #SANDBOX => "https://app.hyperswitch.io/api"
   | #INTEG => "https://integ.hyperswitch.io/api"
   }

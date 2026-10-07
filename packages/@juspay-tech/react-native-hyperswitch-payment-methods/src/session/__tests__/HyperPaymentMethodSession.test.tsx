@@ -621,6 +621,10 @@ describe('resolving the vault from an sdkAuthorization', () => {
         'https://app.hyperswitch.io/api',
       ],
       [
+        { publishableKey: 'pk_prd_x', environment: 'PROD_EU' },
+        'https://eu.hyperswitch.io/api',
+      ],
+      [
         { publishableKey: 'pk_snd_x', environment: 'INTEG' },
         'https://integ.hyperswitch.io/api',
       ],
