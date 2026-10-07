@@ -16,6 +16,9 @@ describe('validateEndpoint', () => {
     expect(
       validateEndpoint('http://localhost:8080/api', 'PROD')
     ).toBeUndefined();
+    expect(
+      validateEndpoint('http://localhost:8080/api', 'PROD_EU')
+    ).toBeUndefined();
     expect(validateEndpoint('http://localhost:8080/api', 'SANDBOX')).toBe(
       'http://localhost:8080/api'
     );

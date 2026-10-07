@@ -110,10 +110,19 @@ const Host: ProviderAdapter['Host'] = ({
   //   [expiresAt, data.sdkAuthorization]
   // );
 
+  /* Inside a session the merchant's configuration decides where the vault calls and loads its
+     assets from. Until `hyper` has resolved that is unknown, so the vault does not mount and
+     nothing runs on a guessed environment: the fields keep their placeholders and tokenize()
+     answers sdk_not_ready. If `hyper` fails, the vault never mounts. */
+  const hyperPending = session !== null && session.hyper == null;
+
   useEffect(() => {
+    if (hyperPending) return;
     if (formRef.current) onReady(formRef.current);
     else onError(new Error('The Hyperswitch vault form did not mount.'));
-  }, [onReady, onError]);
+  }, [hyperPending, onReady, onError]);
+
+  if (hyperPending) return <>{children}</>;
 
   return (
     <VaultCardForm

@@ -3858,7 +3858,7 @@ __metadata:
   peerDependencies:
     "@basis-theory/react-native-elements": "*"
     "@evervault/react-native": "*"
-    "@juspay-tech/react-native-hyperswitch-vault": "*"
+    "@juspay-tech/react-native-hyperswitch-vault": ">=1.0.3"
     "@vgs/collect-react-native": "*"
     react: "*"
     react-native: "*"

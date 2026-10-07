@@ -72,7 +72,7 @@ let make = React.forwardRef((
     "sdkAuthorization": option<string>,
 
     "vaultDetails": option<VaultDetails.vaultDetails>,
-    "environment": vaultEnvironment,
+    "environment": option<vaultEnvironment>,
     "appearance": option<appearance>,
     "locale": option<string>,
     "disabled": option<bool>,
@@ -101,7 +101,7 @@ let make = React.forwardRef((
     ~session=props["session"]->Option.map(VaultFormOptions.sessionToJson),
     ~sdkAuthorization=props["sdkAuthorization"],
     ~vaultDetails=props["vaultDetails"],
-    ~environment=props["environment"],
+    ~environment=props["environment"]->Option.getOr(#PROD),
     ~appearance=props["appearance"],
     ~locale=props["locale"],
     ~localisation=props["localisation"],

@@ -1,5 +1,5 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { act, render, screen, waitFor } from '@testing-library/react-native';
 
 /* The vault is an optional peer, so stand one in and record what it is handed.
    The adapter types it as `any`, so only this test pins the prop names. */
@@ -75,6 +75,7 @@ const appearance: Appearance = {
 
 const session = (value: Partial<PaymentMethodsSession>) =>
   ({
+    hyper: { publishableKey: 'pk_snd_test' },
     vaultDetails: details,
     loading: false,
     error: null,
@@ -206,6 +207,34 @@ describe("hyperswitch adapter — the merchant's endpoints", () => {
   });
 });
 
+describe('hyperswitch adapter — before the configuration is known', () => {
+  const form = (value: Partial<PaymentMethodsSession>) => (
+    <SessionContext.Provider value={session(value)}>
+      <CardForm vaultDetails={details}>
+        <CardNumberField />
+      </CardForm>
+    </SessionContext.Provider>
+  );
+
+  it("does not mount the vault until the merchant's hyper resolves, so nothing runs on a guessed environment", async () => {
+    const view = render(form({ hyper: null }));
+    await act(async () => {});
+    expect(vaultProps.form).toBeUndefined();
+
+    view.rerender(
+      form({ hyper: { publishableKey: 'pk_prd_x', environment: 'PROD_EU' } })
+    );
+    await waitFor(() => expect(vaultProps.form).toBeDefined());
+    expect(vaultProps.form?.environment).toBe('PROD_EU');
+  });
+
+  it('never mounts the vault when hyper failed', async () => {
+    render(form({ hyper: null, error: new Error('init failed') }));
+    await act(async () => {});
+    expect(vaultProps.form).toBeUndefined();
+  });
+});
+
 describe('hyperswitch adapter — the environment', () => {
   const renderWith = (
     value: Partial<PaymentMethodsSession> | null,
@@ -245,6 +274,14 @@ describe('hyperswitch adapter — the environment', () => {
     );
     await waitFor(() => expect(vaultProps.form).toBeDefined());
     expect(vaultProps.form?.environment).toBe('INTEG');
+  });
+
+  it('passes PROD_EU through to the vault', async () => {
+    renderWith({
+      hyper: { publishableKey: 'pk_prd_x', environment: 'PROD_EU' },
+    });
+    await waitFor(() => expect(vaultProps.form).toBeDefined());
+    expect(vaultProps.form?.environment).toBe('PROD_EU');
   });
 
   it('defaults to PROD when neither names one', async () => {

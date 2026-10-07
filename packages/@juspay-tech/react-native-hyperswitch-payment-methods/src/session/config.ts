@@ -13,7 +13,9 @@ export interface HyperswitchConfiguration {
 }
 
 export function environmentOf(environment: unknown): HyperswitchEnvironment {
-  return environment === 'SANDBOX' || environment === 'INTEG'
+  return environment === 'SANDBOX' ||
+    environment === 'INTEG' ||
+    environment === 'PROD_EU'
     ? environment
     : 'PROD';
 }

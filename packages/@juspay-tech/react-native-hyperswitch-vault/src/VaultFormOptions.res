@@ -2,7 +2,7 @@ open ReactNative
 
 @genType
 
-type vaultEnvironment = [#PROD | #SANDBOX | #INTEG]
+type vaultEnvironment = [#PROD | #SANDBOX | #INTEG | #PROD_EU]
 
 @genType.import(("./merchantTypes", "MerchantSession"))
 type vaultSession

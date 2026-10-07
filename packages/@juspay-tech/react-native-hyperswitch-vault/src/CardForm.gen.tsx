@@ -42,7 +42,7 @@ export type Props = {
   readonly disabled?: boolean; 
   readonly eligibility?: VaultFormOptions_eligibilityConfig; 
   readonly enabledCardSchemes?: string[]; 
-  readonly environment: VaultFormOptions_vaultEnvironment; 
+  readonly environment?: VaultFormOptions_vaultEnvironment; 
   readonly locale?: string; 
   readonly localisation?: VaultFormOptions_localisation; 
   readonly onChange?: (_1:VaultPublicState_cardFormChange) => void; 
@@ -62,7 +62,7 @@ export const make: React.ComponentType<{
   readonly disabled?: boolean; 
   readonly eligibility?: VaultFormOptions_eligibilityConfig; 
   readonly enabledCardSchemes?: string[]; 
-  readonly environment: VaultFormOptions_vaultEnvironment; 
+  readonly environment?: VaultFormOptions_vaultEnvironment; 
   readonly locale?: string; 
   readonly localisation?: VaultFormOptions_localisation; 
   readonly onChange?: (_1:VaultPublicState_cardFormChange) => void; 

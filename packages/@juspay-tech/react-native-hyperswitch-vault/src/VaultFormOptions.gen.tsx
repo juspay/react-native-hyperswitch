@@ -23,7 +23,7 @@ import type {vaultPaymentResult as VaultResult_vaultPaymentResult} from './Vault
 
 import type {vaultTokenizeResult as VaultResult_vaultTokenizeResult} from './VaultResult.gen';
 
-export type vaultEnvironment = "PROD" | "SANDBOX" | "INTEG";
+export type vaultEnvironment = "PROD" | "SANDBOX" | "INTEG" | "PROD_EU";
 
 export type vaultSession = $$vaultSession;
 

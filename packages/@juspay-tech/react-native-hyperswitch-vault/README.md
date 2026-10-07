@@ -288,7 +288,8 @@ development-only warning.
 
 ## Self-hosted deployments
 
-`environment` selects a public Hyperswitch host (`PROD` when it is missing or unrecognised);
+`environment` (optional) selects a public Hyperswitch host: `PROD` (the default, also for an
+unrecognised value), `SANDBOX`, `INTEG` or `PROD_EU` (`https://eu.hyperswitch.io/api`).
 `customEndpoints` overrides it with your own, and is where `tokenize()` posts:
 
 ```tsx

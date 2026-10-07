@@ -1,4 +1,4 @@
-type vaultEnvironment = [#PROD | #SANDBOX | #INTEG]
+type vaultEnvironment = [#PROD | #SANDBOX | #INTEG | #PROD_EU]
 
 type cardDetails = {
   cardNumber: string,
@@ -216,6 +216,7 @@ let normalizeEnvironment = (environment: vaultEnvironment): vaultEnvironment =>
   switch (environment :> string) {
   | "SANDBOX" => #SANDBOX
   | "INTEG" => #INTEG
+  | "PROD_EU" => #PROD_EU
   | _ => #PROD
   }
 
@@ -224,6 +225,7 @@ let vaultBaseUrl = (environment: vaultEnvironment) =>
   | #PROD => "https://live.hyperswitch.io/api"
   | #SANDBOX => "https://app.hyperswitch.io/api"
   | #INTEG => "https://integ.hyperswitch.io/api"
+  | #PROD_EU => "https://eu.hyperswitch.io/api"
   }
 
 @val external encodeURIComponent: string => string = "encodeURIComponent"

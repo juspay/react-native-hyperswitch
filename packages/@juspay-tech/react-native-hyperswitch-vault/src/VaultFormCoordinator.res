@@ -91,6 +91,7 @@ let environmentKey = (environment: VaultConfirm.vaultEnvironment) =>
   | #PROD => "PROD"
   | #SANDBOX => "SANDBOX"
   | #INTEG => "INTEG"
+  | #PROD_EU => "PROD_EU"
   }
 
 @genType

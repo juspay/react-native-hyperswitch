@@ -24,13 +24,13 @@ npm install @juspay-tech/react-native-hyperswitch-payment-methods
 Then install **only** the provider SDK(s) you actually use (they are optional peer
 dependencies, so you only pay for — and natively link — what you configure):
 
-| `vaultType`    | Peer dependency to install                          |
-| -------------- | --------------------------------------------------- |
-| `hyperswitch`  | `@juspay-tech/react-native-hyperswitch-vault`       |
-| `vgs`          | `@vgs/collect-react-native`                         |
-| `skyflow`      | `skyflow-react-native`                              |
-| `basis_theory` | `@basis-theory/react-native-elements` (v3+)         |
-| `evervault`    | `@evervault/react-native` (+ `react-native-webview`)|
+| `vaultType`    | Peer dependency to install                             |
+| -------------- | ------------------------------------------------------ |
+| `hyperswitch`  | `@juspay-tech/react-native-hyperswitch-vault` (1.0.3+) |
+| `vgs`          | `@vgs/collect-react-native`                            |
+| `skyflow`      | `skyflow-react-native`                                 |
+| `basis_theory` | `@basis-theory/react-native-elements` (v3+)            |
+| `evervault`    | `@evervault/react-native` (+ `react-native-webview`)   |
 
 If a `vaultType` is configured without its SDK installed, the form surfaces an
 actionable "install X" error via `onError`.
@@ -97,7 +97,7 @@ function Checkout({ sdkAuthorization, appearance }) {
 
 | Prop | |
 | --- | --- |
-| `hyper` | **Required.** What `Hyperswitch.init(...)` returns, or a plain `HyperswitchConfiguration` — a promise or an object. The merchant's identity and endpoints live here, not in `options`, the same split `react-hyper-js` uses. The fields do not wait for it; only the lookup does. |
+| `hyper` | **Required.** What `Hyperswitch.init(...)` returns, or a plain `HyperswitchConfiguration` — a promise or an object. The merchant's identity and endpoints live here, not in `options`, the same split `react-hyper-js` uses. The lookup waits for it, and so do the Hyperswitch vault's fields, since it decides where they call and load icons from: until it resolves they show placeholders and `tokenize()` answers `sdk_not_ready`. Other providers' fields do not wait. |
 | `options` | An object, or a promise of one, as the web wrapper accepts. |
 | `options.sdkAuthorization` | The payment session your backend minted, as the checkout SDK spells it. Enough on its own: the vault is [looked up](#resolving-the-vault) from it. |
 | `options.vaultDetails` | Which vault to drive — `{vaultType, vaultData}`, the web SDK's shape. Supply it and **no lookup happens**, even alongside `sdkAuthorization`. |
@@ -116,7 +116,7 @@ configures either package:
 | `publishableKey` | **Required.** |
 | `platformPublishableKey` | Carried for parity; unused by this package. |
 | `profileId` | Carried for parity with the checkout SDK; unused by this package. |
-| `environment` | `'PROD'` (default), `'SANDBOX'` or `'INTEG'`. Picks the Hyperswitch host when `customEndpoints` name no backend; a missing or unrecognised value is `PROD`. |
+| `environment` | `'PROD'` (default), `'SANDBOX'`, `'INTEG'` or `'PROD_EU'`. Picks the Hyperswitch host when `customEndpoints` name no backend; a missing or unrecognised value is `PROD`. |
 | `customEndpoints` | `{commonEndpoint}` or `{overrideEndpoints: {customBackendEndpoint}}`. Wins over `environment`. It must be `https` (`http` only to localhost outside `PROD`), with no credentials, query or hash; a blank or invalid one fails the session instead of falling back to a default host. |
 
 Already using `@juspay-tech/react-native-hyperswitch`? Its `Hyperswitch.init(...)` promise is
@@ -169,8 +169,9 @@ reason, and `tokenize()` answers `unsupported_configuration` quoting it.
 
 Default hosts, used when `customEndpoints` name no backend: `https://live.hyperswitch.io/api` for
 `PROD` (also a missing or unrecognised `environment`), `https://app.hyperswitch.io/api` for
-`SANDBOX` and `https://integ.hyperswitch.io/api` for `INTEG` — the route is appended after the
-`/api` prefix. Self-hosted deployments are reached through `customEndpoints`.
+`SANDBOX`, `https://integ.hyperswitch.io/api` for `INTEG` and `https://eu.hyperswitch.io/api` for
+`PROD_EU` — the route is appended after the `/api` prefix. Self-hosted deployments are reached
+through `customEndpoints`.
 
 ### `vaultDetails`
 
@@ -269,7 +270,7 @@ BIN, last four, brand and expiry. An absent member is an absent key, never `unde
 | `validation_error`         | `validation_error` | a field is empty or malformed, or `savedCard` has no paymentMethodToken           |
 | `incomplete_field_set`     | `validation_error` | no `<CardForm id>` is mounted for the id given to `tokenize(id)`     |
 | `unsupported_configuration`| `api_error`        | no vault configuration in scope or the lookup failed, or `savedCard` mounted beside other fields |
-| `sdk_not_ready`            | `api_error`        | the provider's SDK has not finished initialising, or the vault lookup is still in flight |
+| `sdk_not_ready`            | `api_error`        | the provider's SDK has not finished initialising, or the vault lookup (or, for the Hyperswitch vault, `hyper`) is still in flight |
 | `session_expired`          | `api_error`        | Hyperswitch vault: the session's `expires_at` has passed             |
 | `session_consumed`         | `api_error`        | Hyperswitch vault: this session already tokenized a card             |
 | `invalid_session`          | `api_error`        | Hyperswitch vault: no session, or an unreadable one                  |

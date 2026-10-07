@@ -195,6 +195,19 @@ describe('fetchVaultDetails', () => {
     );
   });
 
+  it('uses the EU host for PROD_EU', async () => {
+    fetchMock.mockResolvedValue(
+      okResponse(sessionBody({ vgs: { external_vault_id: 'x' } }))
+    );
+    await fetchVaultDetails({
+      sdkAuthorization: VALID_AUTH,
+      environment: 'PROD_EU',
+    });
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      'https://eu.hyperswitch.io/api/v1/payment-method-sessions/0a_pms_0192'
+    );
+  });
+
   it('treats an unrecognised environment as PROD', async () => {
     fetchMock.mockResolvedValue(
       okResponse(sessionBody({ vgs: { external_vault_id: 'x' } }))

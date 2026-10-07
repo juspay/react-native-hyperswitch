@@ -3,7 +3,7 @@ import type { VaultDetails, VaultType } from '../core/types';
 import { environmentOf } from './config';
 import { validateEndpoint } from './endpoint';
 
-export type HyperswitchEnvironment = 'PROD' | 'SANDBOX' | 'INTEG';
+export type HyperswitchEnvironment = 'PROD' | 'SANDBOX' | 'INTEG' | 'PROD_EU';
 
 export interface OverrideEndpointConfiguration {
   customBackendEndpoint?: string;
@@ -25,6 +25,7 @@ const DEFAULT_BASE_URL: Record<HyperswitchEnvironment, string> = {
   PROD: 'https://live.hyperswitch.io/api',
   SANDBOX: 'https://app.hyperswitch.io/api',
   INTEG: 'https://integ.hyperswitch.io/api',
+  PROD_EU: 'https://eu.hyperswitch.io/api',
 };
 
 const DEFAULT_TIMEOUT_MS = 10_000;

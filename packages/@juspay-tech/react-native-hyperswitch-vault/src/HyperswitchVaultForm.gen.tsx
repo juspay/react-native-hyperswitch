@@ -111,7 +111,7 @@ export type Props = {
   readonly disabled?: boolean; 
   readonly eligibility?: eligibilityConfig; 
   readonly enabledCardSchemes?: string[]; 
-  readonly environment: vaultEnvironment; 
+  readonly environment?: vaultEnvironment; 
   readonly fieldArrangement?: fieldArrangement; 
   readonly fieldOptions?: formFieldOptions; 
   readonly fieldStyles?: formFieldStyles; 
@@ -134,7 +134,7 @@ export const make: React.ComponentType<{
   readonly disabled?: boolean; 
   readonly eligibility?: eligibilityConfig; 
   readonly enabledCardSchemes?: string[]; 
-  readonly environment: vaultEnvironment; 
+  readonly environment?: vaultEnvironment; 
   readonly fieldArrangement?: fieldArrangement; 
   readonly fieldOptions?: formFieldOptions; 
   readonly fieldStyles?: formFieldStyles; 
