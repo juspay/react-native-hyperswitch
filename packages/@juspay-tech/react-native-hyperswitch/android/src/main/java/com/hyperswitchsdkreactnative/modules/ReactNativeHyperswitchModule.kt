@@ -49,18 +49,19 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
   NativeHyperswitchModuleSpec(reactContext) {
 
   private var paymentSessionReactLauncher: PaymentSessionReactLauncher? = null
-  private var launchOptions: LaunchOptions? = null
   private var handler: PaymentSessionHandler? = null
   private var walletHandler: WalletSessionHandler? = null
   private var walletSdkAuthorization: String? = null
-  // The Activity that paymentSessionReactLauncher and launchOptions were built for, and a copy of
-  // its configuration (kept so the rebind log can say what changed even after it is collected).
-  private var boundActivity: WeakReference<Activity>? = null
-  private var boundConfiguration: Configuration? = null
-  // HyperLogManager keeps logs in memory until it is initialised, so only log once it is.
+  /*
+   * The Activity seen by the last SDK call and a copy of its configuration, kept so the log can
+   * say why and how it changed when a later call finds a different one.
+   */
+  private var lastActivity: WeakReference<Activity>? = null
+  private var lastConfiguration: Configuration? = null
+  /* HyperLogManager keeps logs in memory until it is initialised, so only log once it is. */
   private var loggingEnabled = false
-  // The Activity whose launcher built walletHandler.
-  private var walletHandlerActivity: WeakReference<Activity>? = null
+  /* Set only once initialise has completed. */
+  private var initialised = false
 
   private val uiManagerType = if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
     UIManagerType.FABRIC
@@ -93,6 +94,7 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     customEndpoints: ReadableMap?,
     promise: Promise?
   ) {
+    initialised = false
     val activity = reactApplicationContext.currentActivity
     if (publishableKey.isNullOrBlank()) {
       promise?.reject("INITIALIZATION_ERROR", "publishableKey is required")
@@ -103,10 +105,10 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       return
     }
 
-    activity.let {
-      paymentSessionReactLauncher = PaymentSessionReactLauncher(activity)
-      paymentSessionReactLauncher?.initializeReactNativeInstance()
-    }
+    val launcher = paymentSessionReactLauncher
+      ?: PaymentSessionReactLauncher { reactApplicationContext.currentActivity }
+        .also { paymentSessionReactLauncher = it }
+    launcher.initializeReactNativeInstance()
     val overrideEndpoints: OverrideEndpoints? = customEndpoints?.getMap("overrideEndpoints")?.let {
       val overrideEndpointsMap = customEndpoints.getMap("overrideEndpoints")
       OverrideEndpoints(
@@ -135,43 +137,65 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       getLoggingEndpoint(publishableKey, overrideEndpoints, customConfig.commonEndpoint)
     loggingEnabled = loggingEndpoint != null
     loggingEndpoint?.let { HyperLogManager.initialise(publishableKey, it) }
-    activity.let {
-      launchOptions = LaunchOptions(activity, BuildConfig.VERSION_NAME, hyperswitchConfig)
-    }
-    boundActivity = WeakReference(activity)
-    boundConfiguration = Configuration(activity.resources.configuration)
+    lastActivity = WeakReference(activity)
+    lastConfiguration = Configuration(activity.resources.configuration)
     sendLog(
       "debug",
       "SDK initialised (environment=${hyperswitchConfig?.environment}, " +
         "activity=${activity.javaClass.simpleName})"
     )
+    initialised = true
     val handle = UUID.randomUUID().toString()
     promise?.resolve(handle)
   }
 
   /**
-   * [initialise] binds the launcher to the Activity that is current at that moment. If that
-   * Activity is replaced later in the same process (configuration change, recreate(), "Don't keep
-   * activities"), the sheet would be committed to the destroyed Activity's FragmentManager, which
-   * silently drops it, and presentPaymentSheet would never settle. Rebuild both for the current
-   * Activity, as [initialise] does.
+   * The live Activity to present on or start a headless flow from. When there is none, or the SDK
+   * was never initialised, resolves [promise] with a failure and returns null, so a call never
+   * hangs waiting on a sheet that cannot be shown.
    */
-  private fun rebindToCurrentActivity(trigger: String) {
-    val current = reactApplicationContext.currentActivity ?: return
-    if (paymentSessionReactLauncher == null || boundActivity?.get() === current) return
-    val details = "trigger=$trigger, reason=${replacementReason(boundActivity?.get())}, " +
-      "configChanged=${configurationChanges(boundConfiguration, current.resources.configuration)}"
-    try {
-      val launcher = PaymentSessionReactLauncher(current)
-      launcher.initializeReactNativeInstance()
-      paymentSessionReactLauncher = launcher
-      launchOptions = LaunchOptions(current, BuildConfig.VERSION_NAME, hyperswitchConfig)
-      boundActivity = WeakReference(current)
-      boundConfiguration = Configuration(current.resources.configuration)
-      sendLog("warning", "Activity changed since initialise; rebound payment launcher ($details)")
-    } catch (e: Exception) {
-      sendLog("error", "Could not rebind payment launcher ($details): ${e.message}")
+  private fun requireReady(trigger: String, promise: Promise?): Activity? {
+    if (!requireInitialised(trigger, promise)) return null
+    val activity = reactApplicationContext.currentActivity
+    if (
+      activity == null ||
+      activity.isFinishing ||
+      activity.isDestroyed ||
+      activity.isChangingConfigurations
+    ) {
+      sendLog("error", "$trigger called with no live Activity")
+      promise?.resolve(failed("ACTIVITY_UNAVAILABLE", "No active Activity"))
+      return null
     }
+    noteActivityChange(trigger, activity)
+    return activity
+  }
+
+  private fun requireInitialised(trigger: String, promise: Promise?): Boolean {
+    if (initialised && paymentSessionReactLauncher != null) return true
+    sendLog("error", "$trigger called before the SDK was initialised")
+    promise?.resolve(failed("NOT_INITIALISED", "SDK is not initialised"))
+    return false
+  }
+
+  private fun failed(code: String, message: String): String =
+    StandardResult.Failed(code = code, message = message, error = Throwable(message)).toJSONString()
+
+  private fun launchOptionsFor(activity: Activity) =
+    LaunchOptions(activity, BuildConfig.VERSION_NAME, hyperswitchConfig)
+
+  /** Logs when the host Activity differs from the one the previous SDK call saw. */
+  private fun noteActivityChange(trigger: String, current: Activity) {
+    val previous = lastActivity?.get()
+    if (previous === current) return
+    sendLog(
+      "warning",
+      "Activity changed since the last SDK call; using the current Activity (trigger=$trigger, " +
+        "reason=${replacementReason(previous)}, " +
+        "configChanged=${configurationChanges(lastConfiguration, current.resources.configuration)})"
+    )
+    lastActivity = WeakReference(current)
+    lastConfiguration = Configuration(current.resources.configuration)
   }
 
   /** Why the previously bound Activity is no longer the current one. */
@@ -192,10 +216,10 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
   }
 
   /**
-   * Sends a log to the SDK logging endpoint through HyperLogManager. Logger 1.0.0 has no generic
-   * event, so these use CRASH_EVENT; logType (debug/warning/error) and value say what happened.
-   * Never throws, so logging cannot break a payment flow. addLog runs on the UI thread because
-   * logger 1.0.0 keeps an unsynchronised batch that its debouncer reads on the main looper.
+   * Sends a native SDK lifecycle log (RN_SDK_LIFE_CYCLE) to the SDK logging endpoint through
+   * HyperLogManager; logType (debug/warning/error) and value say what happened. Never throws, so
+   * logging cannot break a payment flow. addLog runs on the UI thread because the logger keeps an
+   * unsynchronised batch that its debouncer reads on the main looper.
    */
   private fun sendLog(logType: String, value: String) {
     if (!loggingEnabled) return
@@ -203,7 +227,7 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       HSLog.LogBuilder()
         .logType(logType)
         .category(LogCategory.API)
-        .eventName(EventName.CRASH_EVENT)
+        .eventName(EventName.RN_SDK_LIFE_CYCLE)
         .value(value)
         .build()
     }.getOrNull() ?: return
@@ -242,31 +266,36 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     promise: Promise?
   ) {
     try {
-      rebindToCurrentActivity("presentPaymentSheet")
-      sendLog(
-        "debug",
-        "presentPaymentSheet called (sdkInitialised=${launchOptions != null}, " +
-          "activity=${reactApplicationContext.currentActivity?.javaClass?.simpleName})"
-      )
+      val activity = requireReady("presentPaymentSheet", promise) ?: return
+      sendLog("debug", "presentPaymentSheet called (activity=${activity.javaClass.simpleName})")
       val props = mutableMapOf<String, Any?>().apply {
         putAll(params?.toHashMap().orEmpty())
         put("type", "payment")
       }
-      val bundle = launchOptions?.getBundleWithHyperParams(props)
-      bundle?.let {
-        val isFragment = paymentSessionReactLauncher?.presentSheet(bundle)
-        val resultCallback: (String) -> Unit = { it ->
-          promise?.resolve(it)
+      val bundle = launchOptionsFor(activity).getBundleWithHyperParams(props)
+      if (PaymentSheetCallbackManager.getCallback() != null) {
+        if (paymentSessionReactLauncher?.isSheetVisible(activity) == true) {
+          promise?.resolve(
+            JSONObject().apply {
+              put("status", "cancelled")
+              put("code", "sheet_already_presented")
+              put("message", "A payment sheet is already presented.")
+            }.toString()
+          )
+          return
         }
-        PaymentSheetCallbackManager.setCallback(resultCallback, isFragment == true)
+        /* The previous call's sheet is gone without reporting back; settle it before replacing. */
+        PaymentSheetCallbackManager.executeCallback(
+          failed("SHEET_REPLACED", "Replaced by a newer presentPaymentSheet call")
+        )
       }
+      val isFragment = paymentSessionReactLauncher?.presentSheet(bundle, activity)
+      val resultCallback: (String) -> Unit = { it ->
+        promise?.resolve(it)
+      }
+      PaymentSheetCallbackManager.setCallback(resultCallback, isFragment == true)
     } catch (e: Exception) {
-      val map = mutableMapOf<String, Any>().apply {
-        put("code", "failed")
-        put("message", "failed to open")
-        put("reason", e.message.toString())
-      }
-      promise?.resolve(map)
+      promise?.resolve(failed("PRESENT_FAILED", "failed to open: ${e.message}"))
     }
   }
 
@@ -274,16 +303,16 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     params: ReadableMap?,
     promise: Promise
   ) {
-    rebindToCurrentActivity("getCustomerSavedPaymentMethods")
+    val activity = requireReady("getCustomerSavedPaymentMethods", promise) ?: return
     val props = mutableMapOf<String, Any?>().apply {
       putAll(params?.toHashMap().orEmpty())
       put("type", "payment")
     }
 
     // sdkParams carries appId, which the headless confirm needs to send a return_url.
-    val bundle = launchOptions?.getBundleWithHyperParams(props)
-    bundle?.let {
-      val savedPaymentMethodCallback: (PaymentSessionHandler) -> Unit = { it ->
+    val bundle = launchOptionsFor(activity).getBundleWithHyperParams(props)
+    run {
+      val savedPaymentMethodCallback: (PaymentSessionHandler) -> Unit = {
         handler = it
         promise.resolve(
           JSONObject().apply {
@@ -296,7 +325,9 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
         params?.getMap("paymentSessionConfig")?.getString("sdkAuthorization"),
         savedPaymentMethodCallback
       )
-      paymentSessionReactLauncher?.recreateReactContext(it)
+      if (paymentSessionReactLauncher?.recreateReactContext(bundle) != true) {
+        promise.resolve(failed("ACTIVITY_UNAVAILABLE", "No active Activity"))
+      }
     }
 
   }
@@ -375,6 +406,7 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       )
       return
     }
+    paymentSessionReactLauncher?.resumeHostForCurrentActivity()
 
     val reactTag = reactTag.toInt()
 
@@ -416,6 +448,7 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       )
       return
     }
+    paymentSessionReactLauncher?.resumeHostForCurrentActivity()
 
     val reactTag = reactTag.toInt()
 
@@ -474,6 +507,7 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       )
       return
     } else {
+      paymentSessionReactLauncher?.resumeHostForCurrentActivity()
       handler?.confirmWithCustomerPaymentToken(token, null) { result ->
         promise?.resolve(result.toJSONString())
       }
@@ -528,16 +562,13 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       return
     }
 
-    rebindToCurrentActivity("getWalletSession")
+    if (!requireInitialised("getWalletSession", promise)) return
 
-    // Reuse only while the intent and the Activity are unchanged. A new sdkAuthorization means
-    // updateIntent replaced the intent; a new Activity means the handler's headless task resumed
-    // the SDK host with the old one. Either way the handler is rebuilt.
-    if (
-      walletHandler != null &&
-      walletSdkAuthorization == sdkAuthorization &&
-      walletHandlerActivity?.get() === boundActivity?.get()
-    ) {
+    /*
+     * Reuse only while the intent is unchanged. A new sdkAuthorization means
+     * updateIntent replaced the intent, so the handler is rebuilt against it.
+     */
+    if (walletHandler != null && walletSdkAuthorization == sdkAuthorization) {
       promise.resolve(
         JSONObject().apply {
           put("code", "success")
@@ -547,6 +578,7 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       return
     }
 
+    val activity = requireReady("getWalletSession", promise) ?: return
     walletHandler = null
     walletSdkAuthorization = sdkAuthorization
 
@@ -556,24 +588,11 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     }
 
     // sdkParams carries appId, which the headless confirm needs to send a return_url.
-    val bundle = launchOptions?.getBundleWithHyperParams(props)
-
-    if (bundle == null) {
-      promise.resolve(
-        StandardResult.Failed(
-          code = "NOT_INITIALISED",
-          message = "SDK is not initialised",
-          error = Throwable("SDK is not initialised")
-        ).toJSONString()
-      )
-      return
-    }
+    val bundle = launchOptionsFor(activity).getBundleWithHyperParams(props)
 
     var resolved = false
-    val handlerActivity = boundActivity
     val walletSessionCallback: (WalletSessionHandler) -> Unit = {
       walletHandler = it
-      walletHandlerActivity = handlerActivity
       if (!resolved) {
         resolved = true
         promise.resolve(
@@ -586,7 +605,10 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     }
 
     GetWalletSessionCallBackManager.setCallback(sdkAuthorization, walletSessionCallback)
-    paymentSessionReactLauncher?.recreateReactContext(bundle)
+    if (paymentSessionReactLauncher?.recreateReactContext(bundle) != true) {
+      resolved = true
+      promise.resolve(failed("ACTIVITY_UNAVAILABLE", "No active Activity"))
+    }
   }
 
   override fun isWalletEligible(wallet: String, promise: Promise) {
@@ -610,8 +632,12 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       )
       return
     }
-    current.launchWallet(wallet) { result ->
-      promise.resolve(result.toJSONString())
+    requireReady("launchWallet", promise) ?: return
+    val launcher = paymentSessionReactLauncher ?: return
+    launcher.runWithHostResumed {
+      current.launchWallet(wallet) { result ->
+        promise.resolve(result.toJSONString())
+      }
     }
   }
 

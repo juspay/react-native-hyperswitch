@@ -15,12 +15,20 @@ import NativeHyperswitchModule from './codegen/modules/NativeHyperswitchModule';
 import { createPaymentSession } from './session/PaymentSession';
 import { Elements } from './types/elements';
 import { createElements } from './session/Elements';
-import { setInitializing } from './native/InitializationState';
+import {
+  setInitializing,
+  setSheetPresented,
+} from './native/InitializationState';
 
 export function loadHyper(
   config: HyperswitchConfiguration
 ): Promise<HyperswitchSession> {
   setInitializing(true);
+  /*
+   * A presentPaymentSheet that never settled would otherwise block every later call with
+   * sheet_already_presented; native resolves that stale call when the next sheet is presented.
+   */
+  setSheetPresented(false);
   return NativeHyperswitchModule.initialise(
     config.publishableKey,
     config.platformPublishableKey ?? '',
