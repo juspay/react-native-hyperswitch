@@ -1,5 +1,8 @@
 package com.hyperswitchsdkreactnative.modules
 
+import android.app.Activity
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReadableMap
@@ -18,6 +21,10 @@ import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.wallet.IsReadyToPayRequest
 import com.google.android.gms.wallet.Wallet
 import com.google.android.gms.wallet.WalletConstants
+import io.hyperswitch.logs.EventName
+import io.hyperswitch.logs.HSLog
+import io.hyperswitch.logs.HyperLogManager
+import io.hyperswitch.logs.LogCategory
 import io.hyperswitch.paymentsession.GetPaymentSessionCallBackManager
 import io.hyperswitch.paymentsession.GetWalletSessionCallBackManager
 import io.hyperswitch.paymentsession.WalletSessionHandler
@@ -32,6 +39,7 @@ import io.hyperswitch.utils.StandardResult
 import io.hyperswitch.view.PaymentWidgetView
 import org.json.JSONArray
 import org.json.JSONObject
+import java.lang.ref.WeakReference
 import java.util.UUID
 import kotlin.String
 import kotlin.collections.orEmpty
@@ -45,6 +53,14 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
   private var handler: PaymentSessionHandler? = null
   private var walletHandler: WalletSessionHandler? = null
   private var walletSdkAuthorization: String? = null
+  // The Activity that paymentSessionReactLauncher and launchOptions were built for, and a copy of
+  // its configuration (kept so the rebind log can say what changed even after it is collected).
+  private var boundActivity: WeakReference<Activity>? = null
+  private var boundConfiguration: Configuration? = null
+  // HyperLogManager keeps logs in memory until it is initialised, so only log once it is.
+  private var loggingEnabled = false
+  // The Activity whose launcher built walletHandler.
+  private var walletHandlerActivity: WeakReference<Activity>? = null
 
   private val uiManagerType = if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
     UIManagerType.FABRIC
@@ -114,11 +130,111 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       environment = parseEnvironment(environment),
       customConfig = customConfig
     )
+    // Without this, logs added through HyperLogManager are kept in memory and never sent.
+    val loggingEndpoint =
+      getLoggingEndpoint(publishableKey, overrideEndpoints, customConfig.commonEndpoint)
+    loggingEnabled = loggingEndpoint != null
+    loggingEndpoint?.let { HyperLogManager.initialise(publishableKey, it) }
     activity.let {
       launchOptions = LaunchOptions(activity, BuildConfig.VERSION_NAME, hyperswitchConfig)
     }
+    boundActivity = WeakReference(activity)
+    boundConfiguration = Configuration(activity.resources.configuration)
+    sendLog(
+      "debug",
+      "SDK initialised (environment=${hyperswitchConfig?.environment}, " +
+        "activity=${activity.javaClass.simpleName})"
+    )
     val handle = UUID.randomUUID().toString()
     promise?.resolve(handle)
+  }
+
+  /**
+   * [initialise] binds the launcher to the Activity that is current at that moment. If that
+   * Activity is replaced later in the same process (configuration change, recreate(), "Don't keep
+   * activities"), the sheet would be committed to the destroyed Activity's FragmentManager, which
+   * silently drops it, and presentPaymentSheet would never settle. Rebuild both for the current
+   * Activity, as [initialise] does.
+   */
+  private fun rebindToCurrentActivity(trigger: String) {
+    val current = reactApplicationContext.currentActivity ?: return
+    if (paymentSessionReactLauncher == null || boundActivity?.get() === current) return
+    val details = "trigger=$trigger, reason=${replacementReason(boundActivity?.get())}, " +
+      "configChanged=${configurationChanges(boundConfiguration, current.resources.configuration)}"
+    try {
+      val launcher = PaymentSessionReactLauncher(current)
+      launcher.initializeReactNativeInstance()
+      paymentSessionReactLauncher = launcher
+      launchOptions = LaunchOptions(current, BuildConfig.VERSION_NAME, hyperswitchConfig)
+      boundActivity = WeakReference(current)
+      boundConfiguration = Configuration(current.resources.configuration)
+      sendLog("warning", "Activity changed since initialise; rebound payment launcher ($details)")
+    } catch (e: Exception) {
+      sendLog("error", "Could not rebind payment launcher ($details): ${e.message}")
+    }
+  }
+
+  /** Why the previously bound Activity is no longer the current one. */
+  private fun replacementReason(previous: Activity?): String = when {
+    previous == null -> "unknown, previous Activity already collected"
+    previous.isChangingConfigurations -> "configuration change or recreate()"
+    previous.isFinishing -> "previous Activity finished"
+    previous.isDestroyed -> "previous Activity destroyed by the system"
+    else -> "another Activity is in front"
+  }
+
+  /** Names of the configuration fields that differ, e.g. "fontScale,locale"; "none" for recreate(). */
+  private fun configurationChanges(previous: Configuration?, current: Configuration): String {
+    previous ?: return "unknown"
+    val diff = previous.diff(current)
+    return CONFIG_NAMES.filter { (bit, _) -> diff and bit != 0 }.joinToString(",") { it.second }
+      .ifEmpty { if (diff == 0) "none" else "0x" + Integer.toHexString(diff) }
+  }
+
+  /**
+   * Sends a log to the SDK logging endpoint through HyperLogManager. Logger 1.0.0 has no generic
+   * event, so these use CRASH_EVENT; logType (debug/warning/error) and value say what happened.
+   * Never throws, so logging cannot break a payment flow. addLog runs on the UI thread because
+   * logger 1.0.0 keeps an unsynchronised batch that its debouncer reads on the main looper.
+   */
+  private fun sendLog(logType: String, value: String) {
+    if (!loggingEnabled) return
+    val log = runCatching {
+      HSLog.LogBuilder()
+        .logType(logType)
+        .category(LogCategory.API)
+        .eventName(EventName.CRASH_EVENT)
+        .value(value)
+        .build()
+    }.getOrNull() ?: return
+    UiThreadUtil.runOnUiThread { runCatching { HyperLogManager.addLog(log) } }
+  }
+
+  /**
+   * Mirrors the JS logger (GlobalHooks.getLoggingUrl): endpoints come from overrideEndpoints when
+   * given, otherwise from commonEndpoint. A custom backend without a logging endpoint, or an empty
+   * logging endpoint, turns logging off (null). With neither, the default host is used, picked
+   * like GlobalVars.checkEnv: sandbox for pk_snd_ keys, production otherwise.
+   */
+  private fun getLoggingEndpoint(
+    publishableKey: String,
+    overrideEndpoints: OverrideEndpoints?,
+    commonEndpoint: String?
+  ): String? {
+    val backend: String?
+    val logs: String?
+    if (overrideEndpoints != null) {
+      backend = overrideEndpoints.customBackendEndpoint
+      logs = overrideEndpoints.customLoggingEndpoint
+    } else {
+      backend = commonEndpoint?.let { "$it$BACKEND_PATH" }
+      logs = commonEndpoint?.let { "$it$LOGS_PATH" }
+    }
+    return when {
+      logs != null -> logs.ifEmpty { null }
+      backend != null -> null
+      else -> (if (publishableKey.startsWith("pk_snd_")) SANDBOX_HOST else PROD_HOST) + LOGS_PATH
+    }
   }
 
   override fun presentPaymentSheet(
@@ -126,6 +242,12 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     promise: Promise?
   ) {
     try {
+      rebindToCurrentActivity("presentPaymentSheet")
+      sendLog(
+        "debug",
+        "presentPaymentSheet called (sdkInitialised=${launchOptions != null}, " +
+          "activity=${reactApplicationContext.currentActivity?.javaClass?.simpleName})"
+      )
       val props = mutableMapOf<String, Any?>().apply {
         putAll(params?.toHashMap().orEmpty())
         put("type", "payment")
@@ -152,6 +274,7 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     params: ReadableMap?,
     promise: Promise
   ) {
+    rebindToCurrentActivity("getCustomerSavedPaymentMethods")
     val props = mutableMapOf<String, Any?>().apply {
       putAll(params?.toHashMap().orEmpty())
       put("type", "payment")
@@ -405,9 +528,16 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       return
     }
 
-    // Reuse only while the intent is unchanged. A new sdkAuthorization means
-    // updateIntent replaced the intent, so the handler is rebuilt against it.
-    if (walletHandler != null && walletSdkAuthorization == sdkAuthorization) {
+    rebindToCurrentActivity("getWalletSession")
+
+    // Reuse only while the intent and the Activity are unchanged. A new sdkAuthorization means
+    // updateIntent replaced the intent; a new Activity means the handler's headless task resumed
+    // the SDK host with the old one. Either way the handler is rebuilt.
+    if (
+      walletHandler != null &&
+      walletSdkAuthorization == sdkAuthorization &&
+      walletHandlerActivity?.get() === boundActivity?.get()
+    ) {
       promise.resolve(
         JSONObject().apply {
           put("code", "success")
@@ -440,8 +570,10 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     }
 
     var resolved = false
+    val handlerActivity = boundActivity
     val walletSessionCallback: (WalletSessionHandler) -> Unit = {
       walletHandler = it
+      walletHandlerActivity = handlerActivity
       if (!resolved) {
         resolved = true
         promise.resolve(
@@ -541,5 +673,27 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     private const val IS_READY_TO_PAY_REQUEST =
       """{"apiVersion":2,"apiVersionMinor":0,"allowedPaymentMethods":[{"type":"CARD","parameters":{"allowedAuthMethods":["PAN_ONLY","CRYPTOGRAM_3DS"],"allowedCardNetworks":["AMEX","DISCOVER","JCB","MASTERCARD","VISA"]}}]}"""
     private var hyperswitchConfig: HyperswitchConfiguration? = null
+    private const val PROD_HOST = "https://live.hyperswitch.io"
+    private const val SANDBOX_HOST = "https://app.hyperswitch.io"
+    private const val BACKEND_PATH = "/api"
+    private val CONFIG_NAMES = listOf(
+      ActivityInfo.CONFIG_FONT_SCALE to "fontScale",
+      ActivityInfo.CONFIG_LOCALE to "locale",
+      ActivityInfo.CONFIG_LAYOUT_DIRECTION to "layoutDirection",
+      ActivityInfo.CONFIG_UI_MODE to "uiMode",
+      ActivityInfo.CONFIG_DENSITY to "density",
+      ActivityInfo.CONFIG_ORIENTATION to "orientation",
+      ActivityInfo.CONFIG_SCREEN_SIZE to "screenSize",
+      ActivityInfo.CONFIG_SMALLEST_SCREEN_SIZE to "smallestScreenSize",
+      ActivityInfo.CONFIG_SCREEN_LAYOUT to "screenLayout",
+      ActivityInfo.CONFIG_KEYBOARD to "keyboard",
+      ActivityInfo.CONFIG_KEYBOARD_HIDDEN to "keyboardHidden",
+      ActivityInfo.CONFIG_NAVIGATION to "navigation",
+      ActivityInfo.CONFIG_TOUCHSCREEN to "touchscreen",
+      ActivityInfo.CONFIG_MCC to "mcc",
+      ActivityInfo.CONFIG_MNC to "mnc",
+      ActivityInfo.CONFIG_COLOR_MODE to "colorMode",
+    )
+    private const val LOGS_PATH = "/api/logs/sdk"
   }
 }
