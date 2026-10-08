@@ -158,6 +158,6 @@ dependencies {
   implementation 'org.greenrobot:eventbus:3.1.0'
 //  implementation "io.hyperswitch:hyperswitch-sdk-android-airborne:1.0.0"
   implementation "io.hyperswitch:hyperswitch-sdk-android-common:1.0.1"
-  implementation "io.hyperswitch:hyperswitch-sdk-android-logger:1.0.0"
+  implementation "io.hyperswitch:hyperswitch-sdk-android-logger:1.0.7"
   implementation 'io.hyperswitch:hyperswitch-sdk-android-webview-utils:1.0.6'
 }

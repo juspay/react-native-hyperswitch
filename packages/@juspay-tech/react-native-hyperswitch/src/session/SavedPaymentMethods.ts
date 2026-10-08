@@ -9,7 +9,10 @@ import {
   SavedPaymentMethodsConfiguration,
 } from '../types/savedPaymentMethods';
 import type { PaymentResult } from '../types/paymentresult';
-import { mapNativeResponseToPaymentResult } from '../native/NativeResponseMapper';
+import {
+  mapNativeResponseToPaymentResult,
+  parseNativeResponse,
+} from '../native/NativeResponseMapper';
 import { getWidget } from '../widget/WidgetRegistry';
 
 function getReactTag(widgetId?: string): number {
@@ -116,6 +119,11 @@ export async function getCustomerSavedPaymentMethods(
       }
     },
   };
-  await NativeHyperswitchModule.getCustomerSavedPaymentMethods(payload);
+  const raw = await NativeHyperswitchModule.getCustomerSavedPaymentMethods(payload);
+  const { status, code, message } = parseNativeResponse(raw);
+  // Android reports failures as status "failed", iOS as code "error".
+  if (status === 'failed' || code === 'error') {
+    throw new Error(message ?? 'Failed to load saved payment methods');
+  }
   return createCustomerSavedPaymentMethodsSession();
 }
