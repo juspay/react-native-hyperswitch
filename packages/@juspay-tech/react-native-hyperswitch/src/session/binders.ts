@@ -18,6 +18,8 @@ import type { WalletSessionHandle } from '../types/walletSession';
 type SessionBindings = {
   hyperswitchConfig: HyperswitchConfiguration;
   paymentSessionConfig: PaymentSessionConfiguration;
+  /** The native session these calls belong to (Android). */
+  sessionTag?: number;
 };
 
 /**
@@ -34,7 +36,7 @@ export function bindPresentPaymentSheet(bindings: SessionBindings) {
       bindings.paymentSessionConfig,
       configuration
     );
-    return presentPaymentSheetWithPayload(payload);
+    return presentPaymentSheetWithPayload(payload, bindings.sessionTag);
   };
 }
 
@@ -49,7 +51,8 @@ export function bindGetCustomerSavedPaymentMethods(bindings: SessionBindings) {
     return getCustomerSavedPaymentMethods(
       bindings.hyperswitchConfig,
       bindings.paymentSessionConfig,
-      configuration
+      configuration,
+      bindings.sessionTag
     );
   };
 }

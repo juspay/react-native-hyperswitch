@@ -102,11 +102,13 @@ export function createCustomerSavedPaymentMethodsSession(): CustomerSavedPayment
 export async function getCustomerSavedPaymentMethods(
   hyperswitchConfig: HyperswitchConfiguration,
   paymentSessionConfig: PaymentSessionConfiguration,
-  configuration?: SavedPaymentMethodsConfiguration
+  configuration?: SavedPaymentMethodsConfiguration,
+  sessionTag?: number
 ): Promise<CustomerSavedPaymentMethodsSession> {
   const payload = {
     hyperswitchConfig,
     paymentSessionConfig,
+    sessionTag,
     configuration : {
       ...configuration,
       paymentMethodLayout : {

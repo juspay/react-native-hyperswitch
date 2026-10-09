@@ -13,6 +13,8 @@ import { PaymentSheetConfiguration } from '../PaymentSheetConfiguration';
 
 export interface Elements {
   hyperswitchConfig: HyperswitchConfiguration;
+  /** @internal Tag of the native session, handed to the widgets so they follow its updateIntent. */
+  sessionTag?: number;
   confirmPayment(
     paymentElementRef: { current: PaymentElementHandle | null } | string,
     options?: { confirmParams?: Record<string, any> }

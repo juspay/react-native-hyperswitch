@@ -40,6 +40,19 @@ export interface Spec extends TurboModule {
   isWalletEligible(wallet: string): Promise<boolean>;
 
   launchWallet(wallet: string): Promise<string>;
+
+  /* A new native session (client-core's PaymentSession): starts its prefetch surface and
+     resolves its tag (-1 when there is none), which the session's calls pass back as
+     `sessionTag`. updateIntent crosses the bridge in two calls: init resolves once the new
+     authorization is needed, complete hands it over. */
+  initPaymentSession(params: Object): Promise<number>;
+
+  updateIntentInit(sessionTag: number): Promise<string>;
+
+  updateIntentComplete(
+    sessionTag: number,
+    sdkAuthorization: string
+  ): Promise<string>;
 }
 
 /**

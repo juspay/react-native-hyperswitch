@@ -9,18 +9,13 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.fragment.app.FragmentActivity
-import androidx.fragment.app.FragmentManager
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Callback
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableMap
-import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.fabric.mounting.SurfaceMountingManager
-import com.facebook.react.uimanager.IllegalViewOperationException
-import com.facebook.react.uimanager.UIManagerHelper
 import com.facebook.react.uimanager.UIManagerModule
-import com.facebook.react.uimanager.common.UIManagerType
 import com.hyperswitchsdkreactnative.BuildConfig
 import com.hyperswitchsdkreactnative.NativeHyperModuleSpec
 import io.hyperswitch.payments.GooglePayCallbackManager
@@ -82,12 +77,6 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
 
   init {
     activeInstance = this
-  }
-
-  private val uiManagerType = if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
-    UIManagerType.FABRIC
-  } else {
-    UIManagerType.DEFAULT
   }
 
   override fun getName(): String {
@@ -223,12 +212,8 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
     }
   }
 
-  override fun exitPaymentMethodManagement(
-    rootTag: Double,
-    result: ReadableMap?,
-    reset: Boolean
-  ) {
-    TODO("Not yet implemented")
+  override fun exitPaymentMethodManagement(rootTag: Double, result: String, reset: Boolean) {
+    // TODO: not yet implemented (payment methods management is not offered by this SDK).
   }
 
   // Method to exit the widget
@@ -239,8 +224,8 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
 
   // Method to exit the card form
   @ReactMethod
-  override fun exitCardForm(paymentResult: ReadableMap) {
-//        WidgetLauncher.onPaymentResultCallback(PaymentMethod.CARD.apiValue, paymentResult.toExitResultJson())
+  override fun exitCardForm(result: String) {
+//        WidgetLauncher.onPaymentResultCallback(PaymentMethod.CARD.apiValue, result)
   }
 
   // Method to launch widget payment sheet
@@ -275,18 +260,14 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
   }
 
   @ReactMethod
-  override fun onUpdateIntentEvent(rootTag: Double, type: String, result: ReadableMap) {
-    findViewWithRootTag(rootTag.toInt(), { fragment ->
-      if (fragment == null) {
-        Log.w("HyperModule", "onUpdateIntentEvent: no fragment found for rootTag=$rootTag")
-        return@findViewWithRootTag
+  override fun onUpdateIntentEvent(rootTag: Double, eventType: String, result: ReadableMap) {
+    val json = result.toExitResultJson()
+    SurfaceOwners.resolve(rct, rootTag.toInt()) { owner ->
+      when (owner) {
+        is UpdateIntentReplyTarget -> owner.onUpdateIntentReply(eventType, json)
+        else -> Log.w("HyperModule", "onUpdateIntentEvent: no prefetch owner for rootTag=$rootTag ($eventType)")
       }
-      if (type == "UPDATE_INTENT_INIT_RETURNED") {
-        fragment.notifyResult(CallbackType.UPDATE_INTENT_INIT, result.toExitResultJson())
-      } else if (type == "UPDATE_INTENT_COMPLETE_RETURNED") {
-        fragment.notifyResult(CallbackType.UPDATE_INTENT_COMPLETE, result.toExitResultJson())
-      }
-    })
+    }
   }
 
   // Variable to keep track of event listener count
@@ -433,32 +414,6 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
   }
 
   private fun findViewWithRootTag(rootTag: Int, onFound: (HyperFragment?) -> Unit) {
-    // Registry first (surface-backed rn81 fragments tag their root view); legacy
-    // FragmentManager.findFragment fallback keeps the rn79 ReactFragment path working.
-    SurfaceOwners.resolve(rct, rootTag) { owner ->
-      if (owner is HyperFragment) {
-        onFound(owner)
-      } else {
-        legacyFindViewWithRootTag(rootTag, onFound)
-      }
-    }
-  }
-
-  private fun legacyFindViewWithRootTag(rootTag: Int, onFound: (HyperFragment?) -> Unit) {
-    UiThreadUtil.runOnUiThread {
-      val uiManagerModule =
-        UIManagerHelper.getUIManager(
-          rct,
-          uiManagerType
-        )
-      try {
-        val view = uiManagerModule?.resolveView(rootTag)
-        return@runOnUiThread onFound(view?.let { FragmentManager.findFragment(it) })
-      } catch (e: IllegalViewOperationException) {
-        return@runOnUiThread onFound(null)
-      } catch (e: Exception) {
-        return@runOnUiThread onFound(null)
-      }
-    }
+    SurfaceOwners.resolve(rct, rootTag) { owner -> onFound(owner as? HyperFragment) }
   }
 }

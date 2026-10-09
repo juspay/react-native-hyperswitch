@@ -29,8 +29,22 @@
 
 RCT_EXPORT_MODULE(HyperHeadless);
 
-/* The shared JS bundle sends exit results as objects (post #569); convert to
-   the JSON string contract consumed by the Swift impl layer. */
+/* Exit results arrive as objects. The new architecture hands them over as the
+   codegen struct, read field by field as in hyperswitch-client-core's
+   HyperHeadlessTurboModule.mm; the bridge hands over a dictionary. Either way the
+   Swift impl still takes the JSON string the bundle used to send. */
+#ifdef RCT_NEW_ARCH_ENABLED
+static NSString *HyperHeadlessExitResultJSON(JS::NativeHyperHeadless::PaymentExitResult &status) {
+    NSMutableDictionary *json = [NSMutableDictionary dictionary];
+    json[@"status"] = status.status() ?: @"failed";
+    if (status.code()) json[@"code"] = status.code();
+    if (status.message()) json[@"message"] = status.message();
+    if (status.type()) json[@"type"] = status.type();
+    NSData *data = [NSJSONSerialization dataWithJSONObject:json options:0 error:nil];
+    return data ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]
+                : @"{\"status\":\"failed\",\"message\":\"unknown\"}";
+}
+#else
 static NSString *HyperHeadlessExitResultJSON(NSDictionary *status) {
     if (![status isKindOfClass:[NSDictionary class]] ||
         ![NSJSONSerialization isValidJSONObject:status]) {
@@ -40,6 +54,7 @@ static NSString *HyperHeadlessExitResultJSON(NSDictionary *status) {
     return data ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]
                 : @"{\"status\":\"failed\",\"message\":\"unknown\"}";
 }
+#endif
 
 + (BOOL)requiresMainQueueSetup {
     return YES;
@@ -65,11 +80,19 @@ RCT_EXPORT_METHOD(getWalletSession:(double)rootTag
                                                        callback:callback];
 }
 
+#ifdef RCT_NEW_ARCH_ENABLED
+RCT_EXPORT_METHOD(exitHeadless:(double)rootTag
+                  status:(JS::NativeHyperHeadless::PaymentExitResult &)status) {
+    [HyperHeadlessModuleImpl.shared exitHeadlessWithRootTag:@(rootTag)
+                                                      status:HyperHeadlessExitResultJSON(status)];
+}
+#else
 RCT_EXPORT_METHOD(exitHeadless:(double)rootTag
                   status:(NSDictionary *)status) {
     [HyperHeadlessModuleImpl.shared exitHeadlessWithRootTag:@(rootTag)
                                                       status:HyperHeadlessExitResultJSON(status)];
 }
+#endif
 
 #ifdef RCT_NEW_ARCH_ENABLED
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:

@@ -75,13 +75,13 @@ export interface Spec extends TurboModule {
   exitPaymentsheet(rootTag: number, result: PaymentExitResult, reset: boolean): void;
   exitPaymentMethodManagement(
     rootTag: number,
-    result: PaymentExitResult,
+    result: string,
     reset: boolean
   ): void;
 
   // --- Widget ---
   exitWidget(result: PaymentExitResult, widgetType: string): void;
-  exitCardForm(result: PaymentExitResult): void;
+  exitCardForm(result: string): void;
   launchWidgetPaymentSheet(
     requestObj: string,
     callback: (result: Object) => void

@@ -1,5 +1,6 @@
 package io.hyperswitch.react
 
+import android.util.Log
 import com.facebook.react.bridge.Callback
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -8,9 +9,8 @@ import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
 import com.hyperswitchsdkreactnative.NativeHyperHeadlessSpec
 import io.hyperswitch.paymentsession.ExitHeadlessCallBackManager
-import io.hyperswitch.paymentsession.GetPaymentSessionCallBackManager
 import io.hyperswitch.paymentsession.GetWalletSessionCallBackManager
-import io.hyperswitch.paymentsession.PaymentSessionHandlerImpl
+import io.hyperswitch.paymentsession.HeadlessAttempt
 import io.hyperswitch.paymentsession.WalletSessionHandlerImpl
 
 class HyperHeadlessModule internal constructor(private val rct: ReactApplicationContext) :
@@ -20,19 +20,18 @@ class HyperHeadlessModule internal constructor(private val rct: ReactApplication
     @ReactMethod
     override  fun getPaymentSession(
         rootTag: Double,
-        getPaymentMethodData: ReadableMap,
-        getPaymentMethodData2: ReadableMap,
-        getPaymentMethodDataArray: ReadableArray,
+        paymentIntentData: ReadableMap,
+        defaultPaymentMethod: ReadableMap,
+        savedPaymentMethods: ReadableArray,
         callback: Callback
     ) {
-        val handler = PaymentSessionHandlerImpl(
-            sdkAuthorization = GetPaymentSessionCallBackManager.getSdkAuthorization(),
-            defaultMethodData = getPaymentMethodData,
-            lastUsedMethodData = getPaymentMethodData2,
-            allMethodsData = getPaymentMethodDataArray,
-            jsCallback = callback,
-        )
-      GetPaymentSessionCallBackManager.executeCallback(handler)
+        SurfaceOwners.resolve(rct, rootTag.toInt()) { owner ->
+            when (owner) {
+                is HeadlessAttempt ->
+                    owner.onPaymentSession(paymentIntentData, defaultPaymentMethod, savedPaymentMethods, callback)
+                else -> Log.w(TAG, "getPaymentSession: no headless owner for rootTag=$rootTag")
+            }
+        }
     }
 
     @ReactMethod
@@ -52,10 +51,11 @@ class HyperHeadlessModule internal constructor(private val rct: ReactApplication
     override fun exitHeadless(rootTag: Double, status: ReadableMap) {
       try {
         val json = status.toExitResultJson()
-        // A CVC widget answers through its own surface root: resolve the owner
-        // first; headless-API flows fall back to the callback manager.
+        // Saved-methods surfaces and CVC widgets answer through their own root;
+        // the wallet session still answers through the callback manager.
         SurfaceOwners.resolve(rct, rootTag.toInt()) { owner ->
           when (owner) {
+            is HeadlessAttempt -> owner.onExit(parsePaymentResult(json))
             is HyperFragment -> owner.notifyResult(CallbackType.CONFIRM_CVC_ACTION, json)
             else -> ExitHeadlessCallBackManager.executeCallback(rootTag.toInt(), json)
           }
@@ -66,5 +66,6 @@ class HyperHeadlessModule internal constructor(private val rct: ReactApplication
 
   companion object {
     const val NAME = "HyperHeadless"
+    private const val TAG = "HyperHeadlessModule"
   }
 }

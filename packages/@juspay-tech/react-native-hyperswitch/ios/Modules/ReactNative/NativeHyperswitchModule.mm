@@ -185,6 +185,30 @@ RCT_EXPORT_METHOD(launchWallet:(nonnull NSString *)wallet
     [[self moduleImpl] launchWalletWithWallet:wallet resolve:resolve reject:reject];
 }
 
+/* The native session and its updateIntent are Android-only until the iOS side is ported:
+   no session here (-1), and TS keeps iOS on the per-widget updateIntent path. */
+RCT_EXPORT_METHOD(initPaymentSession:(nonnull NSDictionary *)params
+                  resolve:(nonnull RCTPromiseResolveBlock)resolve
+                  reject:(nonnull RCTPromiseRejectBlock)reject)
+{
+    resolve(@(-1));
+}
+
+RCT_EXPORT_METHOD(updateIntentInit:(double)sessionTag
+                  resolve:(nonnull RCTPromiseResolveBlock)resolve
+                  reject:(nonnull RCTPromiseRejectBlock)reject)
+{
+    resolve(@"{\"status\":\"failed\",\"code\":\"NOT_SUPPORTED\",\"message\":\"updateIntent runs per widget on iOS\"}");
+}
+
+RCT_EXPORT_METHOD(updateIntentComplete:(double)sessionTag
+                  sdkAuthorization:(nonnull NSString *)sdkAuthorization
+                  resolve:(nonnull RCTPromiseResolveBlock)resolve
+                  reject:(nonnull RCTPromiseRejectBlock)reject)
+{
+    resolve(@"{\"status\":\"failed\",\"code\":\"NOT_SUPPORTED\",\"message\":\"updateIntent runs per widget on iOS\"}");
+}
+
 // ---------------------------------------------------------------------------
 // TurboModule (New Architecture) — JSI spec wiring
 // The generated spec class name follows codegen convention:

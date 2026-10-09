@@ -1,7 +1,6 @@
 package io.hyperswitch.react
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -11,14 +10,11 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactContext
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.UiThreadUtil
 import com.facebook.react.interfaces.fabric.ReactSurface
-import com.facebook.react.modules.core.DefaultHardwareBackBtnHandler
 import com.facebook.react.runtime.ReactSurfaceImpl
 import com.facebook.react.views.scroll.ReactHorizontalScrollView
 import com.facebook.react.views.scroll.ReactScrollView
@@ -76,7 +72,7 @@ sealed class HyperCallback {
  * follows the Activity, not this fragment: a session's surfaces outlive the
  * sheet, so dismissing it must not put the host to sleep.
  */
-class HyperFragment : Fragment(), DefaultLifecycleObserver {
+class HyperFragment : Fragment() {
 
   private val callbacks = ConcurrentHashMap<CallbackType, HyperCallback>()
 
@@ -266,47 +262,38 @@ class HyperFragment : Fragment(), DefaultLifecycleObserver {
 
   /**
    * Confirms through the widget's own React root: a `widgetConfirm` marker on its props.
-   * JS answers through `notifyWidgetPaymentResult` for this root tag.
+   * [sessionConfig] is the session's current `paymentSessionConfig`; it replaces the one the
+   * widget was shown with, so a confirm after `updateIntent` pays the intent the session has
+   * now. JS answers through `notifyWidgetPaymentResult` for this root tag.
    */
-  fun confirmPayment(callback: (String) -> Unit) {
+  fun confirmPayment(sessionConfig: Bundle?, callback: (String) -> Unit) {
     UiThreadUtil.runOnUiThread {
       if (callbacks.containsKey(CallbackType.CONFIRM_ACTION)) {
         callback(
           StandardResult.Failed(
-            error = Throwable("Payment already in progress")
+            code = "ALREADY_IN_PROGRESS",
+            error = Throwable("A confirm is already in progress for this widget").apply {
+              initCause(Throwable("ALREADY_IN_PROGRESS"))
+            }
           ).toJSONString()
         )
         return@runOnUiThread
       }
-
-      if (callbacks.containsKey(CallbackType.UPDATE_INTENT_COMPLETE)) {
-        callback(
-          StandardResult.Failed(
-            error = Throwable(
-              "Payment intent update is in progress"
-            )
-          ).toJSONString()
-        )
-        return@runOnUiThread
-      }
-
-      callbacks[CallbackType.CONFIRM_ACTION] =
-        HyperCallback.Payment(callback)
-
+      callbacks[CallbackType.CONFIRM_ACTION] = HyperCallback.Payment(callback)
       confirmSequence += 1
       val attempt = confirmSequence
       val pushed = pushProps {
-        putBundle(
-          "widgetConfirm",
-          Bundle().apply { putInt("attempt", attempt) }
-        )
+        sessionConfig?.let { putBundle("paymentSessionConfig", it) }
+        putBundle("widgetConfirm", Bundle().apply { putInt("attempt", attempt) })
       }
-
       if (!pushed) {
         callbacks.remove(CallbackType.CONFIRM_ACTION)
         callback(
           StandardResult.Failed(
-            error = Throwable("React Context not ready")
+            code = "WIDGET_UNAVAILABLE",
+            error = Throwable("The payment widget has no React root.").apply {
+              initCause(Throwable("WIDGET_UNAVAILABLE"))
+            }
           ).toJSONString()
         )
       }
@@ -468,9 +455,8 @@ class HyperFragment : Fragment(), DefaultLifecycleObserver {
       if (!registered) {
         callback(
           StandardResult.Failed(
-            error = Throwable(
-              "CVC payment already in progress for this widget"
-            ).apply {
+            code = "ALREADY_IN_PROGRESS",
+            error = Throwable("CVC payment already in progress for this widget").apply {
               initCause(Throwable("ALREADY_IN_PROGRESS"))
             }
           ).toJSONString()
@@ -493,7 +479,10 @@ class HyperFragment : Fragment(), DefaultLifecycleObserver {
         callbacks.remove(CallbackType.CONFIRM_CVC_ACTION)
         callback(
           StandardResult.Failed(
-            error = Throwable("Cannot find the React view")
+            code = "WIDGET_UNAVAILABLE",
+            error = Throwable("The CVC widget has no React root.").apply {
+              initCause(Throwable("WIDGET_UNAVAILABLE"))
+            }
           ).toJSONString()
         )
       }
@@ -506,65 +495,9 @@ class HyperFragment : Fragment(), DefaultLifecycleObserver {
     // The OS can recreate this fragment after process death before the host app
     // initialised the SDK; initialize() is idempotent.
     activity?.application?.let(ReactNativeController::initialize)
-    super<Fragment>.onCreate(savedInstanceState)
-    follow(requireActivity())
+    super.onCreate(savedInstanceState)
+    HyperReactRuntime.follow(requireActivity())
     registerEventBus()
-  }
-
-  /**
-   * Makes the host follow [activity]'s lifecycle: JS timers (and therefore every
-   * fetch) run only while the host is resumed. Every AndroidX Activity is a
-   * LifecycleOwner; a plain Activity is taken as resumed immediately.
-   */
-  private fun follow(activity: Activity) {
-    if (activity is LifecycleOwner) {
-      activity.lifecycle.addObserver(this)
-    } else {
-      activity.application.registerActivityLifecycleCallbacks(ResumeHost(activity))
-      ReactNativeController.getReactHost()
-        .onHostResume(activity, activity as? DefaultHardwareBackBtnHandler)
-    }
-  }
-
-  private inner class ResumeHost(private val activity: Activity) :
-    android.app.Application.ActivityLifecycleCallbacks {
-    override fun onActivityResumed(resumed: Activity) {
-      if (resumed === activity) {
-        ReactNativeController.getReactHost()
-          .onHostResume(activity, activity as? DefaultHardwareBackBtnHandler)
-      }
-    }
-
-    override fun onActivityPaused(paused: Activity) {
-      if (paused === activity) ReactNativeController.getReactHost().onHostPause()
-    }
-
-    override fun onActivityDestroyed(destroyed: Activity) {
-      if (destroyed !== activity) return
-      ReactNativeController.getReactHost().onHostDestroy(activity)
-      activity.application.unregisterActivityLifecycleCallbacks(this)
-    }
-
-    override fun onActivityCreated(a: Activity, s: Bundle?) {}
-    override fun onActivityStarted(a: Activity) {}
-    override fun onActivityStopped(a: Activity) {}
-    override fun onActivitySaveInstanceState(a: Activity, outState: Bundle) {}
-  }
-
-  override fun onResume(owner: LifecycleOwner) {
-    (owner as? Activity)?.let {
-      ReactNativeController.getReactHost()
-        .onHostResume(it, it as? DefaultHardwareBackBtnHandler)
-    }
-  }
-
-  override fun onPause(owner: LifecycleOwner) {
-    ReactNativeController.getReactHost().onHostPause()
-  }
-
-  override fun onDestroy(owner: LifecycleOwner) {
-    ReactNativeController.getReactHost().onHostDestroy(owner as Activity)
-    owner.lifecycle.removeObserver(this)
   }
 
   override fun onCreateView(
@@ -641,20 +574,19 @@ class HyperFragment : Fragment(), DefaultLifecycleObserver {
       paymentEventListener = null
     } catch (_: Exception) {
     } finally {
-      super<Fragment>.onDestroyView()
+      super.onDestroyView()
     }
   }
 
   override fun onDestroy() {
     try {
-      (activity as? LifecycleOwner)?.lifecycle?.removeObserver(this)
       unRegisterEventBus()
       callbacks.clear()
       onExit = null
       paymentEventListener = null
     } catch (_: Exception) {
     } finally {
-      super<Fragment>.onDestroy()
+      super.onDestroy()
     }
   }
 

@@ -8,15 +8,15 @@ import com.facebook.react.uimanager.common.UIManagerType
 import com.hyperswitchsdkreactnative.R
 import java.lang.ref.WeakReference
 
+/** Owner of a prefetch surface: receives the JS reply to an updateIntent round trip. */
+fun interface UpdateIntentReplyTarget {
+  fun onUpdateIntentReply(eventType: String, resultJson: String)
+}
+
 /**
  * Every React surface is reconciled by its root tag. The mounting layer already
  * maps a root tag to the surface's root view, so the owner of a surface is kept
  * on that view and nothing is registered anywhere else.
- *
- * Ported from hyperswitch-client-core (io.hyperswitch.react.SurfaceOwners); the
- * wrapper keeps its own resolution order — registry first, legacy
- * FragmentManager.findFragment fallback second — so the rn79 ReactFragment path
- * keeps working.
  */
 internal object SurfaceOwners {
 

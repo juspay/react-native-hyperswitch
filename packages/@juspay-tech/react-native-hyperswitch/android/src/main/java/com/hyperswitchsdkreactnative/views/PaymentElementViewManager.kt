@@ -82,6 +82,8 @@ class PaymentElementViewManager : SimpleViewManager<PaymentWidgetView>(),
   override fun setOptions(container: PaymentWidgetView, options: Dynamic?) {
     options?.asMap()?.let {
       container.setConfiguration(it)
+      // The widget's session (client-core's HyperswitchElement.bind); JS scopes updateIntent by its tag.
+      container.bindSession(if (it.hasKey("sessionTag") && !it.isNull("sessionTag")) it.getInt("sessionTag") else null)
     }
   }
 

@@ -25,9 +25,10 @@ type ElementsNativeActions = Pick<
 
 export function createElementsNativeActions(
   hyperswitchConfig: HyperswitchConfiguration,
-  paymentSessionConfig: PaymentSessionConfiguration
+  paymentSessionConfig: PaymentSessionConfiguration,
+  sessionTag?: number
 ): ElementsNativeActions {
-  const bindings = { hyperswitchConfig, paymentSessionConfig };
+  const bindings = { hyperswitchConfig, paymentSessionConfig, sessionTag };
   return {
     presentPaymentSheet: bindPresentPaymentSheet(bindings),
 
@@ -52,16 +53,22 @@ export function createElementsNativeActions(
 
     getWalletSession: bindGetWalletSession(bindings),
 
-    updateIntent,
+    updateIntent: (intentResolver) => updateIntent(intentResolver, sessionTag),
   };
 }
 
 export function createElements(
   hyperswitchConfig: HyperswitchConfiguration,
-  paymentSessionConfig: PaymentSessionConfiguration
+  paymentSessionConfig: PaymentSessionConfiguration,
+  sessionTag?: number
 ): Elements {
   return {
     hyperswitchConfig,
-    ...createElementsNativeActions(hyperswitchConfig, paymentSessionConfig),
+    sessionTag,
+    ...createElementsNativeActions(
+      hyperswitchConfig,
+      paymentSessionConfig,
+      sessionTag
+    ),
   };
 }

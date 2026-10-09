@@ -35,12 +35,26 @@ export function loadHyper(
         async initPaymentSession(
           options: PaymentSessionConfiguration
         ): Promise<PaymentSession> {
-          return createPaymentSession(config, options);
+          const sessionTag = await NativeHyperswitchModule.initPaymentSession({
+            paymentSessionConfig: options,
+          });
+          return createPaymentSession(
+            config,
+            options,
+            sessionTag >= 0 ? sessionTag : undefined
+          );
         },
         async elements(
           options: PaymentSessionConfiguration
         ): Promise<Elements> {
-          return createElements(config, options);
+          const sessionTag = await NativeHyperswitchModule.initPaymentSession({
+            paymentSessionConfig: options,
+          });
+          return createElements(
+            config,
+            options,
+            sessionTag >= 0 ? sessionTag : undefined
+          );
         },
       };
     })

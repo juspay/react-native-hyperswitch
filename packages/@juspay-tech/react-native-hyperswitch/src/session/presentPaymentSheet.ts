@@ -22,7 +22,8 @@ import { normalizeSubscribedEvents } from '../utils/EventValidator';
  *      instead of stacking a duplicate.
  */
 export async function presentPaymentSheetWithPayload(
-  payload: NativePaymentSheetPayload
+  payload: NativePaymentSheetPayload,
+  sessionTag?: number
 ): Promise<PaymentResult> {
   if (isInitializing()) {
     return {
@@ -62,6 +63,7 @@ export async function presentPaymentSheetWithPayload(
       hyperswitchConfig: payload.hyperswitchConfig,
       paymentSessionConfig: payload.paymentSessionConfig,
       configuration,
+      sessionTag,
     });
     return mapNativeResponseToPaymentResult(raw);
   } finally {

@@ -16,10 +16,12 @@ import com.hyperswitchsdkreactnative.BuildConfig
 import io.hyperswitch.PaymentEventListener
 import io.hyperswitch.model.ElementUpdateIntentResult
 import io.hyperswitch.model.HyperswitchBaseConfiguration
+import io.hyperswitch.model.PaymentSessionConfiguration
 import io.hyperswitch.paymentsession.LaunchOptions
 import io.hyperswitch.react.HyperFragment
 import io.hyperswitch.react.HyperFragmentManager
 import io.hyperswitch.react.ReactNativeController
+import io.hyperswitch.utils.StandardResult
 import kotlin.collections.orEmpty
 
 import kotlin.math.abs
@@ -56,6 +58,7 @@ open class PaymentWidgetView : FrameLayout {
   private var onEventCallback: PaymentEventListener? = null
   private var activeLayoutChangeListener: OnLayoutChangeListener? = null
   private var widgetShown = false
+  private var sessionTag: Int? = null
 
   constructor(context: Context) : super(context) {
     init(context)
@@ -85,6 +88,32 @@ open class PaymentWidgetView : FrameLayout {
     this.mContext = context
     launchOptions = LaunchOptions(context.applicationContext, BuildConfig.VERSION_NAME, hsConfig)
   }
+
+  fun setSessionTag(tag: Int?) {
+    this.sessionTag = tag
+  }
+
+  fun getSessionTag(): Int? = sessionTag
+
+  /**
+   * client-core's HyperswitchElement.bind, then the setSdkAuthorization HyperswitchBoundElement
+   * runs after it: a widget already on screen belongs to the session it was started for, so
+   * bound to another session it starts over under that one.
+   */
+  fun bindSession(tag: Int?) {
+    if (this.sessionTag != null && this.sessionTag != tag) {
+      removeWidget()
+      this.sessionTag = tag
+      if (isAttachedToWindow && !isSdkAuthorizationEmpty()) {
+        post { showWidgetInternal() }
+      }
+      return
+    }
+    this.sessionTag = tag
+  }
+
+  private val requiresSession: Boolean
+    get() = widgetType != CVC_WIDGET_TYPE
 
   fun setFragment(fragment: HyperFragment) {
     this.fragment = fragment
@@ -179,14 +208,21 @@ open class PaymentWidgetView : FrameLayout {
   fun getLaunchOptions(): Bundle {
     val props = mutableMapOf<String, Any?>().apply {
       putAll(widgetConfig?.toHashMap().orEmpty())
+      remove("sessionTag")
       put("type", widgetType)
     }
     val bundle = launchOptions.getBundleWithHyperParams(props)
+    sessionTag?.let { tag ->
+      bundle.getBundle("props")?.getBundle("sdkParams")?.putInt("sessionTag", tag)
+    }
     return bundle
   }
 
   fun confirmPayment(callback: (String) -> Unit) {
-    this.fragment?.confirmPayment(callback)
+    val fragment = this.fragment ?: return callback(noRoot())
+    val sessionConfig = sdkAuthorization.takeIf { requiresSession && it.isNotEmpty() }
+      ?.let { PaymentSessionConfiguration(it).toBundle() }
+    fragment.confirmPayment(sessionConfig, callback)
   }
 
 
@@ -245,8 +281,14 @@ open class PaymentWidgetView : FrameLayout {
     billing: String?,
     callback: (String) -> Unit
   ) {
-    this.fragment?.confirmCvcPayment(sdkAuthorization, paymentToken, billing, callback)
+    val fragment = this.fragment ?: return callback(noRoot())
+    fragment.confirmCvcPayment(sdkAuthorization, paymentToken, billing, callback)
   }
+
+  private fun noRoot(): String = StandardResult.Failed(
+    code = "WIDGET_UNAVAILABLE",
+    error = Throwable("The widget has no React root").apply { initCause(Throwable("WIDGET_UNAVAILABLE")) }
+  ).toJSONString()
 
   fun setSdkAuthorization(sdkAuthorization: String) {
     this.sdkAuthorization = sdkAuthorization
@@ -395,5 +437,9 @@ open class PaymentWidgetView : FrameLayout {
       }
     }
     return super.dispatchTouchEvent(ev)
+  }
+
+  companion object {
+    const val CVC_WIDGET_TYPE = "cvcWidget"
   }
 }

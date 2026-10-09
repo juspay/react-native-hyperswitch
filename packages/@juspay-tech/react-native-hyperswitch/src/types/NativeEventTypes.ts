@@ -96,6 +96,8 @@ export type NativePaymentWidgetPropTypes = {
     hyperswitchConfig?: HyperswitchConfiguration;
     paymentSessionConfig?: PaymentSessionConfiguration;
     configuration?: Record<string, unknown>;
+    /** Tag of the native session; Android stamps it on the widget so it follows updateIntent. */
+    sessionTag?: number;
   };
   onPaymentResult?: (event: NativeEventEnvelope & { nativeEvent: {
   eventName: string;

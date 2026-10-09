@@ -35,7 +35,8 @@ export const PaymentElement = forwardRef<
 >((props, ref) => {
   const { widgetId, options, onPaymentResult, onChange, onReady, style } =
     props;
-  const { paymentSessionConfig, hyperswitchConfig } = useHyperElementsContext();
+  const { paymentSessionConfig, hyperswitchConfig, elements } =
+    useHyperElementsContext();
   const viewRef = useRef(null);
   const viewTag = useNativeViewTag(viewRef, onReady);
 
@@ -158,6 +159,7 @@ export const PaymentElement = forwardRef<
         hyperswitchConfig: hyperswitchConfig || undefined,
         paymentSessionConfig: paymentSessionConfig || undefined,
         configuration,
+        sessionTag: elements?.sessionTag,
       }}
       style={{ ...style, flex: 1 }}
     />

@@ -27,15 +27,18 @@
 
 RCT_EXPORT_MODULE(HyperModule)
 
-/* The shared JS bundle sends exit results as objects (post #569); convert to
-   the JSON string contract consumed by the Swift impl layer. */
-static NSString *HyperExitResultJSON(NSDictionary *result)
+/* Exit results arrive as the codegen struct and are read field by field, as in
+   hyperswitch-client-core's HyperTurboModule.mm. The Swift impl still takes the
+   JSON string the bundle used to send, so it is rebuilt from the fields that are
+   present, as Android's toExitResultJson does. */
+static NSString *HyperExitResultJSON(JS::NativeHyperModule::PaymentExitResult &result)
 {
-    if (![result isKindOfClass:[NSDictionary class]] ||
-        ![NSJSONSerialization isValidJSONObject:result]) {
-        return @"{\"status\":\"failed\",\"message\":\"unknown\"}";
-    }
-    NSData *data = [NSJSONSerialization dataWithJSONObject:result options:0 error:nil];
+    NSMutableDictionary *json = [NSMutableDictionary dictionary];
+    json[@"status"] = result.status() ?: @"failed";
+    if (result.code()) json[@"code"] = result.code();
+    if (result.message()) json[@"message"] = result.message();
+    if (result.type()) json[@"type"] = result.type();
+    NSData *data = [NSJSONSerialization dataWithJSONObject:json options:0 error:nil];
     return data ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]
                 : @"{\"status\":\"failed\",\"message\":\"unknown\"}";
 }
@@ -149,24 +152,26 @@ static BOOL HyperModuleDelegateAttachUnsupported(void)
     [self.impl presentApplePay:requestObj callback:callback];
 }
 
-- (void)exitPaymentsheet:(double)rootTag result:(NSDictionary *)result reset:(BOOL)reset
+- (void)exitPaymentsheet:(double)rootTag
+                  result:(JS::NativeHyperModule::PaymentExitResult &)result
+                   reset:(BOOL)reset
 {
     [self.impl exitPaymentsheet:@(rootTag) result:HyperExitResultJSON(result) reset:reset];
 }
 
-- (void)exitPaymentMethodManagement:(double)rootTag result:(NSDictionary *)result reset:(BOOL)reset
+- (void)exitPaymentMethodManagement:(double)rootTag result:(NSString *)result reset:(BOOL)reset
 {
-    [self.impl exitPaymentMethodManagement:@(rootTag) result:HyperExitResultJSON(result) reset:reset];
+    [self.impl exitPaymentMethodManagement:@(rootTag) result:result reset:reset];
 }
 
-- (void)exitWidget:(NSDictionary *)result widgetType:(NSString *)widgetType
+- (void)exitWidget:(JS::NativeHyperModule::PaymentExitResult &)result widgetType:(NSString *)widgetType
 {
     [self.impl exitWidget:HyperExitResultJSON(result) widgetType:widgetType];
 }
 
-- (void)exitCardForm:(NSDictionary *)result
+- (void)exitCardForm:(NSString *)result
 {
-    [self.impl exitCardForm:HyperExitResultJSON(result)];
+    [self.impl exitCardForm:result];
 }
 
 - (void)launchWidgetPaymentSheet:(NSString *)requestObj callback:(RCTResponseSenderBlock)callback
@@ -174,7 +179,9 @@ static BOOL HyperModuleDelegateAttachUnsupported(void)
     [self.impl launchWidgetPaymentSheet:requestObj callback:callback];
 }
 
-- (void)exitWidgetPaymentsheet:(double)rootTag result:(NSDictionary *)result reset:(BOOL)reset
+- (void)exitWidgetPaymentsheet:(double)rootTag
+                        result:(JS::NativeHyperModule::PaymentExitResult &)result
+                         reset:(BOOL)reset
 {
     [self.impl exitWidgetPaymentsheet:@(rootTag) result:HyperExitResultJSON(result) reset:reset];
 }
@@ -184,7 +191,8 @@ static BOOL HyperModuleDelegateAttachUnsupported(void)
     [self.impl updateWidgetHeight:@(height)];
 }
 
-- (void)notifyWidgetPaymentResult:(double)rootTag result:(NSDictionary *)result
+- (void)notifyWidgetPaymentResult:(double)rootTag
+                           result:(JS::NativeHyperModule::PaymentExitResult &)result
 {
     [self.impl notifyWidgetPaymentResult:@(rootTag) result:HyperExitResultJSON(result)];
 }
@@ -199,7 +207,9 @@ static BOOL HyperModuleDelegateAttachUnsupported(void)
     [self.impl emitPaymentEvent:@(rootTag) eventType:eventType payload:payload];
 }
 
-- (void)onUpdateIntentEvent:(double)rootTag type:(NSString *)type result:(NSDictionary *)result
+- (void)onUpdateIntentEvent:(double)rootTag
+                       type:(NSString *)type
+                     result:(JS::NativeHyperModule::PaymentExitResult &)result
 {
     [self.impl onUpdateIntentEvent:@(rootTag) type:type result:HyperExitResultJSON(result)];
 }
