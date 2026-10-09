@@ -13,6 +13,12 @@
 
 using namespace facebook::react;
 
+static double PaypalButtonBorderRadius(const PaypalButtonProps &props)
+{
+  const auto &radius = props.borderRadii.all;
+  return radius.has_value() && radius->unit == UnitType::Point ? radius->value : props.borderRadius;
+}
+
 @interface PaypalButtonComponentView : RCTViewComponentView
 @end
 
@@ -73,8 +79,10 @@ using namespace facebook::react;
   if (oldViewProps.buttonSize != newViewProps.buttonSize && !newViewProps.buttonSize.empty()) {
     _view.buttonSize = RCTNSStringFromString(newViewProps.buttonSize);
   }
-  if (oldViewProps.borderRadius != newViewProps.borderRadius) {
-    _view.borderRadius = newViewProps.borderRadius;
+  const double oldBorderRadius = PaypalButtonBorderRadius(oldViewProps);
+  const double newBorderRadius = PaypalButtonBorderRadius(newViewProps);
+  if (oldBorderRadius != newBorderRadius) {
+    _view.borderRadius = newBorderRadius;
   }
 
   [super updateProps:props oldProps:oldProps];
