@@ -33,15 +33,14 @@ import PayPal
   }
 
   private func setupButton() {
-    if let existingButton = payPalButton {
-      existingButton.removeFromSuperview()
-    }
+    containerView?.removeFromSuperview()
 
     let color = mapColor(buttonColor)
     let label = mapLabel(buttonLabel)
     let edges = mapEdges(borderRadius)
 
     let button = PayPalButton(
+      insets: NSDirectionalEdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0),
       color: color,
       edges: edges,
       size: mapSize(buttonSize),
@@ -100,7 +99,7 @@ import PayPal
   private func mapLabel(_ value: String) -> PayPalButton.Label? {
     switch value.lowercased() {
     case "checkout": return .checkout
-    case "buynow": return .buyNow
+    case "buy_now", "buynow": return .buyNow
     case "pay": return .payWith
     default: return nil
     }
