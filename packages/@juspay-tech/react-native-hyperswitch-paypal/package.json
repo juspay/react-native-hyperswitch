@@ -4,9 +4,11 @@
   "description": "react native hyperswitch paypal",
   "source": "./src/index.tsx",
   "main": "./lib/module/index.js",
+  "react-native": "src/index",
   "types": "./lib/typescript/src/index.d.ts",
   "exports": {
     ".": {
+      "source": "./src/index.tsx",
       "types": "./lib/typescript/src/index.d.ts",
       "default": "./lib/module/index.js"
     },

@@ -4,11 +4,14 @@ import android.annotation.SuppressLint
 import android.util.Log
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.ImageView
 import com.facebook.react.uimanager.ThemedReactContext
 import com.paypal.android.paymentbuttons.PayPalButton
 import com.paypal.android.paymentbuttons.PayPalButtonColor
 import com.paypal.android.paymentbuttons.PayPalButtonLabel
 import com.paypal.android.paymentbuttons.PaymentButtonSize
+import com.paypal.android.ui.R as PayPalR
+import kotlin.math.roundToInt
 
 @SuppressLint("ViewConstructor")
 class PaypalButtonView(private val context: ThemedReactContext) : FrameLayout(context) {
@@ -32,8 +35,15 @@ class PaypalButtonView(private val context: ThemedReactContext) : FrameLayout(co
     val payPalButton = PayPalButton(context)
 
     payPalButton.color = buttonColor
-    payPalButton.label = buttonLabel
-    payPalButton.size = buttonSize
+    payPalButton.label =
+      if (buttonSize == PaymentButtonSize.SMALL) PayPalButtonLabel.PAYPAL else buttonLabel
+    payPalButton.size = PaymentButtonSize.MEDIUM
+    payPalButton.minimumHeight = 0
+    payPalButton.setPadding(payPalButton.paddingLeft, 0, payPalButton.paddingRight, 0)
+    payPalButton.findViewById<ImageView>(PayPalR.id.payPalWordmarkImage)?.let { wordmark ->
+      wordmark.adjustViewBounds = true
+      wordmark.layoutParams = wordmark.layoutParams.apply { height = logoHeight() }
+    }
     payPalButton.customCornerRadius = customCornerRadius
     payPalButton.setOnClickListener {
       (this.parent as? View)?.performClick() ?: run {
@@ -42,6 +52,15 @@ class PaypalButtonView(private val context: ThemedReactContext) : FrameLayout(co
     }
 
     return payPalButton
+  }
+
+  private fun logoHeight(): Int {
+    val dp = when (buttonSize) {
+      PaymentButtonSize.SMALL -> 15f
+      PaymentButtonSize.LARGE -> 26f
+      else -> 20f
+    }
+    return (dp * resources.displayMetrics.density).roundToInt()
   }
 
   override fun requestLayout() {
