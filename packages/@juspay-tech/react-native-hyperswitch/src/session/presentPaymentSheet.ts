@@ -20,6 +20,9 @@ import {
  *      developer mistake) short-circuits to "sheet_already_presented"
  *      instead of stacking a duplicate.
  */
+// Identifies the latest call, so an older call settling late cannot clear the guard for it.
+let presentCallId = 0;
+
 export async function presentPaymentSheetWithPayload(
   payload: NativePaymentSheetPayload
 ): Promise<PaymentResult> {
@@ -41,6 +44,7 @@ export async function presentPaymentSheetWithPayload(
       message: 'A payment sheet is already presented.',
     };
   }
+  const callId = ++presentCallId;
   setSheetPresented(true);
   try {
     const raw = await NativeHyperswitchModule.presentPaymentSheet({
@@ -50,6 +54,8 @@ export async function presentPaymentSheetWithPayload(
     });
     return mapNativeResponseToPaymentResult(raw);
   } finally {
-    setSheetPresented(false);
+    if (callId === presentCallId) {
+      setSheetPresented(false);
+    }
   }
 }

@@ -38,8 +38,18 @@ import org.greenrobot.eventbus.Subscribe
  * to pass all configuration data as plain [Bundle]s or [Map]s.
  */
 class PaymentSessionReactLauncher(
-  private val activity: Activity,
+  private val activityProvider: () -> Activity?,
 ) {
+
+  constructor(activity: Activity) : this({ activity })
+
+  /**
+   * The host Activity, read on every use rather than captured once: a host Activity that is
+   * recreated (configuration change, recreate()) would otherwise leave the sheet committed to the
+   * destroyed Activity, where it is silently dropped.
+   */
+  private val activity: Activity
+    get() = checkNotNull(activityProvider()) { "No current Activity" }
 
   private var reactHost: ReactHost? = null
   private var reactNativeHost: ReactNativeHost? = null
@@ -82,7 +92,8 @@ class PaymentSessionReactLauncher(
    * Recreates the React context (if needed) and starts a headless JS task with the supplied
    * [bundle]. The caller is responsible for assembling the bundle (e.g. via [LaunchOptions]).
    */
-  fun recreateReactContext(bundle: Bundle) {
+  fun recreateReactContext(bundle: Bundle): Boolean {
+    val activity = activityProvider() ?: return false
     activity.runOnUiThread {
       var context = reactContext
       if (context == null) {
@@ -143,6 +154,7 @@ class PaymentSessionReactLauncher(
         startHeadlessTask(context, bundle)
       }
     }
+    return true
   }
 
   private fun startHeadlessTask(reactContext: ReactContext, bundle: Bundle) {
@@ -166,6 +178,8 @@ class PaymentSessionReactLauncher(
    * only for a resumed host. The headless task itself ends immediately, so resume it here.
    */
   private fun resumeHost() {
+    val activity = activityProvider()?.takeUnless { it.isFinishing || it.isDestroyed } ?: return
+    RedirectBridge.install(activity)
     val backHandler = activity as? DefaultHardwareBackBtnHandler
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
       ReactNativeController.getReactHost().onHostResume(activity, backHandler)
@@ -176,18 +190,45 @@ class PaymentSessionReactLauncher(
   }
 
   /**
+   * Resumes the SDK host with the current Activity. Headless flows started from a session created
+   * before the host Activity was recreated would otherwise launch from the destroyed one.
+   */
+  fun resumeHostForCurrentActivity() {
+    UiThreadUtil.runOnUiThread { resumeHost() }
+  }
+
+  /** Like [resumeHostForCurrentActivity], then runs [action] after the resume, on the UI thread. */
+  fun runWithHostResumed(action: () -> Unit) {
+    UiThreadUtil.runOnUiThread {
+      resumeHost()
+      action()
+    }
+  }
+
+  /**
+   * Whether a payment sheet is currently attached and visible on [activity]. Closed sheets are
+   * hidden, not removed, so they do not count.
+   */
+  fun isSheetVisible(activity: Activity): Boolean {
+    val fragmentActivity = activity as? FragmentActivity ?: return false
+    return fragmentActivity.supportFragmentManager.fragments.any {
+      it.tag == "paymentSheet" && it.isAdded && !it.isHidden
+    }
+  }
+
+  /**
    * Presents the payment sheet using a fully prepared launch [bundle].
    *
    * The bundle is expected to contain a `props` bundle with `configuration`, `sdkParams`, etc.
    */
-  fun presentSheet(bundle: Bundle): Boolean {
+  fun presentSheet(bundle: Bundle, host: Activity = activity): Boolean {
     applyFonts(bundle)
-    return presentSheetInternal(bottomInsetToDIPFromPixel(bundle))
+    return presentSheetInternal(bottomInsetToDIPFromPixel(bundle), host)
   }
 
-  private fun presentSheetInternal(bundle: Bundle): Boolean {
-    if (activity is DefaultHardwareBackBtnHandler && activity is FragmentActivity) {
-      val fragmentActivity = activity as FragmentActivity
+  private fun presentSheetInternal(bundle: Bundle, host: Activity): Boolean {
+    if (host is DefaultHardwareBackBtnHandler && host is FragmentActivity) {
+      val fragmentActivity = host as FragmentActivity
       val fragmentManager = fragmentActivity.supportFragmentManager
       try {
         fragmentManager.findFragmentByTag("paymentSheet")?.let { existingFragment ->
@@ -215,9 +256,9 @@ class PaymentSessionReactLauncher(
 
       return true
     } else {
-      activity.startActivity(
+      host.startActivity(
         Intent(
-          activity.applicationContext,
+          host.applicationContext,
           HyperActivity::class.java
         ).apply {
           putExtra("flow", 1)
