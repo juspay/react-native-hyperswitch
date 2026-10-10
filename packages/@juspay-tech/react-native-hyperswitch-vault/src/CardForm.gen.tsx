@@ -35,6 +35,7 @@ export type widgetHandle = {
 
 export type Props = {
   readonly accessible?: boolean; 
+  readonly alwaysSendCustomerAcceptance?: boolean; 
   readonly appearance?: VaultFormOptions_appearance; 
   readonly cardholderName?: CardFieldOptions_cardholderNameMode; 
   readonly children: React.ReactNode; 
@@ -55,6 +56,7 @@ export type Props = {
 
 export const make: React.ComponentType<{
   readonly accessible?: boolean; 
+  readonly alwaysSendCustomerAcceptance?: boolean; 
   readonly appearance?: VaultFormOptions_appearance; 
   readonly cardholderName?: CardFieldOptions_cardholderNameMode; 
   readonly children: React.ReactNode; 

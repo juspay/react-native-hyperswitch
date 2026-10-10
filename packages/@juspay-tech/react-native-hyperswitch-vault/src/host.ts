@@ -17,11 +17,17 @@ import type { safeVaultError as SafeVaultErrorInternal } from './VaultResult.gen
 import type { safeNextAction as SafeNextActionInternal } from './VaultNavigation.gen';
 import type { confirmTokenMode as VaultConfirmTokenModeInternal } from './VaultConfirmBody.gen';
 import type { MerchantSession as MerchantSessionInternal } from './merchantTypes';
+import type { hostPaymentMethodData as VaultHostPaymentMethodDataInternal } from './VaultPaymentMethodData.gen';
 import type { VaultField, VaultTokenizeResult } from './public';
 
 export type HostFormHandle = {
 
-  tokenize(): Promise<VaultTokenizeResult>;
+  /**
+   * Tokenize the mounted card details for the current payment-method-session.
+   * Optional `paymentMethodData` — e.g. `{ nickName }` — is forwarded to the
+   * payment-method-session `confirm` call for the new card.
+   */
+  tokenize(paymentMethodData?: VaultHostPaymentMethodDataInternal): Promise<VaultTokenizeResult>;
 
   confirmPayment(input: VaultPaymentConfirmInput): Promise<VaultPaymentResult>;
   reset(): void;
@@ -82,16 +88,16 @@ export type {
   hostBilling as VaultHostBilling,
   hostBillingAddress as VaultHostBillingAddress,
   hostPhone as VaultHostPhone,
+  acceptanceType as VaultAcceptanceType,
+  hostCustomerAcceptance as VaultHostCustomerAcceptance,
+  hostOnlineAcceptance as VaultHostOnlineAcceptance,
 } from './VaultPaymentMethodData.gen';
 
 export type {
   confirmTokenMode as VaultConfirmTokenMode,
   paymentMethodType as VaultPaymentMethodType,
   paymentType as VaultPaymentType,
-  acceptanceType as VaultAcceptanceType,
   hostBrowserInfo as VaultHostBrowserInfo,
-  hostCustomerAcceptance as VaultHostCustomerAcceptance,
-  hostOnlineAcceptance as VaultHostOnlineAcceptance,
 } from './VaultConfirmBody.gen';
 
 export type {
