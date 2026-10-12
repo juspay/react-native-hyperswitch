@@ -65,6 +65,9 @@ def REACT_NATIVE_VERSION = reactNativeProperties.getProperty("VERSION_NAME")
 def REACT_NATIVE_MINOR_VERSION = REACT_NATIVE_VERSION.startsWith("0.0.0-") ? 1000 : REACT_NATIVE_VERSION.split("\\.")[1].toInteger()
 def REACT_NATIVE_VERSION_NAME = "rn${REACT_NATIVE_MINOR_VERSION}"
 
+def packageJson = new groovy.json.JsonSlurper().parseText(file("../package.json").text)
+version = packageJson.version
+
 //print("${REACT_NATIVE_VERSION_NAME}")
 android {
   namespace "com.hyperswitchsdkreactnative"

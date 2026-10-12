@@ -136,7 +136,11 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     val loggingEndpoint =
       getLoggingEndpoint(publishableKey, overrideEndpoints, customConfig.commonEndpoint)
     loggingEnabled = loggingEndpoint != null
-    loggingEndpoint?.let { HyperLogManager.initialise(publishableKey, it) }
+    loggingEndpoint?.let {
+      HyperLogManager.initialise(publishableKey, it)
+      HyperLogManager.setSdkVersion(BuildConfig.VERSION_NAME)
+      HyperLogManager.setAppId(reactApplicationContext.packageName)
+    }
     lastActivity = WeakReference(activity)
     lastConfiguration = Configuration(activity.resources.configuration)
     sendLog(
