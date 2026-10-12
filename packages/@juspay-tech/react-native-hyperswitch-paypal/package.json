@@ -1,6 +1,6 @@
 {
   "name": "@juspay-tech/react-native-hyperswitch-paypal",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "react native hyperswitch paypal",
   "source": "./src/index.tsx",
   "main": "./lib/module/index.js",

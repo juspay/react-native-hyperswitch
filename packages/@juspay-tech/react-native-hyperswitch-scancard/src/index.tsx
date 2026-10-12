@@ -1,5 +1,5 @@
 import NativeHyperswitchScancard from './NativeHyperswitchScancard';
-import type {ScanCardResponse} from './NativeHyperswitchScancard';
+import type { ScanCardResponse } from './NativeHyperswitchScancard';
 
 // TurboModuleRegistry.get returns null when the native module is not linked
 // into the host app, which lets consumers treat this package as optional.
@@ -18,22 +18,25 @@ interface ScanCardData {
 
 function launchScanCard(callback: (s: ScanCardReturnType) => void): void {
   if (NativeHyperswitchScancard) {
-    NativeHyperswitchScancard.launchScanCard('', (response: ScanCardResponse) => {
-      const status = response.status || 'Default';
-      const data = response.data;
-      const scanData: ScanCardReturnType = {
-        status,
-        data: data
-          ? {
-              pan: data.pan || '',
-              expiryMonth: data.expiryMonth || '',
-              expiryYear: data.expiryYear || '',
-            }
-          : undefined,
-      };
-      callback(scanData);
-    });
+    NativeHyperswitchScancard.launchScanCard(
+      '',
+      (response: ScanCardResponse) => {
+        const status = response.status || 'Default';
+        const data = response.data;
+        const scanData: ScanCardReturnType = {
+          status,
+          data: data
+            ? {
+                pan: data.pan || '',
+                expiryMonth: data.expiryMonth || '',
+                expiryYear: data.expiryYear || '',
+              }
+            : undefined,
+        };
+        callback(scanData);
+      }
+    );
   }
 }
 
-export {isAvailable, launchScanCard};
+export { isAvailable, launchScanCard };
