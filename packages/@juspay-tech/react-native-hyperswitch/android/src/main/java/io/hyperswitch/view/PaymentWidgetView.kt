@@ -20,6 +20,7 @@ import io.hyperswitch.paymentsession.LaunchOptions
 import io.hyperswitch.react.HyperFragment
 import io.hyperswitch.react.HyperFragmentManager
 import io.hyperswitch.react.ReactNativeController
+import io.hyperswitch.utils.StandardResult
 import kotlin.collections.orEmpty
 
 import kotlin.math.abs
@@ -186,13 +187,23 @@ open class PaymentWidgetView : FrameLayout {
   }
 
   fun confirmPayment(callback: (String) -> Unit) {
-    this.fragment?.confirmPayment(callback)
+    val fragment = this.fragment
+    if (fragment != null) {
+      fragment.confirmPayment(callback)
+    } else {
+      /* Without this a detached fragment dropped the callback and the confirm promise hung. */
+      callback(fragmentNotAttachedFailure())
+    }
   }
-
 
   fun updatePaymentIntentInit(callback: () -> Unit) {
     if (isEligibleForUpdateIntent()) {
-      this.fragment?.updatePaymentIntentInit(callback)
+      val fragment = this.fragment
+      if (fragment != null) {
+        fragment.updatePaymentIntentInit(callback)
+      } else {
+        callback()
+      }
     } else {
       callback()
     }
@@ -245,8 +256,20 @@ open class PaymentWidgetView : FrameLayout {
     billing: String?,
     callback: (String) -> Unit
   ) {
-    this.fragment?.confirmCvcPayment(sdkAuthorization, paymentToken, billing, callback)
+    val fragment = this.fragment
+    if (fragment != null) {
+      fragment.confirmCvcPayment(sdkAuthorization, paymentToken, billing, callback)
+    } else {
+      callback(fragmentNotAttachedFailure())
+    }
   }
+
+  /* Mirrors StandardResult.Failed so the JS layer maps it to a failed result. */
+  private fun fragmentNotAttachedFailure() = StandardResult.Failed(
+    code = "FRAGMENT_NOT_ATTACHED",
+    message = "The payment widget's fragment is not attached",
+    error = Throwable("FRAGMENT_NOT_ATTACHED")
+  ).toJSONString()
 
   fun setSdkAuthorization(sdkAuthorization: String) {
     this.sdkAuthorization = sdkAuthorization

@@ -105,52 +105,58 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       return
     }
 
-    val launcher = paymentSessionReactLauncher
-      ?: PaymentSessionReactLauncher { reactApplicationContext.currentActivity }
-        .also { paymentSessionReactLauncher = it }
-    launcher.initializeReactNativeInstance()
-    val overrideEndpoints: OverrideEndpoints? = customEndpoints?.getMap("overrideEndpoints")?.let {
-      val overrideEndpointsMap = customEndpoints.getMap("overrideEndpoints")
-      OverrideEndpoints(
-        customBackendEndpoint = overrideEndpointsMap?.getString("customBackendEndpoint"),
-        customLoggingEndpoint = overrideEndpointsMap?.getString("customLoggingEndpoint"),
-        customAssetEndpoint = overrideEndpointsMap?.getString("customAssetEndpoint"),
-        customSDKConfigEndpoint = overrideEndpointsMap?.getString("customSDKConfigEndpoint"),
-        customConfirmEndpoint = overrideEndpointsMap?.getString("customConfirmEndpoint"),
-        customAirborneEndpoint = overrideEndpointsMap?.getString("customAirborneEndpoint"),
+    try {
+      val launcher = paymentSessionReactLauncher
+        ?: PaymentSessionReactLauncher { reactApplicationContext.currentActivity }
+          .also { paymentSessionReactLauncher = it }
+      launcher.initializeReactNativeInstance()
+      val overrideEndpoints: OverrideEndpoints? = customEndpoints?.getMap("overrideEndpoints")?.let {
+        val overrideEndpointsMap = customEndpoints.getMap("overrideEndpoints")
+        OverrideEndpoints(
+          customBackendEndpoint = overrideEndpointsMap?.getString("customBackendEndpoint"),
+          customLoggingEndpoint = overrideEndpointsMap?.getString("customLoggingEndpoint"),
+          customAssetEndpoint = overrideEndpointsMap?.getString("customAssetEndpoint"),
+          customSDKConfigEndpoint = overrideEndpointsMap?.getString("customSDKConfigEndpoint"),
+          customConfirmEndpoint = overrideEndpointsMap?.getString("customConfirmEndpoint"),
+          customAirborneEndpoint = overrideEndpointsMap?.getString("customAirborneEndpoint"),
+        )
+      }
+      val customConfig = CustomEndpointConfiguration(
+        overrideEndpoints = overrideEndpoints,
+        commonEndpoint = customEndpoints?.getString("commonEndpoint")
+
       )
-    }
-    val customConfig = CustomEndpointConfiguration(
-      overrideEndpoints = overrideEndpoints,
-      commonEndpoint = customEndpoints?.getString("commonEndpoint")
 
-    )
-
-    hyperswitchConfig = HyperswitchConfiguration(
-      publishableKey = publishableKey,
-      profileId = profileId,
-      environment = parseEnvironment(environment),
-      customConfig = customConfig
-    )
-    // Without this, logs added through HyperLogManager are kept in memory and never sent.
-    val loggingEndpoint =
-      getLoggingEndpoint(publishableKey, overrideEndpoints, customConfig.commonEndpoint)
-    loggingEnabled = loggingEndpoint != null
-    loggingEndpoint?.let {
-      HyperLogManager.initialise(publishableKey, it)
-      HyperLogManager.setSdkVersion(BuildConfig.VERSION_NAME)
-      HyperLogManager.setAppId(reactApplicationContext.packageName)
+      hyperswitchConfig = HyperswitchConfiguration(
+        publishableKey = publishableKey,
+        profileId = profileId,
+        environment = parseEnvironment(environment),
+        customConfig = customConfig
+      )
+      // Without this, logs added through HyperLogManager are kept in memory and never sent.
+      val loggingEndpoint =
+        getLoggingEndpoint(publishableKey, overrideEndpoints, customConfig.commonEndpoint)
+      loggingEnabled = loggingEndpoint != null
+      loggingEndpoint?.let {
+        HyperLogManager.initialise(publishableKey, it)
+        HyperLogManager.setSdkVersion(BuildConfig.VERSION_NAME)
+        HyperLogManager.setAppId(reactApplicationContext.packageName)
+      }
+      lastActivity = WeakReference(activity)
+      lastConfiguration = Configuration(activity.resources.configuration)
+      sendLog(
+        "debug",
+        "SDK initialised (environment=${hyperswitchConfig?.environment}, " +
+          "activity=${activity.javaClass.simpleName})"
+      )
+      initialised = true
+      val handle = UUID.randomUUID().toString()
+      promise?.resolve(handle)
+    } catch (e: Exception) {
+      /* initializeReactNativeInstance throws on a broken RN setup; without this the
+         initialise promise stayed pending and loadHyper never settled. */
+      promise?.reject("INITIALIZATION_ERROR", "Failed to initialise the SDK: ${e.message}")
     }
-    lastActivity = WeakReference(activity)
-    lastConfiguration = Configuration(activity.resources.configuration)
-    sendLog(
-      "debug",
-      "SDK initialised (environment=${hyperswitchConfig?.environment}, " +
-        "activity=${activity.javaClass.simpleName})"
-    )
-    initialised = true
-    val handle = UUID.randomUUID().toString()
-    promise?.resolve(handle)
   }
 
   /**
@@ -337,69 +343,81 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
   }
 
   override fun getCustomerLastUsedPaymentMethodData(promise: Promise) {
-    handler?.let {
-      it.getCustomerLastUsedPaymentMethodData().fold(
-        onSuccess = { data ->
-          promise.resolve(ConversionUtils.convertMapToJson(data.toMap()).toString())
-        },
-        onFailure = { error ->
-          val pmError = error as? PMError
-          promise.resolve(
-            StandardResult.Failed(
-              code = pmError?.code ?: "UNKNOWN",
-              message = pmError?.message ?: error.message ?: "Unknown error",
-              error = Throwable(pmError?.message ?: error.message ?: "Unknown error")
-            ).toJSONString()
-          )
-        }
-      )
+    val handler = handler
+    if (handler == null) {
+      /* A null handler previously fell through ?.let without settling the promise. */
+      promise.resolve(failed("NO_HANDLER", "Saved payment methods are not initialized"))
+      return
     }
+    handler.getCustomerLastUsedPaymentMethodData().fold(
+      onSuccess = { data ->
+        promise.resolve(ConversionUtils.convertMapToJson(data.toMap()).toString())
+      },
+      onFailure = { error ->
+        val pmError = error as? PMError
+        promise.resolve(
+          StandardResult.Failed(
+            code = pmError?.code ?: "UNKNOWN",
+            message = pmError?.message ?: error.message ?: "Unknown error",
+            error = Throwable(pmError?.message ?: error.message ?: "Unknown error")
+          ).toJSONString()
+        )
+      }
+    )
   }
 
   override fun getCustomerDefaultSavedPaymentMethodData(promise: Promise) {
-    handler?.let {
-      it.getCustomerDefaultSavedPaymentMethodData().fold(
-        onSuccess = { data ->
-          promise.resolve(ConversionUtils.convertMapToJson(data.toMap()).toString())
-        },
-        onFailure = { error ->
-          val pmError = error as? PMError
-          promise.resolve(
-            StandardResult.Failed(
-              code = pmError?.code ?: "UNKNOWN",
-              message = pmError?.message ?: error.message ?: "Unknown error",
-              error = Throwable(pmError?.message ?: error.message ?: "Unknown error")
-            ).toJSONString()
-          )
-        }
-      )
+    val handler = handler
+    if (handler == null) {
+      /* A null handler previously fell through ?.let without settling the promise. */
+      promise.resolve(failed("NO_HANDLER", "Saved payment methods are not initialized"))
+      return
     }
+    handler.getCustomerDefaultSavedPaymentMethodData().fold(
+      onSuccess = { data ->
+        promise.resolve(ConversionUtils.convertMapToJson(data.toMap()).toString())
+      },
+      onFailure = { error ->
+        val pmError = error as? PMError
+        promise.resolve(
+          StandardResult.Failed(
+            code = pmError?.code ?: "UNKNOWN",
+            message = pmError?.message ?: error.message ?: "Unknown error",
+            error = Throwable(pmError?.message ?: error.message ?: "Unknown error")
+          ).toJSONString()
+        )
+      }
+    )
   }
 
   override fun getCustomerSavedPaymentMethodData(promise: Promise) {
-    handler?.let {
-      it.getCustomerSavedPaymentMethodData().fold(
-        onSuccess = { data ->
-          val jsonArray = JSONArray()
-          data.forEach { item ->
-            jsonArray.put(
-              ConversionUtils.convertMapToJson(item.toMap())
-            )
-          }
-          promise.resolve(jsonArray.toString())
-        },
-        onFailure = { error ->
-          val pmError = error as? PMError
-          promise.resolve(
-            StandardResult.Failed(
-              code = pmError?.code ?: "UNKNOWN",
-              message = pmError?.message ?: error.message ?: "Unknown error",
-              error = Throwable(pmError?.message ?: error.message ?: "Unknown error")
-            ).toJSONString()
+    val handler = handler
+    if (handler == null) {
+      /* A null handler previously fell through ?.let without settling the promise. */
+      promise.resolve(failed("NO_HANDLER", "Saved payment methods are not initialized"))
+      return
+    }
+    handler.getCustomerSavedPaymentMethodData().fold(
+      onSuccess = { data ->
+        val jsonArray = JSONArray()
+        data.forEach { item ->
+          jsonArray.put(
+            ConversionUtils.convertMapToJson(item.toMap())
           )
         }
-      )
-    }
+        promise.resolve(jsonArray.toString())
+      },
+      onFailure = { error ->
+        val pmError = error as? PMError
+        promise.resolve(
+          StandardResult.Failed(
+            code = pmError?.code ?: "UNKNOWN",
+            message = pmError?.message ?: error.message ?: "Unknown error",
+            error = Throwable(pmError?.message ?: error.message ?: "Unknown error")
+          ).toJSONString()
+        )
+      }
+    )
   }
 
   override fun confirmWithCustomerLastUsedPaymentMethod(reactTag: Double, promise: Promise?) {

@@ -537,12 +537,32 @@ class HyperFragment : ReactFragment() {
 
   override fun onDestroy() {
     try {
+      /* A fragment restored after recreation is a new instance, so pending callbacks can
+         never be fulfilled past this point; settle them instead of silently dropping. */
+      settlePendingCallbacks()
       unRegisterEventBus()
       callbacks.clear()
       onExit = null
       paymentEventListener = null
     } finally {
       super.onDestroy()
+    }
+  }
+
+  /* Failure payload mirrors StandardResult.Failed so the JS layer maps it to a failed result. */
+  private fun settlePendingCallbacks() {
+    val failure = StandardResult.Failed(
+      code = "SURFACE_LOST",
+      message = "The payment surface was destroyed before the flow completed",
+      error = Throwable("SURFACE_LOST")
+    ).toJSONString()
+    callbacks.values.forEach { hyperCallback ->
+      when (hyperCallback) {
+        is HyperCallback.Payment -> hyperCallback.fn(failure)
+        is HyperCallback.UpdateIntentInit -> hyperCallback.fn?.invoke()
+        is HyperCallback.UpdateIntentComplete -> hyperCallback.fn(failure)
+        is HyperCallback.ConfirmButtonTriggered -> Unit
+      }
     }
   }
 

@@ -65,7 +65,25 @@ def REACT_NATIVE_VERSION = reactNativeProperties.getProperty("VERSION_NAME")
 def REACT_NATIVE_MINOR_VERSION = REACT_NATIVE_VERSION.startsWith("0.0.0-") ? 1000 : REACT_NATIVE_VERSION.split("\\.")[1].toInteger()
 def REACT_NATIVE_VERSION_NAME = "rn${REACT_NATIVE_MINOR_VERSION}"
 
-def packageJson = new groovy.json.JsonSlurper().parseText(file("../package.json").text)
+def packageJsonFile = file("../package.json")
+if (!packageJsonFile.exists()) {
+  throw new GradleException(
+    "[@juspay-tech/react-native-hyperswitch] package.json not found at ${packageJsonFile.absolutePath}; unable to determine the SDK version"
+  )
+}
+def packageJson
+try {
+  packageJson = new groovy.json.JsonSlurper().parseText(packageJsonFile.text)
+} catch (Exception e) {
+  throw new GradleException(
+    "[@juspay-tech/react-native-hyperswitch] Failed to parse ${packageJsonFile.absolutePath}: ${e.message}", e
+  )
+}
+if (!packageJson.version) {
+  throw new GradleException(
+    "[@juspay-tech/react-native-hyperswitch] 'version' not found in ${packageJsonFile.absolutePath}"
+  )
+}
 version = packageJson.version
 
 //print("${REACT_NATIVE_VERSION_NAME}")
