@@ -53,6 +53,7 @@ enum EventName: String, Codable {
     case hyperOTAInit = "HYPER_OTA_INIT"
     case hyperOTAFinish = "HYPER_OTA_FINISH"
     case hyperOTAEvent = "HYPER_OTA_EVENT"
+    case rnSdkLifeCycle = "RN_SDK_LIFE_CYCLE"
 
     case authenticationSessionInit = "AUTHENTICATION_SESSION_INIT"
     case authenticationSessionReturned = "AUTHENTICATION_SESSION_RETURNED"

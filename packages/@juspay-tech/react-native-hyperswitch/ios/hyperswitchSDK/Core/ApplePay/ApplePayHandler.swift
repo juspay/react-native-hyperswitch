@@ -20,6 +20,7 @@ internal class ApplePayHandler: NSObject {
 
         callback = rnCallback
         retainedSelf = self
+        NativeLog.debug("wallet_launch_called", ["wallet": "apple_pay"])
         var requiredBillingContactFields: Set<PKContactField>?
         var requiredShippingContactFields: Set<PKContactField>?
 
@@ -137,15 +138,21 @@ internal class ApplePayHandler: NSObject {
             presentCallback?([])
             if presented {
                 self.paymentStatus = nil
+                NativeLog.debug("wallet_presented", ["wallet": "apple_pay"])
             } else {
+                NativeLog.error("wallet_present_failed", ["wallet": "apple_pay"])
                 self.finish(["status": "Failed", "message": "ApplePay: unable to present"])
             }
         })
     }
 
     private func complete(_ result: [String: Any]) {
-        guard let callback else { return }
+        guard let callback else {
+            NativeLog.warning("wallet_result_dropped", ["wallet": "apple_pay", "status": result["status"] as? String])
+            return
+        }
         self.callback = nil
+        NativeLog.debug("wallet_result_delivered", ["wallet": "apple_pay", "status": result["status"] as? String])
         callback([result])
     }
 
@@ -201,8 +208,13 @@ extension ApplePayHandler: PKPaymentAuthorizationControllerDelegate {
     }
     /// Handle completion of the payment authorization flow
     internal func paymentAuthorizationControllerDidFinish(_ controller: PKPaymentAuthorizationController) {
+        NativeLog.debug("wallet_did_finish", ["wallet": "apple_pay", 
+            "paymentStatus": paymentStatus.map { $0 == .success ? "success" : "failure" } ?? "nil",
+            "callbackPending": callback != nil,
+        ])
         controller.delegate = nil
         controller.dismiss {
+            NativeLog.debug("wallet_dismiss_completed", ["wallet": "apple_pay"])
             DispatchQueue.main.async {
                 if self.paymentStatus == .failure {
                     self.finish(["status": "Failed", "message": "ApplePay: payment failed"])

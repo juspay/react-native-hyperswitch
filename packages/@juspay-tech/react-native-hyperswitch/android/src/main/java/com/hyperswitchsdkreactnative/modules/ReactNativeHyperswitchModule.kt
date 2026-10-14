@@ -21,10 +21,7 @@ import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.wallet.IsReadyToPayRequest
 import com.google.android.gms.wallet.Wallet
 import com.google.android.gms.wallet.WalletConstants
-import io.hyperswitch.logs.EventName
-import io.hyperswitch.logs.HSLog
 import io.hyperswitch.logs.HyperLogManager
-import io.hyperswitch.logs.LogCategory
 import io.hyperswitch.paymentsession.GetPaymentSessionCallBackManager
 import io.hyperswitch.paymentsession.GetWalletSessionCallBackManager
 import io.hyperswitch.paymentsession.WalletSessionHandler
@@ -48,6 +45,10 @@ import kotlin.collections.orEmpty
 class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
   NativeHyperswitchModuleSpec(reactContext) {
 
+  init {
+    NativeLog.attach(reactContext)
+  }
+
   private var paymentSessionReactLauncher: PaymentSessionReactLauncher? = null
   private var handler: PaymentSessionHandler? = null
   private var walletHandler: WalletSessionHandler? = null
@@ -58,8 +59,6 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
    */
   private var lastActivity: WeakReference<Activity>? = null
   private var lastConfiguration: Configuration? = null
-  /* HyperLogManager keeps logs in memory until it is initialised, so only log once it is. */
-  private var loggingEnabled = false
   /* Set only once initialise has completed. */
   private var initialised = false
 
@@ -136,7 +135,7 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       // Without this, logs added through HyperLogManager are kept in memory and never sent.
       val loggingEndpoint =
         getLoggingEndpoint(publishableKey, overrideEndpoints, customConfig.commonEndpoint)
-      loggingEnabled = loggingEndpoint != null
+      NativeLog.enabled = loggingEndpoint != null
       loggingEndpoint?.let {
         HyperLogManager.initialise(publishableKey, it)
         HyperLogManager.setSdkVersion(BuildConfig.VERSION_NAME)
@@ -144,10 +143,12 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       }
       lastActivity = WeakReference(activity)
       lastConfiguration = Configuration(activity.resources.configuration)
-      sendLog(
-        "debug",
-        "SDK initialised (environment=${hyperswitchConfig?.environment}, " +
-          "activity=${activity.javaClass.simpleName})"
+      NativeLog.debug(
+        "sdk_initialised",
+        mapOf(
+          "environment" to NativeLog.environmentName(hyperswitchConfig?.environment?.name),
+          "activity" to activity.javaClass.simpleName
+        )
       )
       initialised = true
       val handle = UUID.randomUUID().toString()
@@ -173,7 +174,7 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
       activity.isDestroyed ||
       activity.isChangingConfigurations
     ) {
-      sendLog("error", "$trigger called with no live Activity")
+      NativeLog.error("activity_unavailable", mapOf("trigger" to trigger))
       promise?.resolve(failed("ACTIVITY_UNAVAILABLE", "No active Activity"))
       return null
     }
@@ -183,7 +184,7 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
 
   private fun requireInitialised(trigger: String, promise: Promise?): Boolean {
     if (initialised && paymentSessionReactLauncher != null) return true
-    sendLog("error", "$trigger called before the SDK was initialised")
+    NativeLog.error("sdk_not_initialised", mapOf("trigger" to trigger))
     promise?.resolve(failed("NOT_INITIALISED", "SDK is not initialised"))
     return false
   }
@@ -198,11 +199,14 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
   private fun noteActivityChange(trigger: String, current: Activity) {
     val previous = lastActivity?.get()
     if (previous === current) return
-    sendLog(
-      "warning",
-      "Activity changed since the last SDK call; using the current Activity (trigger=$trigger, " +
-        "reason=${replacementReason(previous)}, " +
-        "configChanged=${configurationChanges(lastConfiguration, current.resources.configuration)})"
+    NativeLog.warning(
+      "activity_changed",
+      mapOf(
+        "trigger" to trigger,
+        "reason" to replacementReason(previous),
+        "configChanged" to configurationChanges(lastConfiguration, current.resources.configuration),
+        "activity" to current.javaClass.simpleName
+      )
     )
     lastActivity = WeakReference(current)
     lastConfiguration = Configuration(current.resources.configuration)
@@ -223,25 +227,6 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     val diff = previous.diff(current)
     return CONFIG_NAMES.filter { (bit, _) -> diff and bit != 0 }.joinToString(",") { it.second }
       .ifEmpty { if (diff == 0) "none" else "0x" + Integer.toHexString(diff) }
-  }
-
-  /**
-   * Sends a native SDK lifecycle log (RN_SDK_LIFE_CYCLE) to the SDK logging endpoint through
-   * HyperLogManager; logType (debug/warning/error) and value say what happened. Never throws, so
-   * logging cannot break a payment flow. addLog runs on the UI thread because the logger keeps an
-   * unsynchronised batch that its debouncer reads on the main looper.
-   */
-  private fun sendLog(logType: String, value: String) {
-    if (!loggingEnabled) return
-    val log = runCatching {
-      HSLog.LogBuilder()
-        .logType(logType)
-        .category(LogCategory.API)
-        .eventName(EventName.RN_SDK_LIFE_CYCLE)
-        .value(value)
-        .build()
-    }.getOrNull() ?: return
-    UiThreadUtil.runOnUiThread { runCatching { HyperLogManager.addLog(log) } }
   }
 
   /**
@@ -277,7 +262,7 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
   ) {
     try {
       val activity = requireReady("presentPaymentSheet", promise) ?: return
-      sendLog("debug", "presentPaymentSheet called (activity=${activity.javaClass.simpleName})")
+      NativeLog.debug("present_payment_sheet_called", mapOf("activity" to activity.javaClass.simpleName))
       val props = mutableMapOf<String, Any?>().apply {
         putAll(params?.toHashMap().orEmpty())
         put("type", "payment")
