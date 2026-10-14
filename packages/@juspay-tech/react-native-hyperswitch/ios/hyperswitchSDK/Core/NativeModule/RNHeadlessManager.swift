@@ -22,7 +22,7 @@ internal class RNHeadlessManagerDelegate: RNFactoryDelegate {
     }
 }
 
-internal class RNHeadlessManager: RCTDefaultReactNativeFactoryDelegate {
+internal class RNHeadlessManager: RCTDefaultReactNativeFactoryDelegate, ReactHostManager {
 
     internal var responseHandler: RNResponseHandler?
     internal var rootView: UIView?
@@ -42,6 +42,7 @@ internal class RNHeadlessManager: RCTDefaultReactNativeFactoryDelegate {
             return existing
         }
         delegate.dependencyProvider = RCTAppDependencyProvider()
+        delegate.manager = self
         let created = RCTReactNativeFactory(delegate: delegate)
         factory = created
         return created
@@ -100,17 +101,6 @@ internal class RNHeadlessManager: RCTDefaultReactNativeFactoryDelegate {
         } else {
             DispatchQueue.main.sync(execute: drop)
         }
-    }
-
-    // MARK: - RCTTurboModuleManagerDelegate
-
-    @objc public func getModuleInstanceFromClass(_ moduleClass: AnyClass) -> AnyObject? {
-        if String(describing: moduleClass) == "HyperModule",
-           let shim = (moduleClass as? NSObject.Type)?.init() as? HyperModuleShim {
-            hyperModule.attach(to: shim)
-            return shim as AnyObject
-        }
-        return nil
     }
 
     public override func bridgelessEnabled() -> Bool {

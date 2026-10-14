@@ -55,25 +55,11 @@ public class HyperModuleImpl: NSObject {
         }
     }
 
-    private let applePayPaymentHandler = ApplePayHandler()
     private let expressCheckoutHandler = ExpressCheckoutLauncher()
     private var presentCallback: RCTResponseSenderBlock? = nil
 
-    /// Direct reference to the currently-presented PaymentSheet.
-    /// Set by PaymentSheetView+UIKit when the sheet is presented; cleared in exitPaymentsheet.
-    /// Avoids relying on bridge.uiManager.addUIBlock (which doesn't find Fabric views).
-    private var activePaymentSheet: PaymentSheet?
-    private weak var activePaymentSheetVC: HyperUIViewController?
-
     internal override init() {
         super.init()
-    }
-
-    // MARK: - Payment sheet registration (called from PaymentSheetView+UIKit)
-
-    internal func registerPaymentSheet(_ sheet: PaymentSheet, vc: HyperUIViewController) {
-        activePaymentSheet = sheet
-        activePaymentSheetVC = vc
     }
 
     private func onMain(_ work: @escaping () -> Void) {
@@ -130,7 +116,9 @@ public class HyperModuleImpl: NSObject {
     // MARK: - Apple Pay
 
     @objc public func launchApplePay(_ rnMessage: String, callback: @escaping RCTResponseSenderBlock) {
-        applePayPaymentHandler.startPayment(rnMessage: rnMessage, rnCallback: callback, presentCallback: self.presentCallback)
+        let presentCallback = self.presentCallback
+        self.presentCallback = nil
+        ApplePayHandler().startPayment(rnMessage: rnMessage, rnCallback: callback, presentCallback: presentCallback)
     }
 
     @objc public func startApplePay(_ rnMessage: String, callback: @escaping RCTResponseSenderBlock) {
@@ -171,21 +159,19 @@ public class HyperModuleImpl: NSObject {
     // MARK: - Payment sheet exits
 
     @objc public func exitPaymentsheet(_ reactTag: NSNumber, result rnMessage: String, reset: Bool) {
-        // Consume and clear so they can't be called a second time.
-        let sheet = activePaymentSheet
-        let vc    = activePaymentSheetVC
-        activePaymentSheet   = nil
-        activePaymentSheetVC = nil
-
-        // Pass the raw JS result string directly — no PaymentResult conversion.
-        // PaymentSheet.completion is (String) -> Void, so this goes straight to
-        // the promise resolve in HyperswitchModule.presentPaymentSheet.
-        sheet?.completion?(rnMessage)
-
-        // Dismiss the VC, then release the rootView so the Fabric surface is torn down.
-        vc?.dismiss(animated: false) {
-            RNViewManager.sharedInstance.rootView?.removeFromSuperview()
-            RNViewManager.sharedInstance.rootView = nil
+        withPaymentSheet(reactTag) { vc, sheet in
+            guard let sheet else { return }
+            let completion = sheet.completion
+            sheet.completion = nil
+            guard let vc else {
+                completion?(rnMessage)
+                return
+            }
+            vc.dismiss(animated: false) {
+                RNViewManager.sharedInstance.rootView?.removeFromSuperview()
+                RNViewManager.sharedInstance.rootView = nil
+                completion?(rnMessage)
+            }
         }
     }
 
@@ -489,10 +475,34 @@ public class HyperModuleImpl: NSObject {
 
     private func withPaymentSheet(_ rootTag: NSNumber, _ block: @escaping (UIViewController?, PaymentSheet?) -> Void) {
         DispatchQueue.main.async {
-            let view = self.resolveView(forRootTag: rootTag)
-            let vc = view?.reactViewController() as? HyperUIViewController
-            let sheet = vc?.paymentSheet
-            block(vc, sheet)
+            let vc: HyperUIViewController?
+            if let view = self.resolveView(forRootTag: rootTag) {
+                vc = view.reactViewController() as? HyperUIViewController
+            } else {
+                vc = HyperModuleImpl.topmostPaymentSheetController()
+            }
+            block(vc, vc?.paymentSheet)
         }
+    }
+
+    private static func topmostPaymentSheetController() -> HyperUIViewController? {
+        let windows = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .sorted { $0.isKeyWindow && !$1.isKeyWindow }
+        for window in windows {
+            var found: HyperUIViewController?
+            var current = window.rootViewController
+            while let vc = current {
+                if let sheetVC = vc as? HyperUIViewController, sheetVC.paymentSheet != nil {
+                    found = sheetVC
+                }
+                current = vc.presentedViewController
+            }
+            if let found {
+                return found
+            }
+        }
+        return nil
     }
 }
