@@ -16,7 +16,7 @@ class PaymentWidgetEvent(
   override fun canCoalesce() = false
 
   override fun getEventData() = Arguments.createMap().apply {
-    putString("eventName", event.type)
+    putString("eventName", event.eventName)
     // Codegen types the payload as a string on every platform; JS parses it.
     putString("payload", event.data.optJSONObject("payload")?.toString() ?: "{}")
   }

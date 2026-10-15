@@ -16,43 +16,27 @@ public class CVCWidget: UIControl {
     internal var rootReactTag: NSNumber? { widgetReactTag }
     private var rootView: UIView?
     private var cvcCallback: ((PaymentResult) -> Void)?
-    private var subscribedEventNames: [String]?
     private let hyperswitch: Hyperswitch
 
     internal var paymentEventListener: PaymentEventListener?
 
     public init(
         hyperswitch: Hyperswitch,
-        configuration: PaymentSheet.Configuration? = nil,
-        subscribe: ((PaymentEventSubscriptionBuilder) -> Void)? = nil
+        configuration: PaymentSheet.Configuration? = nil
     ) {
         self.hyperswitch = hyperswitch
         self.configuration = configuration
         self.configurationDict = nil
-        if let subscribe {
-            let builder = PaymentEventSubscriptionBuilder()
-            subscribe(builder)
-            let (subscription, listener) = builder.build()
-            self.paymentEventListener = listener
-            self.subscribedEventNames = subscription.subscribedEventStrings()
-        }
         super.init(frame: .zero)
         commonInit()
     }
 
     //MARK: pass through
-    public init(hyperswitch: Hyperswitch, configurationDict: [String: Any]?, subscribe: ((PaymentEventSubscriptionBuilder) -> Void)? = nil)
+    public init(hyperswitch: Hyperswitch, configurationDict: [String: Any]?)
     {
         self.hyperswitch = hyperswitch
         self.configuration = nil
         self.configurationDict = configurationDict
-        if let subscribe {
-            let builder = PaymentEventSubscriptionBuilder()
-            subscribe(builder)
-            let (subscription, listener) = builder.build()
-            self.paymentEventListener = listener
-            self.subscribedEventNames = subscription.subscribedEventStrings()
-        }
         super.init(frame: .zero)
         commonInit()
     }
@@ -118,7 +102,7 @@ public class CVCWidget: UIControl {
 
     internal func dispatchPaymentEvent(type: String, payload: [String: Any]) {
         guard let listener = paymentEventListener else { return }
-        let event = PaymentEvent(type: type, payload: payload)
+        let event = PaymentEvent(eventName: type, payload: payload)
         if Thread.isMainThread {
             listener.onPaymentEvent(event)
         } else {

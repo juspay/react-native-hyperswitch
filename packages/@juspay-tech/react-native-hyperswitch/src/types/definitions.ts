@@ -57,7 +57,6 @@ import type {
   Theme,
   Font,
   SubscriptionEvent,
-  LegacySubscriptionEvent,
   PaymentSheetConfiguration,
 } from './PaymentSheetConfiguration';
 
@@ -105,6 +104,4 @@ export interface CvcWidgetOptions {
   cvcIcon?: 'hidden' | 'shown';
   /** Events delivered to `onChange`; the CVC widget emits `cvcStatusChange`. */
   subscriptionEvents?: SubscriptionEvent[];
-  /** @deprecated Use `subscriptionEvents`. */
-  subscribedEvents?: (SubscriptionEvent | LegacySubscriptionEvent)[];
 }

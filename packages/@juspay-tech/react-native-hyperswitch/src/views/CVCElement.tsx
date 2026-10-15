@@ -13,7 +13,7 @@ import { useNativeViewTag } from './useNativeViewTag';
 import { PaymentResult } from '../types/paymentresult';
 import {
   routeWidgetEvent,
-  withNativeSubscription,
+  withSubscriptionEvents,
 } from '../utils/EventValidator';
 
 type CVCElementProps = {
@@ -76,7 +76,7 @@ export const CVCElement = forwardRef<CVCWidgetRef, CVCElementProps>(
         | undefined;
       const layout = opts?.paymentMethodLayout;
       return {
-        ...withNativeSubscription(opts ?? {}),
+        ...withSubscriptionEvents(opts ?? {}),
         paymentMethodLayout: {
           ...layout,
           savedMethodCustomization: {

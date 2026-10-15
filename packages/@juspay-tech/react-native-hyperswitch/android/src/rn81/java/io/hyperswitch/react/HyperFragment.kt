@@ -430,7 +430,7 @@ class HyperFragment : Fragment(), DefaultLifecycleObserver {
       if (listener != null) {
         listener.onPaymentEvent(
           PaymentEvent(
-            type = eventType,
+            eventName = eventType,
             payload = payload
           )
         )

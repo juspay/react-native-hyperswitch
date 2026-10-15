@@ -81,12 +81,10 @@ class LaunchOptions(
     fun getBundle(
         sessionConfig: PaymentSessionConfiguration? = null,
         configuration: Bundle? = null,
-        subscribedEvents: List<String> = emptyList(),
     ): Bundle = getBundle(
         type = "payment",
         sessionConfig = sessionConfig,
         configuration = configuration,
-        subscribedEvents= subscribedEvents
     )
 
     // ── Widget bundle ─────────────────────────────────────────────────────────
@@ -104,16 +102,12 @@ class LaunchOptions(
         type: String? = "payment",
         sessionConfig: PaymentSessionConfiguration? = null,
         configuration: Bundle? = null,
-        subscribedEvents: List<String> = emptyList(),
     ): Bundle = Bundle().apply {
         putBundle("props", Bundle().apply {
             putString("type", type)
             hsConfig?.let { putBundle("hyperswitchConfig", it.toBundle()) }
             sessionConfig?.let { putBundle("paymentSessionConfig", it.toBundle()) }
             val configCopy = configuration?.let { Bundle(it) }
-            if (subscribedEvents.isNotEmpty()) {
-                configCopy?.putStringArrayList("subscribedEvents", ArrayList(subscribedEvents))
-            }
             putBundle("configuration", configCopy)
             putBundle("sdkParams", getSdkParams())
         })
@@ -123,11 +117,9 @@ class LaunchOptions(
 
     fun getBundleWithHyperParams(
         readableMap: Map<*, *>,
-        subscribedEvents: List<String> = emptyList(),
     ): Bundle = Bundle().apply {
         putBundle("props", toBundle(readableMap).apply {
             putBundle("sdkParams", getSdkParams())
-            putStringArrayList("subscribedEvents", ArrayList(subscribedEvents))
         })
     }
 

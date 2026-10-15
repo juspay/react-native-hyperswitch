@@ -8,11 +8,11 @@ interface PaymentEventListener {
 }
 
 data class PaymentEvent(
-  val type: String,
+  val eventName: String,
   val payload: Map<String, Any?>,
 ) {
   val data = JSONObject().apply {
-    put("type", type)
+    put("eventName", eventName)
     put("payload", ConversionUtils.convertMapToJson(payload))
   }
 }

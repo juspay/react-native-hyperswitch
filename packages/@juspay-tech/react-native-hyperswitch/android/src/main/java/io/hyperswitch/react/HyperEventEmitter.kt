@@ -67,17 +67,6 @@ object HyperEventEmitter {
 //        return subscription.isSubscribed(eventType)
 //    }
 
-    /**
-     * Get the list of subscribed event types
-     * Called by React Native to initialize subscription state
-     * @return List of subscribed event type strings
-     */
-    fun getSubscribedEvents(): List<String> {
-//        val subscription = subscriptionEvents ?:
-        return emptyList()
-//        return subscription.getSubscribedEventStrings()
-    }
-
     fun confirmStatic(tag: String, map: MutableMap<String, String?>) {
         val writableMap = Arguments.createMap()
         for ((key, value) in map) {

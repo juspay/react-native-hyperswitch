@@ -6,7 +6,7 @@ import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfigurati
 import { useHyperElementsContext } from '../context/HyperElements';
 import {
   routeWidgetEvent,
-  withNativeSubscription,
+  withSubscriptionEvents,
 } from '../utils/EventValidator';
 import type {
   PaymentEvent,
@@ -121,7 +121,7 @@ export const PaymentElement = forwardRef<
   };
 
   const configuration = options
-    ? (withNativeSubscription(options) as Record<string, unknown>)
+    ? (withSubscriptionEvents(options) as Record<string, unknown>)
     : undefined;
 
   return (

@@ -15,20 +15,6 @@ const validEventStrings: readonly string[] = [
   'cvcStatusChange',
 ];
 
-/*
- * Legacy event names accepted transparently so existing merchant integrations
- * keep working; everything is normalized to the bundle's current camelCase
- * taxonomy before crossing to native.
- */
-const legacyToCurrentEventName: Record<string, string> = {
-  PAYMENT_METHOD_INFO_CARD: 'cardDetailsChange',
-  PAYMENT_METHOD_STATUS: 'paymentMethodChange',
-  FORM_STATUS: 'formStatusChange',
-  PAYMENT_METHOD_INFO_ADDRESS: 'billingDetailsChange',
-  PAYMENT_METHOD_INFO_BILLING_ADDRESS: 'billingDetailsChange',
-  CVC_STATUS: 'cvcStatusChange',
-};
-
 const warnedUnknownEvents = new Set<string>();
 
 // Options are re-read on every render, so each unknown name warns only once.
@@ -41,55 +27,30 @@ function warnUnknownEvent(event: string, key: string): void {
   );
 }
 
-function normalizeSubscribedEvents(
-  subscribedEvents: readonly string[] | undefined,
-  key: string
-): string[] {
-  return (subscribedEvents ?? [])
-    .map((event) => legacyToCurrentEventName[event] ?? event)
-    .filter((event) => {
-      const known = validEventStrings.includes(event);
-      if (!known) warnUnknownEvent(event, key);
-      return known;
-    });
-}
-
 type SubscriptionOptions = {
   subscriptionEvents?: readonly string[];
-  subscribedEvents?: readonly string[];
 };
 
-function mergeSubscriptionEvents(
-  options: SubscriptionOptions | undefined
-): string[] {
-  const merged = [
-    ...normalizeSubscribedEvents(options?.subscriptionEvents, 'subscriptionEvents'),
-    ...normalizeSubscribedEvents(options?.subscribedEvents, 'subscribedEvents'),
-  ];
-  return merged.filter((event, index) => merged.indexOf(event) === index);
-}
-
-// The bundle reads `configuration.subscribedEvents`; both merchant keys collapse into it.
-export function withNativeSubscription<T extends SubscriptionOptions>(
-  options: T
-): Omit<T, 'subscriptionEvents'> {
-  const events = mergeSubscriptionEvents(options);
-  const rest: SubscriptionOptions = { ...options };
-  delete rest.subscriptionEvents;
-  delete rest.subscribedEvents;
-  return (
-    events.length > 0 ? { ...rest, subscribedEvents: events } : rest
-  ) as Omit<T, 'subscriptionEvents'>;
+// Validate names while keeping the same configuration key through the native bridge.
+export function withSubscriptionEvents<T extends SubscriptionOptions>(options: T): T {
+  if (!options.subscriptionEvents) return options;
+  return {
+    ...options,
+    subscriptionEvents: options.subscriptionEvents.filter((event) => {
+      const known = validEventStrings.includes(event);
+      if (!known) warnUnknownEvent(event, 'subscriptionEvents');
+      return known;
+    }),
+  };
 }
 
 // RN's payment sheet cannot deliver events, so its subscriptions are dropped.
 export function withoutSubscription<T extends SubscriptionOptions>(
   options: T
-): Omit<T, 'subscriptionEvents' | 'subscribedEvents'> {
-  const rest: SubscriptionOptions = { ...options };
+): Omit<T, 'subscriptionEvents'> {
+  const rest = { ...options };
   delete rest.subscriptionEvents;
-  delete rest.subscribedEvents;
-  return rest as Omit<T, 'subscriptionEvents' | 'subscribedEvents'>;
+  return rest;
 }
 
 export type WidgetEventHandlers = {

@@ -409,7 +409,7 @@ class HyperFragment : ReactFragment() {
       if (listener != null) {
         listener.onPaymentEvent(
           PaymentEvent(
-            type = eventType,
+            eventName = eventType,
             payload = payload
           )
         )

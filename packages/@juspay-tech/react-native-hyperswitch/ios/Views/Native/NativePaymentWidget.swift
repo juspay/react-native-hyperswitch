@@ -267,7 +267,7 @@ public class NativePaymentWidgetView: UIView {
                 : nil
             let payload = payloadData.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
             self?.onPaymentEvent?([
-                "eventName": event.type,
+                "eventName": event.eventName,
                 "payload": payload,
             ])
         }
@@ -279,8 +279,7 @@ public class NativePaymentWidgetView: UIView {
             }
             let cvc = CVCWidget(
                 hyperswitch: hyperswitch,
-                configurationDict: configuration,
-                subscribe: nil
+                configurationDict: configuration
             )
             cvc.setPaymentEventListener(listener)
             cvcWidget = cvc
@@ -294,8 +293,7 @@ public class NativePaymentWidgetView: UIView {
                 configurationDict: configuration,
                 completion: { [weak self] result in
                     self?.handlePaymentResult(result)
-                },
-                subscribe: nil
+                }
             )
             payment.setPaymentEventListener(listener)
             paymentWidget = payment

@@ -62,8 +62,7 @@ export interface Font {
 }
 
 /*
- * Event names emitted by the shared JS bundle. Legacy names
- * (LegacySubscriptionEvent) are accepted only in the deprecated `subscribedEvents`.
+ * Current camelCase event names emitted by the shared JS bundle.
  */
 export type SubscriptionEvent =
   | 'cardDetailsChange'
@@ -72,14 +71,6 @@ export type SubscriptionEvent =
   | 'billingDetailsChange'
   | 'cvcStatusChange';
 
-/** @deprecated Old event names, accepted only in deprecated `subscribedEvents`. */
-export type LegacySubscriptionEvent =
-  | 'PAYMENT_METHOD_INFO_CARD'
-  | 'PAYMENT_METHOD_STATUS'
-  | 'FORM_STATUS'
-  | 'PAYMENT_METHOD_INFO_ADDRESS'
-  | 'PAYMENT_METHOD_INFO_BILLING_ADDRESS'
-  | 'CVC_STATUS';
 
 export type Theme =
   | 'Default'
@@ -353,8 +344,6 @@ export interface PaymentSheetConfiguration {
    * for events not listed. `presentPaymentSheet` ignores it (no sheet events on RN).
    */
   subscriptionEvents?: SubscriptionEvent[];
-  /** @deprecated Use `subscriptionEvents`. */
-  subscribedEvents?: (SubscriptionEvent | LegacySubscriptionEvent)[];
   customer?: CustomerConfiguration;
   placeholder?: Placeholder;
   billingDetails?: AddressDetails;

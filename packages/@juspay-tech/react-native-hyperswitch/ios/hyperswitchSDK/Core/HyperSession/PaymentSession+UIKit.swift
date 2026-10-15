@@ -33,7 +33,6 @@ extension PaymentSession {
     public func presentPaymentSheet(
         viewController: UIViewController,
         configuration: PaymentSheet.Configuration? = nil,
-        subscribe: ((PaymentEventSubscriptionBuilder) -> Void)? = nil,
         completion: @escaping (PaymentResult) -> Void
     ) {
         let paymentSheet = PaymentSheet(
@@ -42,13 +41,6 @@ extension PaymentSession {
             configuration: configuration
         )
 
-        if let subscribe {
-            let builder = PaymentEventSubscriptionBuilder()
-            subscribe(builder)
-            let (subscription, builtListener) = builder.build()
-            paymentSheet.subscribedEvents = subscription.subscribedEventStrings()
-            paymentSheet.paymentEventListener = builtListener
-        }
         paymentSheet.present(from: viewController, completion: completion)
     }
 
@@ -56,7 +48,6 @@ extension PaymentSession {
     public func presentPaymentSheetWithParams(
         viewController: UIViewController,
         params: [String: Any],
-        subscribe: ((PaymentEventSubscriptionBuilder) -> Void)? = nil,
         completion: @escaping (PaymentResult) -> Void
     ) {
         let paymentSheet = PaymentSheet(
@@ -64,13 +55,6 @@ extension PaymentSession {
             hyperswitchConfiguration: hyperswitchConfiguration ?? nil
         )
 
-        if let subscribe {
-            let builder = PaymentEventSubscriptionBuilder()
-            subscribe(builder)
-            let (subscription, builtListener) = builder.build()
-            paymentSheet.subscribedEvents = subscription.subscribedEventStrings()
-            paymentSheet.paymentEventListener = builtListener
-        }
         paymentSheet.presentWithParams(from: viewController, props: params, completion: completion)
     }
 

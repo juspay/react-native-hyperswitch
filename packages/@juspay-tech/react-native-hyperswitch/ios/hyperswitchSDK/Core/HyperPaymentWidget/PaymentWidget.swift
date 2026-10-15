@@ -20,25 +20,16 @@ public class PaymentWidget: UIControl {
     private var initCallback: ((PaymentResult) -> Void)?
     private var shouldProceedWithPaymentCallback: ((PaymentRequestData, @escaping (Bool) -> Void) -> Void)?
     private var cancellables = Set<AnyCancellable>()
-    private var subscribedEventNames: [String]?
     internal var paymentEventListener: PaymentEventListener?
 
     public init(
         paymentSession: PaymentSession,
         configuration: PaymentSheet.Configuration? = nil,
-        completion: @escaping ((PaymentResult) -> Void),
-        subscribe: ((PaymentEventSubscriptionBuilder) -> Void)? = nil
+        completion: @escaping ((PaymentResult) -> Void)
     ) {
         self.paymentSession = paymentSession
         self.configuration = configuration
         self.configurationDict = nil
-        if let subscribe {
-            let builder = PaymentEventSubscriptionBuilder()
-            subscribe(builder)
-            let (subscription, listener) = builder.build()
-            self.paymentEventListener = listener
-            self.subscribedEventNames = subscription.subscribedEventStrings()
-        }
         self.initCallback = completion
         super.init(frame: .zero)
         commonInit()
@@ -47,19 +38,11 @@ public class PaymentWidget: UIControl {
     public init(
         paymentSession: PaymentSession,
         configurationDict: [String: Any]?,
-        completion: @escaping ((PaymentResult) -> Void),
-        subscribe: ((PaymentEventSubscriptionBuilder) -> Void)? = nil
+        completion: @escaping ((PaymentResult) -> Void)
     ) {
         self.paymentSession = paymentSession
         self.configuration = nil
         self.configurationDict = configurationDict
-        if let subscribe {
-            let builder = PaymentEventSubscriptionBuilder()
-            subscribe(builder)
-            let (subscription, listener) = builder.build()
-            self.paymentEventListener = listener
-            self.subscribedEventNames = subscription.subscribedEventStrings()
-        }
         self.initCallback = completion
         super.init(frame: .zero)
         commonInit()
@@ -179,7 +162,7 @@ public class PaymentWidget: UIControl {
 
     internal func dispatchPaymentEvent(type: String, payload: [String: Any]) {
         guard let listener = paymentEventListener else { return }
-        let event = PaymentEvent(type: type, payload: payload)
+        let event = PaymentEvent(eventName: type, payload: payload)
         if Thread.isMainThread {
             listener.onPaymentEvent(event)
         } else {
