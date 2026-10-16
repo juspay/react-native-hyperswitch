@@ -136,4 +136,18 @@ export default [
       paths: (id) => (/standalone-entry\.mjs$/.test(id) ? './index.js' : id),
     })),
   },
+  /*
+   * THE DETACHED ENTRY: re-exports of the root's objects, built exactly like the host entry so a
+   * field imported from `/detached` is the root's field and shares its one widget context.
+   */
+  {
+    input: {detached: 'src/detached-entry.mjs'},
+    external: (id) => hostRuntime.includes(id) || /standalone-entry\.mjs$/.test(id),
+    plugins,
+    treeshake,
+    output: outputs('detached').map((o) => ({
+      ...o,
+      paths: (id) => (/standalone-entry\.mjs$/.test(id) ? './index.js' : id),
+    })),
+  },
 ];

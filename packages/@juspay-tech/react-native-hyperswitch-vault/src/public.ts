@@ -163,6 +163,52 @@ export declare const createCardForm: (
   config?: Partial<Omit<CardFormProps, 'children'>>
 ) => CardFormInstance;
 
+/* The <CardForm> props a detached form takes; `environment` also accepts the web's lowercase names. */
+export type DetachedCardFormConfig = Partial<
+  Pick<
+    CardFormProps,
+    | 'sdkAuthorization'
+    | 'vaultDetails'
+    | 'appearance'
+    | 'locale'
+    | 'customEndpoints'
+    | 'onReady'
+    | 'onChange'
+  >
+> & {
+  readonly environment?:
+    | CardFormProps['environment']
+    | 'prod'
+    | 'prod_eu'
+    | 'sandbox'
+    | 'integ';
+};
+
+/*
+ * A card form whose fields are not its children: render `Host` once, and each field inside a
+ * `Field` in whatever React root it lives in. The handle carries no card data.
+ */
+export type DetachedCardFormInstance = {
+  readonly Host: React.ComponentType;
+  readonly Field: React.ComponentType<{ children: React.ReactNode }>;
+
+  tokenize(): Promise<VaultTokenizeResult>;
+  reset(): void;
+  focus(field: VaultField): void;
+
+  getState(): VaultCardFormChange | null;
+
+  on(event: 'ready', listener: (event: VaultCardFormEvent) => void): () => void;
+  on(
+    event: 'change',
+    listener: (event: VaultCardFormChange) => void
+  ): () => void;
+};
+
+export declare const createDetachedCardForm: (
+  config?: DetachedCardFormConfig
+) => DetachedCardFormInstance;
+
 export type VaultFieldStyles = fieldStyles;
 export type VaultCardNumberStyles = fieldStyles;
 export type VaultCardExpiryStyles = expiryStyles;
