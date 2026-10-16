@@ -127,7 +127,7 @@ type submitFlow =
   | SavedCardCvc(CardStateReducer.savedCard)
 
 type machinery = {
-  tokenize: unit => promise<VaultResult.vaultTokenizeResult>,
+  tokenize: option<VaultPaymentMethodData.hostPaymentMethodData> => promise<VaultResult.vaultTokenizeResult>,
   confirmPayment: paymentConfirmInput => promise<VaultResult.vaultPaymentResult>,
   reset: unit => unit,
   isSubmitting: bool,
@@ -172,6 +172,9 @@ let useMachinery = (
   ~eligibilityVerdict: unit => option<VaultEligibility.verdict>,
   ~recordEligibility: VaultEligibility.verdict => unit,
   ~markSubmitAttempted: unit => unit,
+  /* PMM parity with the web SDK: the management save always stamps the
+     payment-method-session confirm with a fresh customer_acceptance. */
+  ~alwaysSendCustomerAcceptance: bool,
 
   ~presenceGate: unit => result<submitFlow, string>,
   ~clearLocal: unit => unit,
@@ -266,6 +269,7 @@ let useMachinery = (
     ~appId: option<string>,
     ~nickName: option<string>,
     ~cardholderName: option<string>,
+    ~customerAcceptance: option<VaultConfirmBody.hostCustomerAcceptance>,
     ~signal: VaultConfirm.abortSignal,
   ): result<(string, VaultConfirm.vaultCardMetadata), mintFailure> => {
     let vaultAuthorization = session.authorization
@@ -291,6 +295,7 @@ let useMachinery = (
 
         cardNetwork: ?VaultConfirmBody.cardNetworkToWire(cardNetwork()),
         nickName: ?nickName,
+        customerAcceptance: ?customerAcceptance,
         signal,
       })
       switch outcome {
@@ -326,7 +331,7 @@ let useMachinery = (
     | _ => ()
     }
 
-  let runTokenize = async () => {
+  let runTokenize = async (~paymentMethodData: option<VaultPaymentMethodData.hostPaymentMethodData>) => {
     let (sessionState, environment, _, vaultEndpoint) = latestRef.current
 
     switch sessionState {
@@ -372,16 +377,24 @@ let useMachinery = (
                 result
 
               | NewCard =>
-                let (controller, signal) = openRequest(
-                  ~vaultAuthorization=session.authorization,
-                  ~environment,
-                )
-                let minted = await mintToken(
-                  ~session,
-                  ~vaultBaseUrl,
+                if (
+                  paymentMethodData->VaultPaymentMethodData.validateHostPaymentMethodData->Result.isError
+                ) {
+                  VaultResult.tokenizeFailedWith(#forbidden_card_data, VaultResult.forbiddenCardDataMessage)
+                } else {
+                  let (controller, signal) = openRequest(
+                    ~vaultAuthorization=session.authorization,
+                    ~environment,
+                  )
+                  let minted = await mintToken(
+                    ~session,
+                    ~vaultBaseUrl,
 
-                  ~appId=None,
-                  ~nickName=None,
+                    ~appId=None,
+                    ~nickName=VaultPaymentMethodData.nickNameOf(paymentMethodData),
+                    ~customerAcceptance=alwaysSendCustomerAcceptance
+                      ? Some(VaultPaymentMethodData.acceptanceNow(~userAgent=Some(VaultPaymentMethodData.nativeUserAgent())))
+                      : None,
 
                   ~cardholderName=switch currentCardholderNameMode() {
                   | #collect => cardholderName()->nonBlank
@@ -403,6 +416,7 @@ let useMachinery = (
         }
       }
     }
+  }
   }
 
   let eligibilityGate = async (~args: paymentConfirmInput, ~credential, ~baseUrl, ~signal) =>
@@ -548,6 +562,7 @@ let useMachinery = (
                             ~appId=args.appId,
                             ~nickName=VaultPaymentMethodData.nickNameOf(args.paymentMethodData),
                             ~cardholderName=resolvedCardholderName,
+                            ~customerAcceptance=args.customerAcceptance,
                             ~signal,
                           )
 
@@ -630,11 +645,11 @@ let useMachinery = (
     tracked
   }
 
-  let tokenize = () =>
+  let tokenize = paymentMethodData =>
     switch inFlightRef.current {
     | Some(TokenizeInFlight(pending)) => pending
     | Some(ConfirmInFlight(_)) => Promise.resolve(VaultResult.tokenizeConfirmInProgress())
-    | None => trackTokenize(runTokenize())
+    | None => trackTokenize(runTokenize(~paymentMethodData))
     }
 
   let confirmPayment = (args: paymentConfirmInput) =>
