@@ -207,10 +207,6 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
   // Method to exit the payment sheet
   @ReactMethod
   override fun exitPaymentsheet(rootTag: Double, paymentResult: String, reset: Boolean) {
-    NativeLog.debug(
-      "exit_payment_sheet_called",
-      mapOf("activity" to currentActivity?.javaClass?.simpleName)
-    )
     val isFragment = PaymentSheetCallbackManager.executeCallback(paymentResult)
     NativeLog.debug(
       "exit_payment_sheet_resolved",

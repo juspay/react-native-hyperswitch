@@ -159,7 +159,6 @@ public class HyperModuleImpl: NSObject {
     // MARK: - Payment sheet exits
 
     @objc public func exitPaymentsheet(_ reactTag: NSNumber, result rnMessage: String, reset: Bool) {
-        NativeLog.debug("exit_payment_sheet_called", ["rootTag": reactTag.intValue])
         withPaymentSheet(reactTag) { vc, sheet in
             guard let sheet else {
                 NativeLog.error("exit_payment_sheet_no_sheet", ["rootTag": reactTag.intValue, "vcFound": vc != nil])

@@ -1,6 +1,7 @@
 package com.hyperswitchsdkreactnative.modules
 
 import android.content.res.Configuration
+import android.util.Base64
 import com.facebook.react.common.LifecycleState
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.UiThreadUtil
@@ -29,6 +30,32 @@ object NativeLog {
   var enabled = false
 
   private var reactContext: WeakReference<ReactApplicationContext>? = null
+
+  /* Payment of the latest session the SDK was asked about; null until the first one. */
+  @Volatile
+  private var paymentId: String? = null
+
+  /** Every later log carries the payment id read from [sdkAuthorization]. */
+  fun setSdkAuthorization(sdkAuthorization: String?) {
+    paymentId = paymentIdFrom(sdkAuthorization)
+  }
+
+  /**
+   * Same rule as client-core's Utils.getSdkAuthorizationData: base64 "key=value,..." pairs,
+   * payment_id, else the client_secret part before "_secret_".
+   */
+  private fun paymentIdFrom(sdkAuthorization: String?): String? {
+    if (sdkAuthorization.isNullOrEmpty()) return null
+    val decoded = runCatching {
+      String(Base64.decode(sdkAuthorization, Base64.DEFAULT), Charsets.UTF_8)
+    }.getOrNull() ?: return null
+    val fields = decoded.split(",").mapNotNull { pair ->
+      val i = pair.indexOf('=')
+      if (i > 0) pair.substring(0, i) to pair.substring(i + 1) else null
+    }.toMap()
+    return fields["payment_id"]?.ifEmpty { null }
+      ?: fields["client_secret"]?.substringBefore("_secret_")?.ifEmpty { null }
+  }
 
   /** Lets every log carry app_state and orientation, as on iOS. */
   fun attach(context: ReactApplicationContext) {
@@ -70,6 +97,7 @@ object NativeLog {
         .category(LogCategory.API)
         .eventName(EventName.RN_SDK_LIFE_CYCLE)
         .value(event)
+        .paymentId(paymentId ?: "")
         .internalMetadata(JSONObject((details + context()).filterValues { it != null }).toString())
         .source(SOURCE)
         .build()

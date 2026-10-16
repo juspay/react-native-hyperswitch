@@ -16,6 +16,42 @@ import UIKit
 internal enum NativeLog {
     private static let source = "native"
 
+    /// Payment of the latest session the SDK was asked about; nil until the first one.
+    private static var paymentId: String?
+    private static let paymentIdLock = NSLock()
+
+    /// Every later log carries the payment id read from `sdkAuthorization`.
+    static func setSdkAuthorization(_ sdkAuthorization: String?) {
+        let id = paymentId(from: sdkAuthorization)
+        paymentIdLock.lock()
+        paymentId = id
+        paymentIdLock.unlock()
+    }
+
+    private static func currentPaymentId() -> String {
+        paymentIdLock.lock()
+        defer { paymentIdLock.unlock() }
+        return paymentId ?? ""
+    }
+
+    /// Same rule as client-core's Utils.getSdkAuthorizationData: base64 "key=value,..." pairs,
+    /// payment_id, else the client_secret part before "_secret_".
+    private static func paymentId(from sdkAuthorization: String?) -> String? {
+        guard var base64 = sdkAuthorization, !base64.isEmpty else { return nil }
+        base64 += String(repeating: "=", count: (4 - base64.count % 4) % 4)
+        guard let data = Data(base64Encoded: base64),
+              let decoded = String(data: data, encoding: .utf8) else { return nil }
+        var fields: [String: String] = [:]
+        for pair in decoded.split(separator: ",") {
+            guard let i = pair.firstIndex(of: "="), i != pair.startIndex else { continue }
+            fields[String(pair[..<i])] = String(pair[pair.index(after: i)...])
+        }
+        if let id = fields["payment_id"], !id.isEmpty { return id }
+        guard let secret = fields["client_secret"] else { return nil }
+        let id = secret.components(separatedBy: "_secret_")[0]
+        return id.isEmpty ? nil : id
+    }
+
     static func debug(_ event: String, _ details: [String: Any?] = [:]) { send(.DEBUG, event, details) }
     static func warning(_ event: String, _ details: [String: Any?] = [:]) { send(.WARNING, event, details) }
     static func error(_ event: String, _ details: [String: Any?] = [:]) { send(.ERROR, event, details) }
@@ -32,6 +68,7 @@ internal enum NativeLog {
                 .setCategory(.API)
                 .setEventName(.rnSdkLifeCycle)
                 .setValue(event)
+                .setPaymentId(currentPaymentId())
                 .setInternalMetadata(json)
                 .setAppId(Bundle.main.bundleIdentifier)
                 .setSource(source)

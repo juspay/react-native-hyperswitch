@@ -261,6 +261,7 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     promise: Promise?
   ) {
     try {
+      NativeLog.setSdkAuthorization(params?.getMap("paymentSessionConfig")?.getString("sdkAuthorization"))
       val activity = requireReady("presentPaymentSheet", promise) ?: return
       NativeLog.debug("present_payment_sheet_called", mapOf("activity" to activity.javaClass.simpleName))
       val props = mutableMapOf<String, Any?>().apply {
@@ -298,6 +299,7 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
     params: ReadableMap?,
     promise: Promise
   ) {
+    NativeLog.setSdkAuthorization(params?.getMap("paymentSessionConfig")?.getString("sdkAuthorization"))
     val activity = requireReady("getCustomerSavedPaymentMethods", promise) ?: return
     val props = mutableMapOf<String, Any?>().apply {
       putAll(params?.toHashMap().orEmpty())
@@ -557,6 +559,7 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
   override fun getWalletSession(params: ReadableMap?, promise: Promise) {
     val sdkAuthorization =
       params?.getMap("paymentSessionConfig")?.getString("sdkAuthorization")
+    NativeLog.setSdkAuthorization(sdkAuthorization)
 
     if (sdkAuthorization.isNullOrEmpty()) {
       promise.resolve(
