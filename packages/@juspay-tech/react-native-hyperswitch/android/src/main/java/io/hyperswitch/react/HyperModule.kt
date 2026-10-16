@@ -23,6 +23,7 @@ import com.facebook.react.uimanager.UIManagerModule
 import com.facebook.react.uimanager.common.UIManagerType
 import com.hyperswitchsdkreactnative.BuildConfig
 import com.hyperswitchsdkreactnative.NativeHyperModuleSpec
+import com.hyperswitchsdkreactnative.modules.NativeLog
 import io.hyperswitch.payments.GooglePayCallbackManager
 import io.hyperswitch.paymentsession.LaunchOptions
 import io.hyperswitch.paymentsession.PaymentSheetCallbackManager
@@ -67,6 +68,7 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
   }
 
   init {
+    NativeLog.attach(rct)
     activeInstance = this
   }
 
@@ -143,11 +145,17 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
   // Method to launch Google Pay payment
   @ReactMethod
   override fun launchGPay(googlePayRequest: String, callBack: Callback) {
+    val activityName = currentActivity?.javaClass?.simpleName
+    NativeLog.debug("wallet_launch_called", mapOf("wallet" to "google_pay", "activity" to activityName))
+    if (currentActivity == null) {
+      NativeLog.warning("wallet_launch_without_activity", mapOf("wallet" to "google_pay"))
+    }
     currentActivity?.let {
       GooglePayCallbackManager.setCallback(
         it,
         googlePayRequest,
         fun(data: Map<String, Any?>) {
+          NativeLog.debug("wallet_result_delivered", mapOf("wallet" to "google_pay", "status" to data["status"]?.toString()))
           callBack.invoke(
             Arguments.fromBundle(
               LaunchOptions(
@@ -162,6 +170,7 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
         reactApplicationContext,
         googlePayRequest,
         fun(data: Map<String, Any?>) {
+          NativeLog.debug("wallet_result_delivered", mapOf("wallet" to "google_pay", "status" to data["status"]?.toString()))
           callBack.invoke(
             Arguments.fromBundle(
               LaunchOptions(
@@ -199,6 +208,10 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
   @ReactMethod
   override fun exitPaymentsheet(rootTag: Double, paymentResult: String, reset: Boolean) {
     val isFragment = PaymentSheetCallbackManager.executeCallback(paymentResult)
+    NativeLog.debug(
+      "exit_payment_sheet_resolved",
+      mapOf("isFragment" to isFragment, "activityPresent" to (currentActivity != null))
+    )
     (currentActivity as? FragmentActivity)?.let {
       if (isFragment) it.supportFragmentManager.findFragmentByTag("paymentSheet")
         ?.let { fragment ->

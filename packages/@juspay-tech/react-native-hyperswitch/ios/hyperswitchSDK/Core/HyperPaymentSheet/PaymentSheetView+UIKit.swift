@@ -19,6 +19,7 @@ internal extension PaymentSheet {
         completion: @escaping (String) -> Void
     ) {
         self.completion = completion
+        NativeLog.debug("present_payment_sheet_called")
 
         let paymentSheetViewController = HyperUIViewController()
         paymentSheetViewController.paymentSheet = self

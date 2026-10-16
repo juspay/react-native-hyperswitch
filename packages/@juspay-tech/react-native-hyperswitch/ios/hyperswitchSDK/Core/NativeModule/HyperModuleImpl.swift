@@ -160,14 +160,19 @@ public class HyperModuleImpl: NSObject {
 
     @objc public func exitPaymentsheet(_ reactTag: NSNumber, result rnMessage: String, reset: Bool) {
         withPaymentSheet(reactTag) { vc, sheet in
-            guard let sheet else { return }
+            guard let sheet else {
+                NativeLog.error("exit_payment_sheet_no_sheet", ["rootTag": reactTag.intValue, "vcFound": vc != nil])
+                return
+            }
             let completion = sheet.completion
             sheet.completion = nil
             guard let vc else {
+                NativeLog.warning("exit_payment_sheet_no_view_controller")
                 completion?(rnMessage)
                 return
             }
             vc.dismiss(animated: false) {
+                NativeLog.debug("exit_payment_sheet_resolved", ["completionPresent": completion != nil])
                 RNViewManager.sharedInstance.rootView?.removeFromSuperview()
                 RNViewManager.sharedInstance.rootView = nil
                 completion?(rnMessage)

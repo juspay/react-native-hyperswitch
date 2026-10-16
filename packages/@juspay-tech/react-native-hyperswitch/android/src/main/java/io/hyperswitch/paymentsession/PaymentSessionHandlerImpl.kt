@@ -40,16 +40,32 @@ internal class PaymentSessionHandlerImpl(
     override fun confirmWithCustomerDefaultPaymentMethod(
         cvc: String?, resultHandler: (PaymentResult) -> Unit
     ) {
-        defaultMethodData.getString("payment_token")
-            ?.let { confirmWithCustomerPaymentToken(it, cvc, resultHandler) }
+        val paymentToken = defaultMethodData.getString("payment_token")
+        if (paymentToken == null) {
+            resultHandler(paymentTokenMissingFailure("default"))
+            return
+        }
+        confirmWithCustomerPaymentToken(paymentToken, cvc, resultHandler)
     }
 
     override fun confirmWithCustomerLastUsedPaymentMethod(
         cvc: String?, resultHandler: (PaymentResult) -> Unit
     ) {
-        lastUsedMethodData.getString("payment_token")
-            ?.let { confirmWithCustomerPaymentToken(it, cvc, resultHandler) }
+        val paymentToken = lastUsedMethodData.getString("payment_token")
+        if (paymentToken == null) {
+            resultHandler(paymentTokenMissingFailure("last used"))
+            return
+        }
+        confirmWithCustomerPaymentToken(paymentToken, cvc, resultHandler)
     }
+
+    /* A missing token previously fell through ?.let without invoking resultHandler,
+       leaving the merchant's confirm promise pending forever. */
+    private fun paymentTokenMissingFailure(which: String) = PaymentResult.Failed(
+        Throwable("payment_token missing on the $which saved payment method").apply {
+            initCause(Throwable("PAYMENT_TOKEN_MISSING"))
+        }
+    )
 
     override fun updateSdkAuthorization(sdkAuthorization: String){
         this.sdkAuthorization = sdkAuthorization

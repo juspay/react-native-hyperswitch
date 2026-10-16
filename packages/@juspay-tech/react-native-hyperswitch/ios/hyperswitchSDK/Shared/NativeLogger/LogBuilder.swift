@@ -78,6 +78,21 @@ internal class LogBuilder {
         return self
     }
 
+    func setInternalMetadata(_ internalMetadata: String) -> LogBuilder {
+        self.internalMetadata = internalMetadata
+        return self
+    }
+
+    func setAppId(_ appId: String?) -> LogBuilder {
+        self.appId = appId
+        return self
+    }
+
+    func setSource(_ source: String) -> LogBuilder {
+        self.source = source
+        return self
+    }
+
     func setSessionId(_ sessionId: String) -> LogBuilder {
         self.sessionId = sessionId
         return self

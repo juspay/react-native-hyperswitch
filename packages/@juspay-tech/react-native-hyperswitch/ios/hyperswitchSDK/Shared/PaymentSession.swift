@@ -34,8 +34,10 @@ public class PaymentSession {
     internal init(paymentSessionConfiguration: PaymentSessionConfiguration, hyperswitchConfiguration: HyperswitchConfiguration? = nil) {
         self.paymentSessionConfiguration = paymentSessionConfiguration
         self.hyperswitchConfiguration = hyperswitchConfiguration
+        NativeLog.setSdkAuthorization(paymentSessionConfiguration.sdkAuthorization)
 
         if let hyperswitchConfiguration = hyperswitchConfiguration {
+            NativeLog.debug("sdk_initialised", ["environment": hyperswitchConfiguration.environment?.rawValue])
             #if canImport(HyperOTA)
             OTAServices.shared.initialize(publishableKey: hyperswitchConfiguration.publishableKey)
             LogManager.initialize(
@@ -75,6 +77,7 @@ public class PaymentSession {
         // MARK: workaround
         authorizationProvider { [weak self] sdkAuthorization in
             self?.paymentSessionConfiguration = PaymentSessionConfiguration(sdkAuthorization: sdkAuthorization)
+            NativeLog.setSdkAuthorization(sdkAuthorization)
             completion(UpdateIntentResult.success)
         }
     }
