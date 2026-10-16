@@ -22,6 +22,7 @@ import { make as CardExpiryFieldImpl } from './CardExpiryField.bs.js';
 import { make as CardCVCFieldImpl } from './CardCVCField.bs.js';
 import { make as CardholderNameFieldImpl } from './CardholderNameField.bs.js';
 import { createCardForm as createCardFormImpl } from './createCardForm.mjs';
+import { createDetachedCardForm as createDetachedCardFormImpl } from './createDetachedCardForm.mjs';
 
 export const CardForm = CardFormImpl;
 export const CardNumberField = CardNumberFieldImpl;
@@ -37,3 +38,9 @@ export const HyperswitchVaultForm = HyperswitchVaultFormImpl;
  * drive it with method calls the way the web's `cardForm()` object is driven.
  */
 export const createCardForm = createCardFormImpl;
+
+/*
+ * A card form whose fields each sit in a React root of their own (one native view per field). Also
+ * re-exported, with the same fields, from `./detached`.
+ */
+export const createDetachedCardForm = createDetachedCardFormImpl;

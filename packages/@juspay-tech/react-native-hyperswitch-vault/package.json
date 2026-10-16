@@ -30,6 +30,13 @@
       "require": "./dist/cjs/orchestration.js",
       "default": "./dist/esm/orchestration.js"
     },
+    "./detached": {
+      "types": "./dist/types/detached.d.ts",
+      "react-native": "./dist/esm/detached.js",
+      "import": "./dist/esm/detached.js",
+      "require": "./dist/cjs/detached.js",
+      "default": "./dist/esm/detached.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
