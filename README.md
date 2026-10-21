@@ -127,6 +127,30 @@ export default function PaymentScreen() {
 }
 ```
 
+## Typed payment events
+
+Set `options.subscriptionEvents` on `PaymentElement` or `CardCVCElement` and use
+`onChange`. The exported `PaymentEvent` type connects each event name to its payload:
+
+```tsx
+import type { PaymentEvent } from '@juspay-tech/react-native-hyperswitch';
+
+function onChange(event: PaymentEvent) {
+  if (event.eventName === 'paymentMethodChange') {
+    const saved: boolean = event.payload.isSavedPaymentMethod;
+    const method: string = event.payload.paymentMethod;
+  }
+  if (event.eventName === 'cardDetailsChange') {
+    const bin: string | null = event.payload.bin;
+  }
+}
+```
+
+Fields belonging to another event are compile-time errors. Card metadata can be null,
+form status is `EMPTY | FILLING | COMPLETE`, and CVC flags are nested under `cvcStatus`.
+Unknown names and malformed payloads never reach `onChange`. Lifecycle callbacks stay separate.
+Run `yarn test:events` for routing and merchant type checks.
+
 ## Advanced Configuration
 
 ### Custom Appearance

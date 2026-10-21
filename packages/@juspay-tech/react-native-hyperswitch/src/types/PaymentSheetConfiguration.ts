@@ -1,3 +1,4 @@
+import type { PaymentEventPayloads } from './NativeEventTypes';
 import { HyperswitchConfiguration } from './definitions';
 
 export interface Colors {
@@ -64,12 +65,7 @@ export interface Font {
 /*
  * Current camelCase event names emitted by the shared JS bundle.
  */
-export type SubscriptionEvent =
-  | 'cardDetailsChange'
-  | 'paymentMethodChange'
-  | 'formStatusChange'
-  | 'billingDetailsChange'
-  | 'cvcStatusChange';
+export type SubscriptionEvent = keyof PaymentEventPayloads;
 
 
 export type Theme =

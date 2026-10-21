@@ -5,7 +5,6 @@ import type {
   HyperswitchConfiguration,
   PaymentSessionConfiguration,
 } from './definitions';
-import type { SubscriptionEvent } from './PaymentSheetConfiguration';
 
 /** Result payload delivered by the widget bridge for a single payment attempt. */
 export type PaymentResultNative = {
@@ -13,56 +12,61 @@ export type PaymentResultNative = {
   errorMessage?: string;
 };
 
-
-
-/** Payload of `cardDetailsChange`. */
-export type CardInfo = {
-  bin: string | undefined;
-  extendedBin?: string;
-  last4: string | undefined;
-  brand: string | undefined;
-  expiryMonth: string | undefined;
-  expiryYear: string | undefined;
-  formattedExpiry: string | undefined;
-  isCardNumberComplete: boolean;
-  isCvcComplete: boolean;
-  isExpiryComplete: boolean;
-  isCardNumberValid: boolean;
-  isExpiryValid: boolean;
+/** Payloads delivered to merchants by the current subscription events. */
+export type CardDetailsChange = {
+  readonly bin: string | null;
+  readonly extendedBin: string | null;
+  readonly last4: string | null;
+  readonly brand: string | null;
+  readonly expiryMonth: string | null;
+  readonly expiryYear: string | null;
+  readonly formattedExpiry: string | null;
+  readonly isCardNumberComplete: boolean;
+  readonly isCardNumberValid: boolean;
+  readonly isExpiryComplete: boolean;
+  readonly isExpiryValid: boolean;
+  readonly isCvcComplete: boolean;
 };
 
-export type PaymentMethodStatusEvent = {
-  paymentMethod: string;
-  paymentMethodType: string;
-  isSavedPaymentMethod: boolean;
-  isOneClickWallet: boolean;
+export type PaymentMethodChange = {
+  readonly paymentMethod: string;
+  readonly paymentMethodType: string;
+  readonly isSavedPaymentMethod: boolean;
+  readonly isOneClickWallet: boolean;
 };
 
-export type FormStatusEvent = { status: string };
+export type FormStatusValue = 'EMPTY' | 'FILLING' | 'COMPLETE';
+export type FormStatusChange = { readonly status: FormStatusValue };
 
-export type PaymentMethodInfoAddress = {
-  country: string;
-  state: string;
-  postalCode: string;
+export type BillingDetailsChange = {
+  readonly country: string | null;
+  readonly state: string | null;
+  readonly postalCode: string | null;
 };
 
-/** Payload of `cvcStatusChange`; the status is nested under `cvcStatus`. */
-export type CvcStatusEvent = {
-  cvcStatus: {
-    isCvcEmpty: boolean;
-    isCvcComplete: boolean;
+export type CvcStatusChange = {
+  readonly cvcStatus: {
+    readonly isCvcEmpty: boolean;
+    readonly isCvcComplete: boolean;
   };
 };
 
-/**
- * Delivered to `onChange` for every event listed in `subscriptionEvents`;
- * branch on `eventName`.
- */
-export type PaymentEvent = {
-  eventName: SubscriptionEvent | (string & {});
-  payload: Record<string, unknown>;
+/** Adding a name here requires its payload to be defined as well. */
+export type PaymentEventPayloads = {
+  cardDetailsChange: CardDetailsChange;
+  paymentMethodChange: PaymentMethodChange;
+  formStatusChange: FormStatusChange;
+  billingDetailsChange: BillingDetailsChange;
+  cvcStatusChange: CvcStatusChange;
 };
 
+/** Check eventName to narrow payload without a cast. */
+export type PaymentEvent<Name extends keyof PaymentEventPayloads = keyof PaymentEventPayloads> = {
+  [Key in Name]: {
+    readonly eventName: Key;
+    readonly payload: PaymentEventPayloads[Key];
+  };
+}[Name];
 
 /** Wire shape from native: `payload` is a JSON string (codegen constraint). */
 export type PaymentEventWire = {

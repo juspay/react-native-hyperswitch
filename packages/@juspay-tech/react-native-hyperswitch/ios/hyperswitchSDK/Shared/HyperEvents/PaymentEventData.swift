@@ -9,13 +9,13 @@ import Foundation
 
 public enum PaymentEventData {
 
-    case cardInfo(CardInfo)
-    case paymentMethodStatus(PaymentMethodStatus)
-    case formStatus(FormStatusEvent)
-    case paymentMethodInfoAddress(PaymentMethodInfoAddress)
-    case cvcStatus(CvcStatus)
+    case cardDetailsChange(CardDetailsChange)
+    case paymentMethodChange(PaymentMethodChange)
+    case formStatusChange(FormStatusChange)
+    case billingDetailsChange(BillingDetailsChange)
+    case cvcStatusChange(CvcStatusChange)
 
-    public struct CardInfo: Sendable {
+    public struct CardDetailsChange: Sendable {
         public let bin: String?
         public let extendedBin: String?
         public let last4: String?
@@ -29,8 +29,8 @@ public enum PaymentEventData {
         public let isCardNumberValid: Bool
         public let isExpiryValid: Bool
 
-        static func from(_ map: [String: Any]) -> CardInfo {
-            CardInfo(
+        static func from(_ map: [String: Any]) -> CardDetailsChange {
+            CardDetailsChange(
                 bin: map["bin"] as? String,
                 extendedBin: map["extendedBin"] as? String,
                 last4: map["last4"] as? String,
@@ -47,14 +47,14 @@ public enum PaymentEventData {
         }
     }
 
-    public struct PaymentMethodStatus: Sendable {
+    public struct PaymentMethodChange: Sendable {
         public let paymentMethod: String
         public let paymentMethodType: String
         public let isSavedPaymentMethod: Bool
         public let isOneClickWallet: Bool
 
-        static func from(_ map: [String: Any]) -> PaymentMethodStatus {
-            PaymentMethodStatus(
+        static func from(_ map: [String: Any]) -> PaymentMethodChange {
+            PaymentMethodChange(
                 paymentMethod: map["paymentMethod"] as? String ?? "",
                 paymentMethodType: map["paymentMethodType"] as? String ?? "",
                 isSavedPaymentMethod: map["isSavedPaymentMethod"] as? Bool ?? false,
@@ -69,21 +69,21 @@ public enum PaymentEventData {
         case complete = "COMPLETE"
     }
 
-    public struct FormStatusEvent: Sendable {
+    public struct FormStatusChange: Sendable {
         public let status: FormStatusValue?
 
-        static func from(_ map: [String: Any]) -> FormStatusEvent {
-            FormStatusEvent(status: (map["status"] as? String).flatMap(FormStatusValue.init(rawValue:)))
+        static func from(_ map: [String: Any]) -> FormStatusChange {
+            FormStatusChange(status: (map["status"] as? String).flatMap(FormStatusValue.init(rawValue:)))
         }
     }
 
-    public struct PaymentMethodInfoAddress: Sendable {
+    public struct BillingDetailsChange: Sendable {
         public let country: String
         public let state: String
         public let postalCode: String
 
-        static func from(_ map: [String: Any]) -> PaymentMethodInfoAddress {
-            PaymentMethodInfoAddress(
+        static func from(_ map: [String: Any]) -> BillingDetailsChange {
+            BillingDetailsChange(
                 country: map["country"] as? String ?? "",
                 state: map["state"] as? String ?? "",
                 postalCode: map["postalCode"] as? String ?? ""
@@ -91,13 +91,13 @@ public enum PaymentEventData {
         }
     }
 
-    public struct CvcStatus: Sendable {
+    public struct CvcStatusChange: Sendable {
         public let isCvcEmpty: Bool
         public let isCvcComplete: Bool
 
-        static func from(_ map: [String: Any]) -> CvcStatus {
+        static func from(_ map: [String: Any]) -> CvcStatusChange {
             let source = (map["cvcStatus"] as? [String: Any]) ?? map
-            return CvcStatus(
+            return CvcStatusChange(
                 isCvcEmpty: source["isCvcEmpty"] as? Bool ?? true,
                 isCvcComplete: source["isCvcComplete"] as? Bool ?? false
             )
@@ -107,15 +107,15 @@ public enum PaymentEventData {
     public static func from(type: String, payload: [String: Any]) -> PaymentEventData? {
         switch type {
         case PaymentEventType.cardDetailsChange.rawValue:
-            return .cardInfo(.from(payload))
+            return .cardDetailsChange(.from(payload))
         case PaymentEventType.paymentMethodChange.rawValue:
-            return .paymentMethodStatus(.from(payload))
+            return .paymentMethodChange(.from(payload))
         case PaymentEventType.formStatusChange.rawValue:
-            return .formStatus(.from(payload))
+            return .formStatusChange(.from(payload))
         case PaymentEventType.billingDetailsChange.rawValue:
-            return .paymentMethodInfoAddress(.from(payload))
+            return .billingDetailsChange(.from(payload))
         case PaymentEventType.cvcStatusChange.rawValue:
-            return .cvcStatus(.from(payload))
+            return .cvcStatusChange(.from(payload))
         default:
             return nil
         }
