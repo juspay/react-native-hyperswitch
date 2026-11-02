@@ -300,6 +300,14 @@ The base is validated — `https` required (`http` only on loopback, never in pr
 credentials, query string or fragment. A base that fails returns `unsupported_configuration` with
 nothing sent.
 
+**Logs.** The form logs its two vault requests (confirm and saved-card update): the URL, the HTTP
+status and, on an error, the error response. It never logs a card value or a request body. As in
+the web SDK, logs are queued and sent in batches: 20 seconds after the last one, at once on an error,
+and when the form closes or the app leaves the foreground. Logs go
+to `<backend>/logs/sdk` on the backend above, or to `overrideEndpoints.customLoggingEndpoint` when
+you set one, which is validated like the base (an endpoint that fails gets no logs). Override only
+`customBackendEndpoint` and no logs are sent.
+
 ---
 
 ## Lifecycle

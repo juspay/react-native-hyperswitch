@@ -55,7 +55,8 @@
     "build": "rescript && tsc -p tsconfig.build.json && rollup -c",
     "build:clean": "rescript clean && rescript && tsc -p tsconfig.build.json && rollup -c",
     "clean": "rescript clean",
-    "prepack": "rescript && tsc -p tsconfig.build.json && rollup -c"
+    "prepack": "rescript && tsc -p tsconfig.build.json && rollup -c",
+    "test": "rescript && node --no-warnings --test test/logging.test.mjs"
   },
   "peerDependencies": {
     "react": "*",
