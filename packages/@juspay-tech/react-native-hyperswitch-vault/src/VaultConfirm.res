@@ -28,6 +28,8 @@ type confirmRequest = {
   timeoutMs?: int,
 
   signal?: abortSignal,
+
+  logger?: VaultLogger.t,
 }
 
 type vaultCardMetadata = {
@@ -132,7 +134,7 @@ let publicMessageForCode = (code: string) =>
   | _ => None
   }
 
-let readSessionId = (decoded: string): option<string> =>
+let readClaim = (decoded: string, ~claim: string): option<string> =>
   decoded
   ->String.split(",")
   ->Array.reduce(None, (found, pair) =>
@@ -145,10 +147,20 @@ let readSessionId = (decoded: string): option<string> =>
       } else {
         let key = pair->String.slice(~start=0, ~end=separator)->String.trim
         let value = pair->String.sliceToEnd(~start=separator + 1)->String.trim
-        key === "payment_method_session_id" && value->String.length > 0 ? Some(value) : None
+        key === claim && value->String.length > 0 ? Some(value) : None
       }
     }
   )
+
+let readSessionId = (decoded: string): option<string> =>
+  decoded->readClaim(~claim="payment_method_session_id")
+
+// The merchant id the logs carry, as client-core logs the publishable key.
+let publishableKeyOf = (sdkAuthorization: string): string =>
+  sdkAuthorization
+  ->decodeBase64
+  ->Option.flatMap(readClaim(_, ~claim="publishable_key"))
+  ->Option.getOr("")
 
 let resolveSessionId = (sdkAuthorization: string): result<string, confirmOutcome> =>
   if sdkAuthorization->String.trim->String.length === 0 {
@@ -429,10 +441,21 @@ let confirmPaymentMethodSession = async (request: confirmRequest): confirmOutcom
         signal: ?Some(controller->controllerSignal),
       }
 
+      let call = request.logger->Option.map((logger): VaultLogger.apiCall => {
+        logger,
+        eventName: PAYMENT_METHOD_SESSION_CONFIRM_CALL,
+        url,
+        merchantId: request.sdkAuthorization->publishableKeyOf,
+        paymentId: sessionId,
+      })
+      call->VaultLogger.callStarted
+
       let attempted = try {
         Ok(await fetch(url, options))
       } catch {
-      | _ => Error()
+      | error =>
+        call->VaultLogger.callUnanswered(~error)
+        Error()
       }
 
       timer->Option.forEach(clearTimeout)
@@ -452,6 +475,7 @@ let confirmPaymentMethodSession = async (request: confirmRequest): confirmOutcom
         } catch {
         | _ => None
         }
+        call->VaultLogger.callAnswered(~status, ~response=parsed)
 
         if response->responseOk {
           switch parsed {

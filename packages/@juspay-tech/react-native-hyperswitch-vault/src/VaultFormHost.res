@@ -37,7 +37,7 @@ let useHost = (
   ~enabledCardSchemes: array<string>,
   ~eligibility: option<VaultFormOptions.eligibilityConfig>,
 
-  ~vaultEndpoint: option<VaultEndpoint.vaultEndpointConfig>,
+  ~customEndpoints: option<VaultEndpoint.customEndpoints>,
 
   ~cardholderNameMode: CardFieldOptions.cardholderNameMode,
 
@@ -49,6 +49,30 @@ let useHost = (
   ~defaultErrorDisplay: CardFieldOptions.errorDisplay,
 ): host => {
   let environment = environment->VaultConfirm.normalizeEnvironment
+  let vaultEndpoint = VaultEndpoint.configOf(customEndpoints)
+  let loggingUrl = customEndpoints->VaultEndpoint.loggingUrl(~environment)
+  let logger = React.useMemo1(
+    () => VaultLogger.make(~url=loggingUrl, ~platform=(ReactNative.Platform.os :> string)),
+    [loggingUrl],
+  )
+  // Queued logs go out when the form closes or the app leaves the foreground, as web sends them
+  // when the page unloads.
+  React.useEffect1(() => {
+    let subscription = ReactNative.AppState.addEventListener(
+      #change(
+        state =>
+          if state !== #active {
+            logger->VaultLogger.sendLogs
+          },
+      ),
+    )
+    Some(
+      () => {
+        subscription->ReactNative.EventSubscription.remove
+        logger->VaultLogger.sendLogs
+      },
+    )
+  }, [logger])
 
   let sessionState = React.useMemo3(
     () =>
@@ -200,6 +224,7 @@ let useHost = (
     ~presenceGate,
     ~clearLocal=controller.reset,
     ~savedCardKey=controller.values.savedCard->Option.mapOr("", saved => saved.token),
+    ~logger,
   )
 
   let sessionStatus: VaultPublicState.vaultSessionStatus = switch sessionState {

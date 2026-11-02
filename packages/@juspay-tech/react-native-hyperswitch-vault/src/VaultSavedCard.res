@@ -10,6 +10,8 @@ type updateRequest = {
   appId?: string,
   timeoutMs?: int,
   signal?: VaultConfirm.abortSignal,
+
+  logger?: VaultLogger.t,
 }
 
 let updateUrl = (~baseUrl, ~sessionId) =>
@@ -86,10 +88,21 @@ let updateSavedPaymentMethod = async (
         signal: ?Some(controller->VaultConfirm.controllerSignal),
       }
 
+      let call = request.logger->Option.map((logger): VaultLogger.apiCall => {
+        logger,
+        eventName: PAYMENT_METHOD_SESSION_UPDATE_CALL,
+        url,
+        merchantId: request.sdkAuthorization->VaultConfirm.publishableKeyOf,
+        paymentId: sessionId,
+      })
+      call->VaultLogger.callStarted
+
       let attempted = try {
         Ok(await VaultConfirm.fetch(url, options))
       } catch {
-      | _ => Error()
+      | error =>
+        call->VaultLogger.callUnanswered(~error)
+        Error()
       }
 
       timer->Option.forEach(VaultConfirm.clearTimeout)
@@ -108,6 +121,7 @@ let updateSavedPaymentMethod = async (
         } catch {
         | _ => None
         }
+        call->VaultLogger.callAnswered(~status, ~response=parsed)
 
         if response->VaultConfirm.responseOk {
           switch parsed {
