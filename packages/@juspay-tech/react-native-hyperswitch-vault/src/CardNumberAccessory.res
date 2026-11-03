@@ -49,6 +49,7 @@ module Body = {
         }}
         editable=ctx.editable
         onSelect=controller.selectNetwork
+        onOpen={() => ctx.onAnalytics(NetworkMenuOpened)}
       />
     } else {
       switch brandIconMode {

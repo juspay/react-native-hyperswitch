@@ -56,28 +56,6 @@ let updateSavedPaymentMethod = async (
     | Ok(sessionId) =>
       let url = updateUrl(~baseUrl=request.vaultBaseUrl, ~sessionId)
 
-      let controller = VaultConfirm.makeAbortController()
-
-      request.signal->Option.forEach(callerSignal =>
-        if callerSignal->VaultConfirm.signalAborted {
-          controller->VaultConfirm.abort
-        } else {
-          callerSignal->VaultConfirm.onSignalAbort("abort", () => controller->VaultConfirm.abort)
-        }
-      )
-
-      let timedOut = ref(false)
-      let timer = switch request.timeoutMs {
-      | Some(ms) if ms > 0 =>
-        Some(
-          VaultConfirm.setTimeout(() => {
-            timedOut := true
-            controller->VaultConfirm.abort
-          }, ms),
-        )
-      | _ => None
-      }
-
       let options: VaultConfirm.fetchOptions = {
         method: "PUT",
         headers: headersFor(~sdkAuthorization=request.sdkAuthorization, ~appId=request.appId),
@@ -85,62 +63,24 @@ let updateSavedPaymentMethod = async (
           ~paymentMethodToken=request.paymentMethodToken->String.trim,
           ~cvc=request.cvc,
         )->JSON.stringify,
-        signal: ?Some(controller->VaultConfirm.controllerSignal),
       }
-
-      let call = request.logger->Option.map((logger): VaultLogger.apiCall => {
-        logger,
-        eventName: PAYMENT_METHOD_SESSION_UPDATE_CALL,
-        url,
-        merchantId: request.sdkAuthorization->VaultConfirm.publishableKeyOf,
-        paymentId: sessionId,
-      })
-      call->VaultLogger.callStarted
-
-      let attempted = try {
-        Ok(await VaultConfirm.fetch(url, options))
-      } catch {
-      | error =>
-        call->VaultLogger.callUnanswered(~error)
-        Error()
-      }
-
-      timer->Option.forEach(VaultConfirm.clearTimeout)
-
-      let outcome = switch attempted {
-      | Error() =>
-        VaultConfirm.unknownOutcomeError(
-          timedOut.contents
-            ? "The vault did not respond in time; the outcome is unknown."
-            : "The vault request did not complete; the outcome is unknown.",
+      let call =
+        request.logger->VaultConfirm.apiCallOf(
+          ~eventName=PAYMENT_METHOD_SESSION_UPDATE_CALL,
+          ~url,
+          ~sdkAuthorization=request.sdkAuthorization,
+          ~sessionId,
         )
-      | Ok(response) =>
-        let status = response->VaultConfirm.responseStatus
-        let parsed = try {
-          Some(await response->VaultConfirm.responseJson)
-        } catch {
-        | _ => None
-        }
-        call->VaultLogger.callAnswered(~status, ~response=parsed)
-
-        if response->VaultConfirm.responseOk {
-          switch parsed {
-          | None =>
-            VaultConfirm.Failure({
-              error: {
-                code: #malformed_response,
-                message: "The vault response was not valid JSON.",
-                httpStatus: status,
-                retryable: false,
-                unknownOutcome: false,
-              },
-            })
-          | Some(json) => json->VaultConfirm.decodeConfirmResponse(~httpStatus=status)
-          }
-        } else {
-          VaultConfirm.describeHttpFailure(parsed, status)
-        }
-      }
+      let outcome =
+        (
+          await VaultConfirm.sendWithLogging(
+            ~url,
+            ~options,
+            ~signal=request.signal,
+            ~timeoutMs=request.timeoutMs,
+            ~call,
+          )
+        )->VaultConfirm.outcomeOf
 
       switch outcome {
       | VaultConfirm.Success({result}) => VaultResult.tokenizeSuccess(result.token)

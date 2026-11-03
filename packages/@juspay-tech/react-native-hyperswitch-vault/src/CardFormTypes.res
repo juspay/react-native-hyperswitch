@@ -44,6 +44,7 @@ type cardFieldId =
 type analyticsEvent =
   | FieldFocused(cardFieldId)
   | FieldBlurred(cardFieldId)
+  | NetworkMenuOpened
 
 type cardFieldValues = {
   cardNumber: string,
