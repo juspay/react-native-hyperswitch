@@ -50,6 +50,7 @@ let make = (
   ~baseUrl: string,
   ~editable: bool,
   ~onSelect: string => unit,
+  ~onOpen: unit => unit=() => (),
 ) => {
   let (isOpen, setIsOpen) = React.useState(() => false)
 
@@ -59,7 +60,10 @@ let make = (
       accessibilityLabel=label
       testID=CardTestIds.networkTrigger
       disabled={!editable}
-      onPress={_ => setIsOpen(_ => true)}
+      onPress={_ => {
+        setIsOpen(_ => true)
+        onOpen()
+      }}
       style={_ => s({flexDirection: #row, alignItems: #center})}>
       {_ =>
         <>

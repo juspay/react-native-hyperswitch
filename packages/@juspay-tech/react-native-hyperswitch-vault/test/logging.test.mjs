@@ -1,5 +1,5 @@
-// The vault's logs: hyperswitch-web's log structure, for the vault's own two API calls only.
-// Runs on the ReScript output (`rescript` first), with `fetch` stubbed.
+// The vault's logs: hyperswitch-web's log structure, for the vault's own two API calls and the card
+// fields' user events. Runs on the ReScript output (`rescript` first), with `fetch` stubbed.
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -47,12 +47,21 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-const confirm = logger =>
+const confirm = (logger, extra = {}) =>
   VaultConfirm.confirmPaymentMethodSession({
     sdkAuthorization: SDK_AUTHORIZATION,
     vaultBaseUrl: BASE_URL,
     card: CARD,
     logger,
+    ...extra,
+  });
+
+// A vault that never answers: its request ends only when it is cancelled.
+const hangUntilCancelled = (url, options) =>
+  new Promise((_, reject) => {
+    const cancelled = () => reject(new DOMException('This operation was aborted', 'AbortError'));
+    if (options.signal.aborted) cancelled();
+    else options.signal.addEventListener('abort', cancelled);
   });
 
 const confirmCall = logger => ({
@@ -150,6 +159,112 @@ test('a request that gets no answer logs status 504 and the exception as web for
   assert.deepEqual(Object.keys(value.response).sort(), ['fileName', 'message', 'stack', 'type']);
 });
 
+test('a request that fails with no error object still returns unknown_outcome, and is logged', async () => {
+  vaultAnswer = () => Promise.reject(undefined);
+  const outcome = await confirm(VaultLogger.make(LOG_URL, 'android'));
+
+  assert.equal(outcome.error.code, 'unknown_outcome');
+  const value = JSON.parse(batches[0][1].value);
+  assert.equal(batches[0][1].log_type, 'ERROR');
+  assert.equal(value.statusCode, 504);
+  assert.equal(value.response, null);
+});
+
+test('a request that fails with something other than an Error logs the value thrown, as web does', async () => {
+  vaultAnswer = () => Promise.reject('Network request failed');
+  const outcome = await confirm(VaultLogger.make(LOG_URL, 'android'));
+
+  assert.equal(outcome.error.code, 'unknown_outcome');
+  assert.equal(JSON.parse(batches[0][1].value).response, 'Network request failed');
+});
+
+test('a request cancelled before it is sent logs nothing', async () => {
+  vaultAnswer = hangUntilCancelled;
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  const outcome = await confirm(logger, { signal: AbortSignal.abort() });
+  VaultLogger.sendLogs(logger);
+
+  assert.equal(outcome.error.code, 'unknown_outcome');
+  assert.deepEqual(logs(), []);
+});
+
+test('a request cancelled in flight, or timed out, is logged with its AbortError as web logs it', async () => {
+  vaultAnswer = hangUntilCancelled;
+  const caller = new AbortController();
+  setTimeout(() => caller.abort(), 1);
+  const cancelled = await confirm(VaultLogger.make(LOG_URL, 'android'), { signal: caller.signal });
+
+  assert.equal(cancelled.error.code, 'unknown_outcome');
+  assert.equal(batches.length, 1, 'an ERROR sends the queue immediately');
+  const [started, answered] = batches[0];
+  assert.equal(started.event_name, 'PAYMENT_METHOD_SESSION_CONFIRM_CALL_INIT');
+  assert.equal(answered.log_type, 'ERROR');
+  assert.equal(JSON.parse(answered.value).statusCode, 504);
+  assert.equal(JSON.parse(answered.value).response.type, 'AbortError');
+
+  batches = [];
+  const timedOut = await confirm(VaultLogger.make(LOG_URL, 'android'), { timeoutMs: 1 });
+  assert.equal(timedOut.error.code, 'unknown_outcome');
+  assert.equal(JSON.parse(batches[0][1].value).response.type, 'AbortError');
+});
+
+test('a request stops listening to the caller signal once it settles', async () => {
+  const caller = new AbortController();
+  const listening = new Set();
+  const add = caller.signal.addEventListener.bind(caller.signal);
+  const remove = caller.signal.removeEventListener.bind(caller.signal);
+  caller.signal.addEventListener = (type, listener) => (listening.add(listener), add(type, listener));
+  caller.signal.removeEventListener = (type, listener) => (listening.delete(listener), remove(type, listener));
+
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  const outcome = await confirm(logger, { signal: caller.signal });
+  VaultLogger.sendLogs(logger);
+  assert.equal(outcome.status, 'success');
+  assert.equal(listening.size, 0);
+});
+
+test('an answer whose body cannot be read is logged as an error with its real status', async () => {
+  const unreadable = status => async () => ({
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => {
+      throw new SyntaxError('Unexpected token <');
+    },
+  });
+
+  vaultAnswer = unreadable(200);
+  const success = await confirm(VaultLogger.make(LOG_URL, 'android'));
+  vaultAnswer = unreadable(502);
+  const gateway = await confirm(VaultLogger.make(LOG_URL, 'android'));
+
+  assert.equal(success.error.code, 'malformed_response');
+  assert.equal(gateway.status, 'failure');
+  assert.equal(batches.length, 2, 'each ERROR sends its queue immediately');
+  const [ok, bad] = batches.map(batch => batch[1]);
+  assert.equal(ok.log_type, 'ERROR');
+  assert.equal(JSON.parse(ok.value).statusCode, 200);
+  assert.equal(JSON.parse(ok.value).response.type, 'SyntaxError');
+  assert.equal(bad.log_type, 'ERROR');
+  assert.equal(JSON.parse(bad.value).statusCode, 502);
+  assert.equal(JSON.parse(bad.value).response.type, 'SyntaxError');
+});
+
+test('a new session sends what is queued, then starts a new session_id, first_event and counts', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  for (let i = 0; i < 100; i++) VaultLogger.setLogInfo(logger, 'cardNumber', 'FOCUS', PUBLISHABLE_KEY, SESSION_ID);
+  const before = logger.sessionId;
+  VaultLogger.startNewSession(logger);
+  const sentBefore = logs().length;
+  VaultLogger.setLogInfo(logger, 'cardNumber', 'FOCUS', PUBLISHABLE_KEY, 'next_pms');
+  VaultLogger.sendLogs(logger);
+
+  assert.equal(sentBefore, 100, 'the old session\'s logs went out first');
+  const next = logs().at(-1);
+  assert.notEqual(next.session_id, before);
+  assert.equal(next.first_event, 'true');
+  assert.equal(next.payment_id, 'next_pms');
+});
+
 test('no log carries a card value, the request body, a token or the client secret', async () => {
   const logger = VaultLogger.make(LOG_URL, 'ios');
   await confirm(logger);
@@ -219,14 +334,29 @@ test('a call without a logger, or a logger without a URL, sends no logs', async 
 
 test('a batch that cannot be sent does not change the outcome', async () => {
   const vaultFetch = globalThis.fetch;
+  let attempts = 0;
   globalThis.fetch = async (url, options) => {
-    if (url === LOG_URL) throw new Error('log collector down');
+    if (url === LOG_URL) {
+      attempts += 1;
+      throw new Error('log collector down');
+    }
     return vaultFetch(url, options);
   };
-  const logger = VaultLogger.make(LOG_URL, 'android');
-  const outcome = await confirm(logger);
-  VaultLogger.sendLogs(logger);
-  assert.equal(outcome.status, 'success');
+  const unhandled = [];
+  const onUnhandled = reason => unhandled.push(reason);
+  process.on('unhandledRejection', onUnhandled);
+  try {
+    const logger = VaultLogger.make(LOG_URL, 'android');
+    const outcome = await confirm(logger);
+    VaultLogger.sendLogs(logger);
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    assert.equal(outcome.status, 'success');
+    assert.equal(attempts, 1, 'the batch was sent');
+    assert.deepEqual(unhandled, [], 'its failure was handled');
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+  }
 });
 
 test('the log URL follows client-core’s rule on the backend the vault calls', () => {
@@ -255,4 +385,39 @@ test('the log URL follows client-core’s rule on the backend the vault calls', 
     url({ overrideEndpoints: { customLoggingEndpoint: 'http://localhost:8080/logs' } }, 'SANDBOX'),
     'http://localhost:8080/logs',
   );
+});
+
+test('a field focus or blur is a USER_EVENT carrying the field name only', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  VaultLogger.setLogInfo(logger, 'cardNumber', 'FOCUS', PUBLISHABLE_KEY, SESSION_ID);
+  VaultLogger.setLogInfo(logger, 'cardNumber', 'BLUR', PUBLISHABLE_KEY, SESSION_ID);
+  VaultLogger.setLogInfo(logger, 'CardSchemeMenu expanded', 'CARD_SCHEME_SELECTION', PUBLISHABLE_KEY, SESSION_ID);
+  VaultLogger.setLogInfo(logger, 'cardExpiry', 'FOCUS', PUBLISHABLE_KEY, SESSION_ID);
+  VaultLogger.sendLogs(logger);
+
+  const [focused, blurred, menu, next] = logs();
+  assert.equal(focused.event_name, 'FOCUS');
+  assert.equal(focused.category, 'USER_EVENT');
+  assert.equal(focused.log_type, 'INFO');
+  assert.equal(focused.value, 'cardNumber');
+  assert.equal(focused.latency, '');
+  assert.equal(focused.payment_id, SESSION_ID);
+  assert.equal(blurred.event_name, 'BLUR');
+  assert.equal(blurred.value, 'cardNumber');
+  assert.equal(menu.event_name, 'CARD_SCHEME_SELECTION');
+  assert.equal(menu.value, 'CardSchemeMenu expanded');
+  assert.equal(next.event_name, 'FOCUS');
+  assert.equal(next.value, 'cardExpiry');
+  assert.equal(next.first_event, 'false');
+});
+
+test('field events go out in batches, at most 100 per event name as on web', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  const focus = field => VaultLogger.setLogInfo(logger, field, 'FOCUS', PUBLISHABLE_KEY, SESSION_ID);
+  for (let i = 0; i < 9; i++) focus('cardNumber');
+  assert.equal(batches.length, 1, 'the 9th queued log sends a batch, as on web');
+  for (let i = 0; i < 110; i++) focus('cardCvc');
+  VaultLogger.sendLogs(logger);
+
+  assert.equal(logs().filter(log => log.event_name === 'FOCUS').length, 100);
 });

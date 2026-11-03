@@ -1,11 +1,11 @@
 // The vault's logs, in hyperswitch-web's structure (HyperLoggerTypes, HyperLogger,
 // LoggerUtils.logApi, Utils.fetchApiWithLogging): the same record, event names and API values, queued
-// and sent as one batch. Only the vault's own API calls are logged: never a request body, never a
-// card value.
+// and sent as one batch. It logs the vault's own API calls and the card fields' user events: never a
+// request body, never a card value.
 
 type logType = INFO | ERROR
 
-type logCategory = API
+type logCategory = API | USER_EVENT
 
 type apiLogType = Request | Response | NoResponse | Err
 
@@ -15,6 +15,9 @@ type eventName =
   | PAYMENT_METHOD_SESSION_CONFIRM_CALL
   | PAYMENT_METHOD_SESSION_UPDATE_CALL_INIT
   | PAYMENT_METHOD_SESSION_UPDATE_CALL
+  | FOCUS
+  | BLUR
+  | CARD_SCHEME_SELECTION
 
 // As LoggerUtils.apiEventInitMapper.
 let apiEventInitMapper = (eventName: eventName): option<eventName> =>
@@ -55,6 +58,7 @@ let logFileToObj = (logFile: logFile) =>
       "category",
       switch logFile.category {
       | API => "API"
+      | USER_EVENT => "USER_EVENT"
       }->JSON.Encode.string,
     ),
     ("source", "HYPER_VAULT"->JSON.Encode.string),
@@ -80,10 +84,10 @@ type timerId
 @val external setTimeout: (unit => unit, int) => timerId = "setTimeout"
 @val external clearTimeout: timerId => unit = "clearTimeout"
 
-// One per card form, as web keeps one logger per SDK frame.
+// One per card form, as web keeps one logger per SDK frame; a new vault session starts it afresh.
 type t = {
   url: option<string>,
-  sessionId: string,
+  mutable sessionId: string,
   platform: string,
   events: Dict.t<float>,
   counts: Dict.t<int>,
@@ -113,6 +117,9 @@ let make = (~url: option<string>, ~platform: string): t => {
   timeOut: None,
 }
 
+// Whether the form logs anywhere: a self-hosted backend without a logging endpoint gets no logs.
+let isOn = (logger: t) => logger.url->Option.isSome
+
 type response
 type requestOptions = {
   method: string,
@@ -136,7 +143,7 @@ let beaconApiCall = (url, logs: array<logFile>) =>
   }
 
 // Sends everything queued. web also calls this when the page unloads; the form calls it when it
-// closes and when the app leaves the foreground.
+// closes, when its session changes and when the app leaves the foreground.
 let sendLogs = (logger: t) => {
   logger.timeOut->Option.forEach(clearTimeout)
   logger.timeOut = None
@@ -147,6 +154,15 @@ let sendLogs = (logger: t) => {
     beaconApiCall(url, batch)
   | _ => ()
   }
+}
+
+// A new vault session on the same form, as web loads its frames afresh for each: what is queued goes
+// out, then the session gets its own session_id, first_event and per-event counts.
+let startNewSession = (logger: t) => {
+  logger->sendLogs
+  logger.sessionId = newSessionId()
+  logger.events->Dict.keysToArray->Array.forEach(key => logger.events->Dict.delete(key))
+  logger.counts->Dict.keysToArray->Array.forEach(key => logger.counts->Dict.delete(key))
 }
 
 // As web's checkForPriorityEvents: an error goes out at once, and so does a queue of more than 8.
@@ -162,14 +178,14 @@ let checkLogSizeAndSendData = (logger: t) => {
   }
 }
 
-// web's maxLogsPushedPerEventName.
+// As web's maxLogsPushedPerEventName.
 let maxLogsPushedPerEventName = 100
 
 let conditionalLogPush = (logger: t, log: logFile) => {
   let key = (log.eventName :> string)
   let count = logger.counts->Dict.get(key)->Option.getOr(0) + 1
   logger.counts->Dict.set(key, count)
-  if logger.url->Option.isSome && count <= maxLogsPushedPerEventName {
+  if count <= maxLogsPushedPerEventName {
     logger.mainLogFile->Array.push(log)
   }
 }
@@ -183,32 +199,55 @@ let calculateLatencyHook = (logger: t, ~eventName: eventName) => {
   latency > 0. ? latency->Float.toString : ""
 }
 
+let pushLog = (
+  logger: t,
+  ~value,
+  ~eventName: eventName,
+  ~logType,
+  ~category,
+  ~merchantId,
+  ~paymentId,
+) =>
+  if logger->isOn {
+    let key = (eventName :> string)
+    let timestamp = Date.now()
+    logger->conditionalLogPush({
+      timestamp: timestamp->Float.toString,
+      logType,
+      category,
+      value,
+      sessionId: logger.sessionId,
+      merchantId,
+      paymentId,
+      platform: logger.platform,
+      eventName,
+      latency: logger->calculateLatencyHook(~eventName),
+      firstEvent: logger.events->Dict.get(key)->Option.isNone,
+    })
+    logger->checkLogSizeAndSendData
+    logger.events->Dict.set(key, timestamp)
+  }
+
 let setLogApi = (
   logger: t,
   ~value: array<(string, JSON.t)>,
-  ~eventName: eventName,
+  ~eventName,
   ~logType,
   ~merchantId,
   ~paymentId,
-) => {
-  let key = (eventName :> string)
-  let timestamp = Date.now()
-  logger->conditionalLogPush({
-    timestamp: timestamp->Float.toString,
-    logType,
-    category: API,
-    value: value->Dict.fromArray->JSON.Encode.object->JSON.stringify,
-    sessionId: logger.sessionId,
-    merchantId,
-    paymentId,
-    platform: logger.platform,
-    eventName,
-    latency: logger->calculateLatencyHook(~eventName),
-    firstEvent: logger.events->Dict.get(key)->Option.isNone,
-  })
-  logger->checkLogSizeAndSendData
-  logger.events->Dict.set(key, timestamp)
-}
+) =>
+  logger->pushLog(
+    ~value=value->Dict.fromArray->JSON.Encode.object->JSON.stringify,
+    ~eventName,
+    ~logType,
+    ~category=API,
+    ~merchantId,
+    ~paymentId,
+  )
+
+// As web's setLogInfo: a user event, recorded by name only, e.g. which card field gained focus.
+let setLogInfo = (logger: t, ~value, ~eventName, ~merchantId, ~paymentId) =>
+  logger->pushLog(~value, ~eventName, ~logType=INFO, ~category=USER_EVENT, ~merchantId, ~paymentId)
 
 // The identity every log of one API call carries.
 type apiCall = {
@@ -246,7 +285,7 @@ let callStarted = (call: option<apiCall>) =>
     ->Option.forEach(eventName => call->logApi(~eventName, ~apiLogType=Request))
   )
 
-let callAnswered = (call: option<apiCall>, ~status: int, ~response: option<JSON.t>) =>
+let callAnswered = (call: option<apiCall>, ~status: int, ~response: JSON.t) =>
   call->Option.forEach(call =>
     if status >= 200 && status < 300 {
       call->logApi(~eventName=call.eventName, ~apiLogType=Response, ~statusCode=status)
@@ -255,27 +294,50 @@ let callAnswered = (call: option<apiCall>, ~status: int, ~response: option<JSON.
         ~eventName=call.eventName,
         ~apiLogType=Err,
         ~statusCode=status,
-        ~data=response->Option.getOr(JSON.Encode.null),
+        ~data=response,
       )
     }
   )
 
-// The exception as web's Utils.formatException records it.
+// The exception as web's Utils.formatException records it, or the value itself when what was thrown
+// is not an Error. Never throws: a value that cannot be written as JSON is recorded as null.
 let formatException = (error: exn) =>
-  switch error->Exn.asJsExn {
+  switch error->Exn.asJsExn->Option.flatMap(jsExn => jsExn->Nullable.make->Nullable.toOption) {
   | Some(jsExn) =>
-    [
-      ("message", jsExn->Exn.message->Option.getOr("Unknown Error")->JSON.Encode.string),
-      ("type", jsExn->Exn.name->Option.getOr("Unknown")->JSON.Encode.string),
-      ("stack", jsExn->Exn.stack->Option.getOr("Unknown")->JSON.Encode.string),
-      ("fileName", jsExn->Exn.fileName->Option.getOr("Unknown")->JSON.Encode.string),
+    let fields = [
+      ("message", jsExn->Exn.message, "Unknown Error"),
+      ("type", jsExn->Exn.name, "Unknown"),
+      ("stack", jsExn->Exn.stack, "Unknown"),
+      ("fileName", jsExn->Exn.fileName, "Unknown"),
     ]
-    ->Dict.fromArray
-    ->JSON.Encode.object
+    if fields->Array.some(((_, field, _)) => field->Option.isSome) {
+      fields
+      ->Array.map(((key, field, fallback)) => (key, field->Option.getOr(fallback)->JSON.Encode.string))
+      ->Dict.fromArray
+      ->JSON.Encode.object
+    } else {
+      try {
+        jsExn->JSON.stringifyAny->Option.mapOr(JSON.Encode.null, JSON.parseExn(_))
+      } catch {
+      | _ => JSON.Encode.null
+      }
+    }
   | None => JSON.Encode.null
   }
 
 let callUnanswered = (call: option<apiCall>, ~error: exn) =>
   call->Option.forEach(call =>
     call->logApi(~eventName=call.eventName, ~apiLogType=NoResponse, ~data=error->formatException)
+  )
+
+// An answer whose body cannot be read: an error with its real status and the exception the read
+// raised.
+let callUnreadable = (call: option<apiCall>, ~status: int, ~error: exn) =>
+  call->Option.forEach(call =>
+    call->logApi(
+      ~eventName=call.eventName,
+      ~apiLogType=Err,
+      ~statusCode=status,
+      ~data=error->formatException,
+    )
   )

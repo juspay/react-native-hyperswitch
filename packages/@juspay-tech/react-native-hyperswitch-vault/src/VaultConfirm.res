@@ -155,7 +155,7 @@ let readClaim = (decoded: string, ~claim: string): option<string> =>
 let readSessionId = (decoded: string): option<string> =>
   decoded->readClaim(~claim="payment_method_session_id")
 
-// The merchant id the logs carry, as client-core logs the publishable key.
+// The merchant id the logs carry: the publishable key, as web logs it.
 let publishableKeyOf = (sdkAuthorization: string): string =>
   sdkAuthorization
   ->decodeBase64
@@ -386,10 +386,121 @@ type abortController
 @send external abort: abortController => unit = "abort"
 @get external signalAborted: abortSignal => bool = "aborted"
 @send external onSignalAbort: (abortSignal, string, unit => unit) => unit = "addEventListener"
+@send external offSignalAbort: (abortSignal, string, unit => unit) => unit = "removeEventListener"
 
 type timerId
 @val external setTimeout: (unit => unit, int) => timerId = "setTimeout"
 @val external clearTimeout: timerId => unit = "clearTimeout"
+
+// What became of one vault request.
+type sent =
+  | NoAnswer({timedOut: bool})
+  | Answered({status: int, ok: bool, body: option<JSON.t>})
+
+// As web's Utils.fetchApiWithLogging: one vault request, cancelled by the caller's signal or after
+// timeoutMs, logged before it goes out, on its answer, and when no answer arrives. A request that
+// ends without an answer is logged with its exception, as web logs it, whether it failed, timed out
+// or was cancelled (type "AbortError"); one cancelled before it was sent is not logged at all. An
+// answer whose body cannot be read is logged as an error with its real status.
+let sendWithLogging = async (
+  ~url,
+  ~options: fetchOptions,
+  ~signal: option<abortSignal>,
+  ~timeoutMs: option<int>,
+  ~call: option<VaultLogger.apiCall>,
+): sent => {
+  let controller = makeAbortController()
+  let cancel = () => controller->abort
+
+  signal->Option.forEach(callerSignal =>
+    if callerSignal->signalAborted {
+      cancel()
+    } else {
+      callerSignal->onSignalAbort("abort", cancel)
+    }
+  )
+  let call = controller->controllerSignal->signalAborted ? None : call
+
+  let timedOut = ref(false)
+  let timer = switch timeoutMs {
+  | Some(ms) if ms > 0 =>
+    Some(
+      setTimeout(() => {
+        timedOut := true
+        cancel()
+      }, ms),
+    )
+  | _ => None
+  }
+
+  call->VaultLogger.callStarted
+
+  let attempted = try {
+    Ok(await fetch(url, {...options, signal: controller->controllerSignal}))
+  } catch {
+  | error => Error(error)
+  }
+
+  timer->Option.forEach(clearTimeout)
+
+  let sent = switch attempted {
+  | Error(error) =>
+    call->VaultLogger.callUnanswered(~error)
+    NoAnswer({timedOut: timedOut.contents})
+  | Ok(response) =>
+    let status = response->responseStatus
+    let ok = response->responseOk
+    switch await response->responseJson {
+    | json =>
+      call->VaultLogger.callAnswered(~status, ~response=json)
+      Answered({status, ok, body: Some(json)})
+    | exception error =>
+      call->VaultLogger.callUnreadable(~status, ~error)
+      Answered({status, ok, body: None})
+    }
+  }
+
+  signal->Option.forEach(callerSignal => callerSignal->offSignalAbort("abort", cancel))
+  sent
+}
+
+let outcomeOf = (sent: sent): confirmOutcome =>
+  switch sent {
+  | NoAnswer({timedOut}) =>
+    unknownOutcomeError(
+      timedOut
+        ? "The vault did not respond in time; the outcome is unknown."
+        : "The vault request did not complete; the outcome is unknown.",
+    )
+  | Answered({status, ok: true, body: None}) =>
+    Failure({
+      error: {
+        code: #malformed_response,
+        message: "The vault response was not valid JSON.",
+        httpStatus: status,
+        retryable: false,
+        unknownOutcome: false,
+      },
+    })
+  | Answered({status, ok: true, body: Some(json)}) => json->decodeConfirmResponse(~httpStatus=status)
+  | Answered({status, ok: false, body}) => describeHttpFailure(body, status)
+  }
+
+// The identity a vault call's logs carry.
+let apiCallOf = (
+  logger: option<VaultLogger.t>,
+  ~eventName,
+  ~url,
+  ~sdkAuthorization,
+  ~sessionId,
+): option<VaultLogger.apiCall> =>
+  logger->Option.map((logger): VaultLogger.apiCall => {
+    logger,
+    eventName,
+    url,
+    merchantId: sdkAuthorization->publishableKeyOf,
+    paymentId: sessionId,
+  })
 
 let confirmPaymentMethodSession = async (request: confirmRequest): confirmOutcome => {
   switch request.card->validateCard {
@@ -399,29 +510,6 @@ let confirmPaymentMethodSession = async (request: confirmRequest): confirmOutcom
     | Error(configurationFailure) => configurationFailure
     | Ok(sessionId) =>
       let url = confirmUrl(~baseUrl=request.vaultBaseUrl, ~sessionId)
-
-      let controller = makeAbortController()
-
-      request.signal->Option.forEach(callerSignal =>
-        if callerSignal->signalAborted {
-          controller->abort
-        } else {
-          callerSignal->onSignalAbort("abort", () => controller->abort)
-        }
-      )
-
-      let timedOut = ref(false)
-      let timer = switch request.timeoutMs {
-      | Some(ms) if ms > 0 =>
-        Some(
-          setTimeout(() => {
-            timedOut := true
-            controller->abort
-          }, ms),
-        )
-      | _ => None
-      }
-
       let options = {
         method: "POST",
 
@@ -438,63 +526,23 @@ let confirmPaymentMethodSession = async (request: confirmRequest): confirmOutcom
           ~cardNetwork=?request.cardNetwork,
         )
         ->JSON.stringify,
-        signal: ?Some(controller->controllerSignal),
       }
-
-      let call = request.logger->Option.map((logger): VaultLogger.apiCall => {
-        logger,
-        eventName: PAYMENT_METHOD_SESSION_CONFIRM_CALL,
-        url,
-        merchantId: request.sdkAuthorization->publishableKeyOf,
-        paymentId: sessionId,
-      })
-      call->VaultLogger.callStarted
-
-      let attempted = try {
-        Ok(await fetch(url, options))
-      } catch {
-      | error =>
-        call->VaultLogger.callUnanswered(~error)
-        Error()
-      }
-
-      timer->Option.forEach(clearTimeout)
-
-      switch attempted {
-      | Error() =>
-
-        unknownOutcomeError(
-          timedOut.contents
-            ? "The vault did not respond in time; the outcome is unknown."
-            : "The vault request did not complete; the outcome is unknown.",
+      let call =
+        request.logger->apiCallOf(
+          ~eventName=PAYMENT_METHOD_SESSION_CONFIRM_CALL,
+          ~url,
+          ~sdkAuthorization=request.sdkAuthorization,
+          ~sessionId,
         )
-      | Ok(response) =>
-        let status = response->responseStatus
-        let parsed = try {
-          Some(await response->responseJson)
-        } catch {
-        | _ => None
-        }
-        call->VaultLogger.callAnswered(~status, ~response=parsed)
-
-        if response->responseOk {
-          switch parsed {
-          | None =>
-            Failure({
-              error: {
-                code: #malformed_response,
-                message: "The vault response was not valid JSON.",
-                httpStatus: status,
-                retryable: false,
-                unknownOutcome: false,
-              },
-            })
-          | Some(json) => json->decodeConfirmResponse(~httpStatus=status)
-          }
-        } else {
-          describeHttpFailure(parsed, status)
-        }
-      }
+      (
+        await sendWithLogging(
+          ~url,
+          ~options,
+          ~signal=request.signal,
+          ~timeoutMs=request.timeoutMs,
+          ~call,
+        )
+      )->outcomeOf
     }
   }
 }

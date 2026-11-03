@@ -301,12 +301,13 @@ credentials, query string or fragment. A base that fails returns `unsupported_co
 nothing sent.
 
 **Logs.** The form logs its two vault requests (confirm and saved-card update): the URL, the HTTP
-status and, on an error, the error response. It never logs a card value or a request body. As in
-the web SDK, logs are queued and sent in batches: 20 seconds after the last one, at once on an error,
-and when the form closes or the app leaves the foreground. Logs go
-to `<backend>/logs/sdk` on the backend above, or to `overrideEndpoints.customLoggingEndpoint` when
-you set one, which is validated like the base (an endpoint that fails gets no logs). Override only
-`customBackendEndpoint` and no logs are sent.
+status and, on an error, the error response or the exception. It also logs when a card field gains
+or loses focus (the field's name only, never what was typed) and the network picker of a co-badged
+card. It never logs a card value or a request body. As in the web SDK, logs are queued and sent in
+batches: 20 seconds after the last one, at once on an error, and when the form closes, its session
+is replaced or the app leaves the foreground. Logs go to `<backend>/logs/sdk` on the backend above,
+or to `overrideEndpoints.customLoggingEndpoint` when you set one, which is validated like the base
+(an endpoint that fails gets no logs). Override only `customBackendEndpoint` and no logs are sent.
 
 ---
 
@@ -325,8 +326,9 @@ you set one, which is validated like the base (an endpoint that fails gets no lo
 ## Security
 
 - Secret API key: **server only.** Never in the app, an app `.env`, or version control.
-- Never log or display the session or the `sdk_authorization`. This library logs nothing at all,
-  beyond a development-only warning for an unrecognised `enabledCardSchemes` entry.
+- Never log or display the session or the `sdk_authorization`. This library never does: it writes
+  nothing to the console beyond a development-only warning for an unrecognised `enabledCardSchemes`
+  entry, and its SDK logs (see **Logs** above) carry no session secret, card value or token.
 - The payment-method token belongs on your backend, not in your app and not in your logs.
 
 > PAN, expiry and CVC never cross the library's supported public API. They stay in library-owned
