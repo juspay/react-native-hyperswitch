@@ -265,9 +265,10 @@ public class NativePaymentWidgetView: UIView {
         configuration["type"] = widgetType
 
         let listener = PaymentEventListener { [weak self] event in
+            let json = (try? JSONSerialization.data(withJSONObject: event.payload)).flatMap { String(data: $0, encoding: .utf8) }
             self?.onPaymentEvent?([
                 "eventName": event.type,
-                "payload": event.payload,
+                "payload": json ?? "",
             ])
         }
 

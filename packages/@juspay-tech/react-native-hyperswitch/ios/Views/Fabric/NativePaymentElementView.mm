@@ -163,15 +163,8 @@ static NSDictionary * _Nullable dynamicToDict(const folly::dynamic &dyn)
 
         RCTNativePaymentWidgetEventEmitter::OnPaymentEvent paymentEvent;
         paymentEvent.eventName = std::string([eventName UTF8String]);
-        /* The Fabric event types payload as a string, so a dictionary crosses as JSON. */
-        id payload = event[@"payload"];
-        if ([payload isKindOfClass:[NSDictionary class]]) {
-            NSData *data = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
-            payload = data ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : nil;
-        }
-        if ([payload isKindOfClass:[NSString class]]) {
-            paymentEvent.payload = std::string([(NSString *)payload UTF8String]);
-        }
+        NSString *payload = event[@"payload"] ?: @"";
+        paymentEvent.payload = std::string([payload UTF8String]);
         em->onPaymentEvent(std::move(paymentEvent));
     };
 }

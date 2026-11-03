@@ -94,9 +94,6 @@ export function preparePaymentMessages(
         ? base
         : { ...base, value: message.value };
     }
-    const active =
-      message.displayMode === undefined ||
-      message.displayMode === 'custom_message';
     const elements: MessageElement[] = [];
     const actions: Record<string, unknown>[] = [];
     let value = '';
@@ -115,7 +112,7 @@ export function preparePaymentMessages(
       const { label, style, onClick } = part.options;
       const wireStyle = styleToWire(style);
       actions.push({ key, label, ...(wireStyle ? { style: wireStyle } : {}) });
-      if (active) callbacks.push({ key, onClick });
+      callbacks.push({ key, onClick });
     });
     return {
       ...base,
@@ -149,7 +146,11 @@ export function preparePaymentMessages(
         : entry;
     }),
   };
-  /* A separate wire key: the iOS sheet overwrites configuration.subscribedEvents. */
-  if (callbacks.length) wire.subscriptionEvents = [MESSAGE_EVENT];
+  if (callbacks.length) {
+    wire.subscribedEvents = [
+      ...(configuration.subscribedEvents ?? []),
+      MESSAGE_EVENT,
+    ];
+  }
   return { configuration: wire, callbacks };
 }
