@@ -13,6 +13,6 @@
  *   • confirmWithCustomerLastUsedPaymentMethod()   ← no cvcWidgetReactTag
  *   • confirmWithCustomerDefaultPaymentMethod()    ← no cvcWidgetReactTag
  */
-@interface NativeHyperswitchModule : NSObject <NativeHyperswitchModuleSpec>
+@interface NativeHyperswitchModule : NativeHyperswitchModuleSpecBase <NativeHyperswitchModuleSpec>
 
 @end

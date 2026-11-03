@@ -22,6 +22,7 @@ import com.facebook.react.uimanager.PixelUtil
 import com.hyperswitchsdkreactnative.BuildConfig
 import com.proyecto26.inappbrowser.ChromeTabsDismissedEvent
 import com.proyecto26.inappbrowser.ChromeTabsManagerActivity
+import io.hyperswitch.PaymentEventListener
 import io.hyperswitch.react.HyperActivity
 import io.hyperswitch.react.HyperEventEmitter
 import io.hyperswitch.react.HyperFragment
@@ -221,12 +222,20 @@ class PaymentSessionReactLauncher(
    *
    * The bundle is expected to contain a `props` bundle with `configuration`, `sdkParams`, etc.
    */
-  fun presentSheet(bundle: Bundle, host: Activity = activity): Boolean {
+  fun presentSheet(
+    bundle: Bundle,
+    host: Activity = activity,
+    eventListener: PaymentEventListener? = null,
+  ): Boolean {
     applyFonts(bundle)
-    return presentSheetInternal(bottomInsetToDIPFromPixel(bundle), host)
+    return presentSheetInternal(bottomInsetToDIPFromPixel(bundle), host, eventListener)
   }
 
-  private fun presentSheetInternal(bundle: Bundle, host: Activity): Boolean {
+  private fun presentSheetInternal(
+    bundle: Bundle,
+    host: Activity,
+    eventListener: PaymentEventListener?,
+  ): Boolean {
     if (host is DefaultHardwareBackBtnHandler && host is FragmentActivity) {
       val fragmentActivity = host as FragmentActivity
       val fragmentManager = fragmentActivity.supportFragmentManager
@@ -245,6 +254,7 @@ class PaymentSessionReactLauncher(
           .setLaunchOptions(bundle)
           .setFabricEnabled(BuildConfig.IS_NEW_ARCHITECTURE_ENABLED)
           .build()
+      eventListener?.let { newReactNativeFragmentSheet.setOnEventCallback(it) }
 
       fragmentActivity.onBackPressedDispatcher.addCallback {
         newReactNativeFragmentSheet.onBackPressed()
@@ -256,6 +266,7 @@ class PaymentSessionReactLauncher(
 
       return true
     } else {
+      PaymentSheetCallbackManager.eventListener = eventListener
       host.startActivity(
         Intent(
           host.applicationContext,

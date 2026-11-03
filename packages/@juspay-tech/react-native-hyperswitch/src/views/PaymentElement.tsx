@@ -23,6 +23,7 @@ import type { PaymentResult } from '../types/paymentresult';
 import { mapNativeResponseToPaymentResult } from '../native/NativeResponseMapper';
 import NativeWidgetHelperModule from '../codegen/modules/NativeWidgetHelperModule';
 import { useNativeViewTag } from './useNativeViewTag';
+import { usePaymentMessages } from './usePaymentMessages';
 
 type PaymentElementProps = {
   widgetId: string;
@@ -41,6 +42,7 @@ export const PaymentElement = forwardRef<
     props;
   const { paymentSessionConfig, hyperswitchConfig } = useHyperElementsContext();
   const viewRef = useRef(null);
+  const messages = usePaymentMessages(options);
   const viewTag = useNativeViewTag(viewRef, onReady);
 
   useEffect(() => {
@@ -135,7 +137,7 @@ export const PaymentElement = forwardRef<
   };
 
   const onPaymentEventInternal = (event: PaymentEventNative) => {
-    onChange?.(event.nativeEvent);
+    if (!messages.dispatch(event.nativeEvent)) onChange?.(event.nativeEvent);
   };
 
   return (
@@ -148,7 +150,7 @@ export const PaymentElement = forwardRef<
       options={{
         hyperswitchConfig: hyperswitchConfig || undefined,
         paymentSessionConfig: paymentSessionConfig || undefined,
-        configuration: options as Record<string, unknown> | undefined,
+        configuration: messages.configuration,
       }}
       style={{ ...style, flex: 1 }}
     />

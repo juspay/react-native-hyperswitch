@@ -57,6 +57,7 @@ extension PaymentSession {
         viewController: UIViewController,
         params: [String: Any],
         subscribe: ((PaymentEventSubscriptionBuilder) -> Void)? = nil,
+        onChange: ((PaymentEvent) -> Void)? = nil,
         completion: @escaping (PaymentResult) -> Void
     ) {
         let paymentSheet = PaymentSheet(
@@ -70,6 +71,11 @@ extension PaymentSession {
             let (subscription, builtListener) = builder.build()
             paymentSheet.subscribedEvents = subscription.subscribedEventStrings()
             paymentSheet.paymentEventListener = builtListener
+        }
+        if let onChange {
+            paymentSheet.paymentEventListener = PaymentEventListener { event in
+                onChange(event)
+            }
         }
         paymentSheet.presentWithParams(from: viewController, props: params, completion: completion)
     }

@@ -3,6 +3,7 @@ package com.hyperswitchsdkreactnative.modules
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReadableMap
@@ -31,6 +32,8 @@ import io.hyperswitch.paymentsession.PaymentMethodType
 import io.hyperswitch.paymentsession.PaymentSessionHandler
 import io.hyperswitch.paymentsession.PaymentSessionReactLauncher
 import io.hyperswitch.paymentsession.PaymentSheetCallbackManager
+import io.hyperswitch.PaymentEvent
+import io.hyperswitch.PaymentEventListener
 import io.hyperswitch.utils.ConversionUtils
 import io.hyperswitch.utils.StandardResult
 import io.hyperswitch.view.PaymentWidgetView
@@ -285,13 +288,24 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
           failed("SHEET_REPLACED", "Replaced by a newer presentPaymentSheet call")
         )
       }
-      val isFragment = paymentSessionReactLauncher?.presentSheet(bundle, activity)
+      val isFragment = paymentSessionReactLauncher?.presentSheet(bundle, activity, sheetEventListener)
       val resultCallback: (String) -> Unit = { it ->
         promise?.resolve(it)
       }
       PaymentSheetCallbackManager.setCallback(resultCallback, isFragment == true)
     } catch (e: Exception) {
       promise?.resolve(failed("PRESENT_FAILED", "failed to open: ${e.message}"))
+    }
+  }
+
+  /* Forwards every sheet event; JS decides what to handle. */
+  private val sheetEventListener = object : PaymentEventListener {
+    override fun onPaymentEvent(event: PaymentEvent) {
+      val body = Arguments.createMap().apply {
+        putString("eventName", event.type)
+        putString("payload", ConversionUtils.convertMapToJson(event.payload).toString())
+      }
+      emitOnPaymentSheetEvent(body)
     }
   }
 

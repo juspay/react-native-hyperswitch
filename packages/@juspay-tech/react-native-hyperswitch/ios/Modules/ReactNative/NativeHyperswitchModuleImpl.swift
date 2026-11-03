@@ -161,9 +161,10 @@ public class NativeHyperswitchModuleImpl: NSObject {
 
     // MARK: - presentPaymentSheet
 
-    @objc(presentPaymentSheet:resolve:reject:)
+    @objc(presentPaymentSheet:onEvent:resolve:reject:)
     public func presentPaymentSheet(
         params: [String: Any],
+        onEvent: @escaping (NSDictionary) -> Void,
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
@@ -214,6 +215,11 @@ public class NativeHyperswitchModuleImpl: NSObject {
             session.presentPaymentSheetWithParams(
                 viewController: vc,
                 params: sheetProps,
+                onChange: { event in
+                    guard let data = try? JSONSerialization.data(withJSONObject: event.payload),
+                          let payload = String(data: data, encoding: .utf8) else { return }
+                    onEvent(["eventName": event.type, "payload": payload])
+                },
                 completion: { result in
                     switch result {
                     case .completed(let data):

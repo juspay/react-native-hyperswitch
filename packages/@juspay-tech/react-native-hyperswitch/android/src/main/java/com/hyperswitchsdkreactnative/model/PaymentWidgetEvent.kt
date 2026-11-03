@@ -11,6 +11,8 @@ class PaymentWidgetEvent(
 ) : Event<PaymentWidgetEvent>(surfaceId, viewId) {
 
   override fun getEventName() = "onPaymentEvent"
+  /* Every onPaymentEvent shares one name, so coalescing would drop distinct events. */
+  override fun canCoalesce() = false
 
   override fun getEventData() = Arguments.createMap().apply {
     putString("eventName", event.type)
