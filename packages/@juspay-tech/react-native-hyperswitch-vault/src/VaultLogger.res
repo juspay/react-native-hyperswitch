@@ -4,7 +4,8 @@
 // how the form was set up and rendered, and crashes inside it: never a request body, never a card
 // value.
 
-type logType = INFO | ERROR
+// As web's logType. DEBUG marks a log kept for debugging, such as how long a field took to show.
+type logType = DEBUG | INFO | ERROR
 
 type logCategory = API | USER_EVENT | USER_ERROR
 
@@ -54,6 +55,7 @@ let logFileToObj = (logFile: logFile) =>
     (
       "log_type",
       switch logFile.logType {
+      | DEBUG => "DEBUG"
       | INFO => "INFO"
       | ERROR => "ERROR"
       }->JSON.Encode.string,
@@ -170,7 +172,8 @@ let startNewSession = (logger: t) => {
 }
 
 // As web's checkForPriorityEvents: an error goes out at once, and so does a queue of more than 8.
-// None of the vault's events is on web's priority list.
+// None of the vault's events is on web's priority list. Unlike web, a DEBUG log waits for the batch:
+// web's are failures, while the vault's are sent each time a form mounts.
 let checkForPriorityEvents = (logs: array<logFile>) =>
   logs->Array.some(log => log.logType === ERROR) || logs->Array.length > 8
 
