@@ -305,9 +305,10 @@ status and, on an error, the error response or the exception. It also logs when 
 or loses focus (the field's name only, never what was typed) and the network picker of a co-badged
 card. It never logs a card value or a request body. As in the web SDK, logs are queued and sent in
 batches: 20 seconds after the last one, at once on an error, and when the form closes, its session
-is replaced or the app leaves the foreground. Logs go to `<backend>/logs/sdk` on the backend above,
-or to `overrideEndpoints.customLoggingEndpoint` when you set one, which is validated like the base
-(an endpoint that fails gets no logs). Override only `customBackendEndpoint` and no logs are sent.
+is replaced or the app leaves the foreground. As in client-core, logs go to
+`overrideEndpoints.customLoggingEndpoint` when you pass `overrideEndpoints` (the environment's host
+when it has none), else to `<commonEndpoint>/logs/sdk`, else to the environment's host
+(`https://app.hyperswitch.io/api/logs/sdk` in `SANDBOX`). A blank `customLoggingEndpoint` sends none.
 
 ---
 

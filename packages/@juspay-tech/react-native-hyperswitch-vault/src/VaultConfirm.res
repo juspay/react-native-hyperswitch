@@ -134,7 +134,7 @@ let publicMessageForCode = (code: string) =>
   | _ => None
   }
 
-let readClaim = (decoded: string, ~claim: string): option<string> =>
+let readKey = (decoded: string, ~key: string): option<string> =>
   decoded
   ->String.split(",")
   ->Array.reduce(None, (found, pair) =>
@@ -145,21 +145,21 @@ let readClaim = (decoded: string, ~claim: string): option<string> =>
       if separator <= 0 {
         None
       } else {
-        let key = pair->String.slice(~start=0, ~end=separator)->String.trim
+        let name = pair->String.slice(~start=0, ~end=separator)->String.trim
         let value = pair->String.sliceToEnd(~start=separator + 1)->String.trim
-        key === claim && value->String.length > 0 ? Some(value) : None
+        name === key && value->String.length > 0 ? Some(value) : None
       }
     }
   )
 
 let readSessionId = (decoded: string): option<string> =>
-  decoded->readClaim(~claim="payment_method_session_id")
+  decoded->readKey(~key="payment_method_session_id")
 
 // The merchant id the logs carry: the publishable key, as web logs it.
 let publishableKeyOf = (sdkAuthorization: string): string =>
   sdkAuthorization
   ->decodeBase64
-  ->Option.flatMap(readClaim(_, ~claim="publishable_key"))
+  ->Option.flatMap(readKey(_, ~key="publishable_key"))
   ->Option.getOr("")
 
 let resolveSessionId = (sdkAuthorization: string): result<string, confirmOutcome> =>
@@ -397,12 +397,13 @@ type sent =
   | NoAnswer({timedOut: bool})
   | Answered({status: int, ok: bool, body: option<JSON.t>})
 
-// As web's Utils.fetchApiWithLogging: one vault request, cancelled by the caller's signal or after
-// timeoutMs, logged before it goes out, on its answer, and when no answer arrives. A request that
-// ends without an answer is logged with its exception, as web logs it, whether it failed, timed out
-// or was cancelled (type "AbortError"); one cancelled before it was sent is not logged at all. An
-// answer whose body cannot be read is logged as an error with its real status.
-let sendWithLogging = async (
+// One vault request (confirm or saved-card update), cancelled by the caller's signal or after the
+// caller's timeoutMs as before, and logged as web's Utils.fetchApiWithLogging logs: before it goes
+// out, on its answer, and when no answer arrives. A request that ends without an answer is logged
+// with its exception, as web logs it, whether it failed, timed out or was cancelled (type
+// "AbortError"); one cancelled before it was sent is not logged at all. Any response is an answer,
+// even one whose body cannot be read: that is logged as an error with its real status.
+let sendVaultRequest = async (
   ~url,
   ~options: fetchOptions,
   ~signal: option<abortSignal>,
@@ -449,15 +450,15 @@ let sendWithLogging = async (
     NoAnswer({timedOut: timedOut.contents})
   | Ok(response) =>
     let status = response->responseStatus
-    let ok = response->responseOk
-    switch await response->responseJson {
+    let body = switch await response->responseJson {
     | json =>
       call->VaultLogger.callAnswered(~status, ~response=json)
-      Answered({status, ok, body: Some(json)})
+      Some(json)
     | exception error =>
       call->VaultLogger.callUnreadable(~status, ~error)
-      Answered({status, ok, body: None})
+      None
     }
+    Answered({status, ok: response->responseOk, body})
   }
 
   signal->Option.forEach(callerSignal => callerSignal->offSignalAbort("abort", cancel))
@@ -500,6 +501,8 @@ let apiCallOf = (
     url,
     merchantId: sdkAuthorization->publishableKeyOf,
     paymentId: sessionId,
+    logSessionId: logger.sessionId,
+    startedAt: None,
   })
 
 let confirmPaymentMethodSession = async (request: confirmRequest): confirmOutcome => {
@@ -535,7 +538,7 @@ let confirmPaymentMethodSession = async (request: confirmRequest): confirmOutcom
           ~sessionId,
         )
       (
-        await sendWithLogging(
+        await sendVaultRequest(
           ~url,
           ~options,
           ~signal=request.signal,

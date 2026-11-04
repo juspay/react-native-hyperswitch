@@ -42,7 +42,8 @@ type logFile = {
 }
 
 // HyperLogger.logFileToObj, with the values web reads from the browser filled in for React Native:
-// the component, the platform from Platform.OS, and web's own defaults for an unknown browser.
+// the component and the platform from Platform.OS. An app has no browser, so browser_name and
+// browser_version are left out (both are nullable downstream).
 let logFileToObj = (logFile: logFile) =>
   [
     ("timestamp", logFile.timestamp->JSON.Encode.string),
@@ -61,7 +62,7 @@ let logFileToObj = (logFile: logFile) =>
       | USER_EVENT => "USER_EVENT"
       }->JSON.Encode.string,
     ),
-    ("source", "HYPER_VAULT"->JSON.Encode.string),
+    ("source", "HYPERSWITCH_VAULT"->JSON.Encode.string),
     ("version", VaultVersion.version->JSON.Encode.string),
     ("value", logFile.value->JSON.Encode.string),
     ("session_id", logFile.sessionId->JSON.Encode.string),
@@ -71,8 +72,6 @@ let logFileToObj = (logFile: logFile) =>
     ("platform", logFile.platform->String.toUpperCase->JSON.Encode.string),
     ("user_agent", ""->JSON.Encode.string),
     ("event_name", (logFile.eventName :> string)->JSON.Encode.string),
-    ("browser_name", "OTHERS"->JSON.Encode.string),
-    ("browser_version", "0"->JSON.Encode.string),
     ("latency", logFile.latency->JSON.Encode.string),
     ("first_event", (logFile.firstEvent ? "true" : "false")->JSON.Encode.string),
     ("payment_method", ""->JSON.Encode.string),
@@ -118,7 +117,7 @@ let make = (~url: option<string>, ~platform: string): t => {
 }
 
 // Whether the form logs anywhere: a self-hosted backend without a logging endpoint gets no logs.
-let isOn = (logger: t) => logger.url->Option.isSome
+let isLoggerEnabled = (logger: t) => logger.url->Option.isSome
 
 type response
 type requestOptions = {
@@ -207,25 +206,35 @@ let pushLog = (
   ~category,
   ~merchantId,
   ~paymentId,
+  ~latency: option<float>=?,
+  ~sessionId: option<string>=?,
 ) =>
-  if logger->isOn {
+  if logger->isLoggerEnabled {
     let key = (eventName :> string)
     let timestamp = Date.now()
+    // A log that belongs to a session the form has since left keeps that session's id, and leaves
+    // the current session's first_event and latencies alone.
+    let current = sessionId->Option.mapOr(true, sessionId => sessionId === logger.sessionId)
     logger->conditionalLogPush({
       timestamp: timestamp->Float.toString,
       logType,
       category,
       value,
-      sessionId: logger.sessionId,
+      sessionId: sessionId->Option.getOr(logger.sessionId),
       merchantId,
       paymentId,
       platform: logger.platform,
       eventName,
-      latency: logger->calculateLatencyHook(~eventName),
-      firstEvent: logger.events->Dict.get(key)->Option.isNone,
+      latency: switch latency {
+      | Some(latency) => latency->Float.toString
+      | None => current ? logger->calculateLatencyHook(~eventName) : ""
+      },
+      firstEvent: current && logger.events->Dict.get(key)->Option.isNone,
     })
     logger->checkLogSizeAndSendData
-    logger.events->Dict.set(key, timestamp)
+    if current {
+      logger.events->Dict.set(key, timestamp)
+    }
   }
 
 let setLogApi = (
@@ -235,6 +244,8 @@ let setLogApi = (
   ~logType,
   ~merchantId,
   ~paymentId,
+  ~latency=?,
+  ~sessionId=?,
 ) =>
   logger->pushLog(
     ~value=value->Dict.fromArray->JSON.Encode.object->JSON.stringify,
@@ -243,19 +254,25 @@ let setLogApi = (
     ~category=API,
     ~merchantId,
     ~paymentId,
+    ~latency?,
+    ~sessionId?,
   )
 
 // As web's setLogInfo: a user event, recorded by name only, e.g. which card field gained focus.
 let setLogInfo = (logger: t, ~value, ~eventName, ~merchantId, ~paymentId) =>
   logger->pushLog(~value, ~eventName, ~logType=INFO, ~category=USER_EVENT, ~merchantId, ~paymentId)
 
-// The identity every log of one API call carries.
+// The identity every log of one API call carries. A call keeps the log session it started in and
+// its own start time, so an answer that arrives after the form's session changed is still filed
+// under the session that sent it, with its real latency.
 type apiCall = {
   logger: t,
   eventName: eventName,
   url: string,
   merchantId: string,
   paymentId: string,
+  logSessionId: string,
+  mutable startedAt: option<float>,
 }
 
 // As LoggerUtils.logApi: what each kind of API log records.
@@ -267,23 +284,33 @@ let logApi = (call: apiCall, ~eventName, ~apiLogType, ~statusCode=0, ~data=JSON.
   | NoResponse => ([url, ("statusCode", 504->JSON.Encode.int), ("response", data)], ERROR)
   | Err => ([url, ("statusCode", statusCode->JSON.Encode.int), ("response", data)], ERROR)
   }
+  // As web's calculateLatencyHook, an answer carries the time since its _INIT.
+  let latency = switch (apiLogType, call.startedAt) {
+  | (Request, _) | (_, None) => None
+  | (_, Some(startedAt)) =>
+    let latency = Date.now() -. startedAt
+    latency > 0. ? Some(latency) : None
+  }
   call.logger->setLogApi(
     ~value,
     ~eventName,
     ~logType,
     ~merchantId=call.merchantId,
     ~paymentId=call.paymentId,
+    ~latency?,
+    ~sessionId=call.logSessionId,
   )
 }
 
 // The three points at which web's fetchApiWithLogging logs: before the request, on its answer, and
 // when no answer arrives. A call without a logger logs nothing.
 let callStarted = (call: option<apiCall>) =>
-  call->Option.forEach(call =>
+  call->Option.forEach(call => {
+    call.startedAt = Some(Date.now())
     call.eventName
     ->apiEventInitMapper
     ->Option.forEach(eventName => call->logApi(~eventName, ~apiLogType=Request))
-  )
+  })
 
 let callAnswered = (call: option<apiCall>, ~status: int, ~response: JSON.t) =>
   call->Option.forEach(call =>

@@ -70,6 +70,8 @@ const confirmCall = logger => ({
   url: CONFIRM_URL,
   merchantId: PUBLISHABLE_KEY,
   paymentId: SESSION_ID,
+  logSessionId: logger.sessionId,
+  startedAt: undefined,
 });
 
 test('a confirm queues its _INIT and answer, and they go out together as one batch', async () => {
@@ -88,13 +90,13 @@ test('a confirm queues its _INIT and answer, and they go out together as one bat
 
   const [started, answered] = batches[0];
   assert.deepEqual(Object.keys(started).sort(), [
-    'app_id', 'browser_name', 'browser_version', 'category', 'component', 'event_name',
-    'first_event', 'latency', 'log_type', 'merchant_id', 'payment_id', 'payment_method',
-    'platform', 'session_id', 'source', 'timestamp', 'user_agent', 'value', 'version',
+    'app_id', 'category', 'component', 'event_name', 'first_event', 'latency', 'log_type',
+    'merchant_id', 'payment_id', 'payment_method', 'platform', 'session_id', 'source',
+    'timestamp', 'user_agent', 'value', 'version',
   ]);
   assert.equal(started.log_type, 'INFO');
   assert.equal(started.category, 'API');
-  assert.equal(started.source, 'HYPER_VAULT');
+  assert.equal(started.source, 'HYPERSWITCH_VAULT');
   assert.equal(started.component, 'MOBILE');
   assert.equal(started.platform, 'ANDROID');
   assert.equal(started.merchant_id, PUBLISHABLE_KEY);
@@ -325,9 +327,9 @@ test('each event sends at most 100 logs per form, as on web', () => {
 });
 
 test('a call without a logger, or a logger without a URL, sends no logs', async () => {
-  await confirm(undefined);
+  assert.equal((await confirm(undefined)).status, 'success', 'the vault request is made without a logger');
   const silent = VaultLogger.make(undefined, 'android');
-  await confirm(silent);
+  assert.equal((await confirm(silent)).status, 'success');
   VaultLogger.sendLogs(silent);
   assert.equal(batches.length, 0);
 });
@@ -359,7 +361,7 @@ test('a batch that cannot be sent does not change the outcome', async () => {
   }
 });
 
-test('the log URL follows client-core’s rule on the backend the vault calls', () => {
+test('the log URL follows client-core’s getUrl(#logs) on the backend the vault calls', () => {
   const url = VaultEndpoint.loggingUrl;
   assert.equal(url(undefined, 'SANDBOX'), 'https://app.hyperswitch.io/api/logs/sdk');
   assert.equal(url(undefined, 'PROD'), 'https://live.hyperswitch.io/api/logs/sdk');
@@ -374,13 +376,20 @@ test('the log URL follows client-core’s rule on the backend the vault calls', 
   );
   assert.equal(
     url({ overrideEndpoints: { customBackendEndpoint: 'https://pay.example.com/api' } }, 'PROD'),
-    undefined,
-    'a self-hosted backend without a logging endpoint sends no logs to Hyperswitch',
+    'https://live.hyperswitch.io/api/logs/sdk',
+    'overrideEndpoints without a logging endpoint uses the default, as client-core',
+  );
+  assert.equal(
+    url({ commonEndpoint: 'https://pay.example.com/api', overrideEndpoints: {} }, 'SANDBOX'),
+    'https://app.hyperswitch.io/api/logs/sdk',
+    'overrideEndpoints wins over commonEndpoint for logs, as client-core',
   );
   assert.equal(
     url({ overrideEndpoints: { customLoggingEndpoint: 'http://logs.example.com' } }, 'PROD'),
-    undefined,
+    'http://logs.example.com',
+    'the logging endpoint is used as given, as client-core',
   );
+  assert.equal(url({ overrideEndpoints: { customLoggingEndpoint: '  ' } }, 'PROD'), undefined);
   assert.equal(
     url({ overrideEndpoints: { customLoggingEndpoint: 'http://localhost:8080/logs' } }, 'SANDBOX'),
     'http://localhost:8080/logs',
@@ -420,4 +429,32 @@ test('field events go out in batches, at most 100 per event name as on web', () 
   VaultLogger.sendLogs(logger);
 
   assert.equal(logs().filter(log => log.event_name === 'FOCUS').length, 100);
+});
+
+test('an answer that arrives after the session changed stays with the session that sent it', async () => {
+  let answer;
+  vaultAnswer = () => new Promise(resolve => (answer = resolve));
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  const firstSession = logger.sessionId;
+  const pending = confirm(logger);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  VaultLogger.startNewSession(logger);
+  const secondSession = logger.sessionId;
+  answer(okJson(200, tokenBody));
+  await pending;
+  vaultAnswer = async () => okJson(200, tokenBody);
+  await confirm(logger);
+  VaultLogger.sendLogs(logger);
+  const calls = logs().filter(log => log.event_name.startsWith('PAYMENT_METHOD_SESSION_CONFIRM'));
+  assert.deepEqual(
+    calls.map(log => [log.event_name, log.session_id === firstSession ? 'first' : 'second', log.first_event]),
+    [
+      ['PAYMENT_METHOD_SESSION_CONFIRM_CALL_INIT', 'first', 'true'],
+      ['PAYMENT_METHOD_SESSION_CONFIRM_CALL', 'first', 'false'],
+      ['PAYMENT_METHOD_SESSION_CONFIRM_CALL_INIT', 'second', 'true'],
+      ['PAYMENT_METHOD_SESSION_CONFIRM_CALL', 'second', 'true'],
+    ],
+  );
+  assert.notEqual(firstSession, secondSession);
+  assert.ok(Number(calls[1].latency) >= 20, `late answer latency ${calls[1].latency}`);
 });

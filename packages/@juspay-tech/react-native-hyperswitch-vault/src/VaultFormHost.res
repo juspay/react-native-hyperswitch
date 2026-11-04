@@ -273,20 +273,22 @@ let useHost = (
   // logs those two names only when the merchant calls focus() or blur().
   let logUserEvent = (~eventName, ~value) =>
     logger->VaultLogger.setLogInfo(~eventName, ~value, ~merchantId, ~paymentId)
-  // The field's public name, as in focus() and state.field.
+  // The field's public name: VaultPublicState's elementType, as in focus() and state.field.
   let fieldName = (field: CardFormTypes.cardFieldId) =>
     switch field {
-    | CardNumberField => "cardNumber"
-    | ExpiryField => "cardExpiry"
-    | CvcField => "cardCvc"
-    | CardholderNameField => "cardholderName"
+    | CardNumberField => (#cardNumber: VaultPublicState.elementType :> string)
+    | ExpiryField => (#cardExpiry: VaultPublicState.elementType :> string)
+    | CvcField => (#cardCvc: VaultPublicState.elementType :> string)
+    | CardholderNameField => (#cardholderName: VaultPublicState.elementType :> string)
     }
   let onAnalytics = (event: CardFormTypes.analyticsEvent) =>
     switch event {
     | FieldFocused(field) => logUserEvent(~eventName=FOCUS, ~value=field->fieldName)
     | FieldBlurred(field) => logUserEvent(~eventName=BLUR, ~value=field->fieldName)
-    | NetworkMenuOpened =>
+    | CardNetworkMenu(Opened) =>
       logUserEvent(~eventName=CARD_SCHEME_SELECTION, ~value="CardSchemeMenu expanded")
+    | CardNetworkMenu(Closed) =>
+      logUserEvent(~eventName=CARD_SCHEME_SELECTION, ~value="CardSchemeMenu closed")
     }
 
   // Once per logger session, as web logs it once per frame.

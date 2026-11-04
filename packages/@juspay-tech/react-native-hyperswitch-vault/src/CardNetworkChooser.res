@@ -50,9 +50,13 @@ let make = (
   ~baseUrl: string,
   ~editable: bool,
   ~onSelect: string => unit,
-  ~onOpen: unit => unit=() => (),
+  ~onMenu: CardFormTypes.cardNetworkMenu => unit=_ => (),
 ) => {
   let (isOpen, setIsOpen) = React.useState(() => false)
+  let close = () => {
+    setIsOpen(_ => false)
+    onMenu(Closed)
+  }
 
   <>
     <Pressable
@@ -62,7 +66,7 @@ let make = (
       disabled={!editable}
       onPress={_ => {
         setIsOpen(_ => true)
-        onOpen()
+        onMenu(Opened)
       }}
       style={_ => s({flexDirection: #row, alignItems: #center})}>
       {_ =>
@@ -83,13 +87,13 @@ let make = (
       visible=isOpen
       transparent=true
       animationType=#fade
-      onRequestClose={() => setIsOpen(_ => false)}>
+      onRequestClose={() => close()}>
 
       <Pressable
         accessibilityRole=#button
         accessibilityLabel=label
         testID=CardTestIds.networkBackdrop
-        onPress={_ => setIsOpen(_ => false)}
+        onPress={_ => close()}
         style={_ =>
           s({
             flex: 1.,
@@ -127,7 +131,7 @@ let make = (
                   baseUrl
                   onSelect={picked => {
                     onSelect(picked)
-                    setIsOpen(_ => false)
+                    close()
                   }}
                 />
               )
