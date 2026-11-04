@@ -423,6 +423,27 @@ An adapter provides `vaultType`, `validateVaultData`, a `Host`, a `Field` (which
 receives `elementType`, `styles`, `placeholder`, `savedCard`, `cvcIcon`, `cardBrandIcon`,
 `onChange`, `onFocus`, `onBlur`) and `tokenize(collector, providerData?)`.
 
+## Logs
+
+Inside a payment-method session (`<HyperPaymentMethodSession>` or `initPaymentMethodSession`), the
+SDK sends logs in the web SDK's structure, as the Hyperswitch vault does. It logs:
+
+- the session starting, its lookup (the URL, the HTTP status and, on an error, the error body), and
+  a missing or malformed `sdkAuthorization` (named, never its value);
+- the card form's lifecycle: created, each field mounted, rendered and unmounted, the fields
+  complete, `clear()`, and why a form never became usable;
+- each `tokenize()` and its outcome: the vault type and the error code;
+- a VGS submit's HTTP status, and a crash while a field renders, which is then thrown on unchanged.
+
+It never logs a card value, a token, a request body or the `sdkAuthorization`. Logs are queued and
+sent in batches: 20 seconds after the last one, at once on an error, and when a `<CardForm>` or
+`<HyperPaymentMethodSession>` closes or the app leaves the foreground. A form made with
+`createCardForm` has no close of its own, so its logs go out on the timer or with the app. As in client-core, they go to
+`overrideEndpoints.customLoggingEndpoint` when you pass `overrideEndpoints` (the environment's host
+when it has none), else to `<commonEndpoint>/logs/sdk`, else to the environment's host
+(`https://app.hyperswitch.io/api/logs/sdk` in `SANDBOX`). A blank `customLoggingEndpoint` sends none.
+A `<CardForm>` used without a session sends none.
+
 ## Notes
 
 - **VGS** uses `@vgs/collect-react-native`, currently in **beta** — pin the version.

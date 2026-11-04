@@ -3,7 +3,7 @@ import type { ProviderAdapter } from './ProviderAdapter';
 import { errorResult, messageOf } from './results';
 import type { FormStatus, TokenizeResult } from './types';
 
-const DEFAULT_READY_TIMEOUT_MS = 10_000;
+export const DEFAULT_READY_TIMEOUT_MS = 10_000;
 
 export interface CreateFormSessionOptions {
   readyTimeoutMs?: number;
