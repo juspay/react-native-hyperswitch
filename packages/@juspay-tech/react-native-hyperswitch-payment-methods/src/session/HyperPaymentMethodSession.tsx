@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { SessionContext } from './SessionContext';
@@ -6,6 +6,10 @@ import type { PaymentMethodsSession } from './SessionContext';
 import type { HyperswitchConfiguration } from './config';
 import { fetchVaultDetails } from './fetchVaultDetails';
 import type { Appearance, VaultDetails } from '../core/types';
+import { createLogger, logSessionStart } from '../logging/logger';
+import type { Logger } from '../logging/logger';
+import { LoggerContext } from '../logging/LoggerContext';
+import { loggingUrl } from '../logging/loggingUrl';
 
 interface CommonOptions {
   appearance?: Appearance;
@@ -118,6 +122,41 @@ export function HyperPaymentMethodSession({
     };
   }, [hyper]);
 
+  /* One logger per session, made once the instance names the environment and endpoints. Fields
+     mounted before the sdkAuthorization arrives keep the session_id it then joins. */
+  const hasHyper = resolvedHyper !== null;
+  const logUrl = resolvedHyper
+    ? loggingUrl(resolvedHyper.environment, resolvedHyper.customEndpoints)
+    : undefined;
+  const logger = useMemo<Logger | null>(
+    () => (hasHyper ? createLogger(logUrl) : null),
+    [hasHyper, logUrl]
+  );
+  /* Every log names the session's merchant and payment-method session. Set in the commit's layout
+     phase, before any effect of the card forms inside logs, and never during a render React may
+     discard. */
+  const publishableKey = resolvedHyper?.publishableKey;
+  useLayoutEffect(() => {
+    logger?.identify(sdkAuthorization, publishableKey);
+  }, [logger, sdkAuthorization, publishableKey]);
+
+  useEffect(() => {
+    if (!logger) return;
+    return () => logger.sendLogs();
+  }, [logger]);
+
+  /* As web's initPaymentMethodSession: once per session, or the parameter it lacks. */
+  const initiatedRef = useRef<{ logger: Logger; key: string } | null>(null);
+  useEffect(() => {
+    if (!logger || !resolvedOptions) return;
+    const key =
+      sdkAuthorization || (providedVaultDetails ? 'vaultDetails' : '');
+    const last = initiatedRef.current;
+    if (last && last.logger === logger && last.key === key) return;
+    initiatedRef.current = { logger, key };
+    logSessionStart(logger, 'HyperPaymentMethodSession', key !== '');
+  }, [logger, resolvedOptions, sdkAuthorization, providedVaultDetails]);
+
   useEffect(() => {
     if (providedVaultDetails || !sdkAuthorization) {
       setFetchedVaultDetails(null);
@@ -141,6 +180,7 @@ export function HyperPaymentMethodSession({
       environment: resolvedHyper.environment,
       customEndpoints: resolvedHyper.customEndpoints,
       signal: controller.signal,
+      log: logger ?? undefined,
     }).then((result) => {
       if (cancelled) return;
       if (result.ok) {
@@ -161,7 +201,7 @@ export function HyperPaymentMethodSession({
       cancelled = true;
       controller.abort();
     };
-  }, [providedVaultDetails, sdkAuthorization, resolvedHyper]);
+  }, [providedVaultDetails, sdkAuthorization, resolvedHyper, logger]);
 
   const optionsPending = resolvedOptions === null && optionsError === null;
 
@@ -193,6 +233,8 @@ export function HyperPaymentMethodSession({
   );
 
   return (
-    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+    <SessionContext.Provider value={value}>
+      <LoggerContext.Provider value={logger}>{children}</LoggerContext.Provider>
+    </SessionContext.Provider>
   );
 }
