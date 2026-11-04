@@ -37,7 +37,7 @@ let useHost = (
   ~enabledCardSchemes: array<string>,
   ~eligibility: option<VaultFormOptions.eligibilityConfig>,
 
-  ~vaultEndpoint: option<VaultEndpoint.vaultEndpointConfig>,
+  ~customEndpoints: option<VaultEndpoint.customEndpoints>,
 
   ~cardholderNameMode: CardFieldOptions.cardholderNameMode,
 
@@ -49,6 +49,8 @@ let useHost = (
   ~defaultErrorDisplay: CardFieldOptions.errorDisplay,
 ): host => {
   let environment = environment->VaultConfirm.normalizeEnvironment
+  let vaultEndpoint = VaultEndpoint.configOf(customEndpoints)
+  let loggingUrl = customEndpoints->VaultEndpoint.loggingUrl(~environment)
 
   let sessionState = React.useMemo3(
     () =>
@@ -62,6 +64,52 @@ let useHost = (
       },
     (session, vaultDetails, sdkAuthorization),
   )
+  let authorization = switch sessionState {
+  | Ready({authorization}) => authorization
+  | Unusable(_) => ""
+  }
+  let logger = React.useMemo1(
+    () => VaultLogger.make(~url=loggingUrl, ~platform=(ReactNative.Platform.os :> string)),
+    [loggingUrl],
+  )
+  // A session that replaces another starts the logger afresh, as web loads its frames afresh for
+  // each. The first session to arrive does not: what the customer did before it keeps its session_id.
+  let loggedAuthorizationRef = React.useRef("")
+  React.useEffect2(() => {
+    if authorization !== "" {
+      let previous = loggedAuthorizationRef.current
+      if previous !== "" && previous !== authorization {
+        logger->VaultLogger.startNewSession
+      }
+      loggedAuthorizationRef.current = authorization
+    }
+    None
+  }, (logger, authorization))
+  let (merchantId, paymentId) = React.useMemo1(
+    () => (
+      authorization->VaultConfirm.publishableKeyOf,
+      authorization->VaultConfirm.resolveSessionId->Result.getOr(""),
+    ),
+    [authorization],
+  )
+  // Queued logs go out when the form closes or the app leaves the foreground, as web sends them when
+  // the page unloads.
+  React.useEffect1(() => {
+    let subscription = ReactNative.AppState.addEventListener(
+      #change(
+        state =>
+          if state !== #active {
+            logger->VaultLogger.sendLogs
+          },
+      ),
+    )
+    Some(
+      () => {
+        subscription->ReactNative.EventSubscription.remove
+        logger->VaultLogger.sendLogs
+      },
+    )
+  }, [logger])
   let theme = React.useMemo1(() => appearance->VaultFormOptions.buildTheme, [appearance])
   let bundle = React.useMemo1(() => LocaleBundles.resolve(locale), [locale])
   let labels = React.useMemo2(
@@ -200,6 +248,7 @@ let useHost = (
     ~presenceGate,
     ~clearLocal=controller.reset,
     ~savedCardKey=controller.values.savedCard->Option.mapOr("", saved => saved.token),
+    ~logger,
   )
 
   let sessionStatus: VaultPublicState.vaultSessionStatus = switch sessionState {
@@ -218,6 +267,39 @@ let useHost = (
   }
 
   let isSubmitting = machinery.isSubmitting
+
+  // The card fields' user events. The co-badged network picker is logged as web's CardSchemeComponent
+  // logs it. FOCUS and BLUR record the customer moving between fields, by field name only; web
+  // logs those two names only when the merchant calls focus() or blur().
+  let logUserEvent = (~eventName, ~value) =>
+    logger->VaultLogger.setLogInfo(~eventName, ~value, ~merchantId, ~paymentId)
+  // The field's public name: VaultPublicState's elementType, as in focus() and state.field.
+  let fieldName = (field: CardFormTypes.cardFieldId) =>
+    switch field {
+    | CardNumberField => (#cardNumber: VaultPublicState.elementType :> string)
+    | ExpiryField => (#cardExpiry: VaultPublicState.elementType :> string)
+    | CvcField => (#cardCvc: VaultPublicState.elementType :> string)
+    | CardholderNameField => (#cardholderName: VaultPublicState.elementType :> string)
+    }
+  let onAnalytics = (event: CardFormTypes.analyticsEvent) =>
+    switch event {
+    | FieldFocused(field) => logUserEvent(~eventName=FOCUS, ~value=field->fieldName)
+    | FieldBlurred(field) => logUserEvent(~eventName=BLUR, ~value=field->fieldName)
+    | CardNetworkMenu(Opened) =>
+      logUserEvent(~eventName=CARD_SCHEME_SELECTION, ~value="CardSchemeMenu expanded")
+    | CardNetworkMenu(Closed) =>
+      logUserEvent(~eventName=CARD_SCHEME_SELECTION, ~value="CardSchemeMenu closed")
+    }
+
+  // Once per logger session, as web logs it once per frame.
+  let coBadgedLoggedInRef = React.useRef("")
+  React.useEffect3(() => {
+    if controller.values.isCoBadged && coBadgedLoggedInRef.current !== logger.sessionId {
+      coBadgedLoggedInRef.current = logger.sessionId
+      logUserEvent(~eventName=CARD_SCHEME_SELECTION, ~value="Card detected as co-badged")
+    }
+    None
+  }, (controller.values.isCoBadged, authorization, logger))
 
   let buildFormChange = () => {
     let snapshot = controller.publicSnapshot()
@@ -274,7 +356,7 @@ let useHost = (
       accessible,
       editable: !machinery.isSubmitting && !disabled,
       isProcessing: machinery.isSubmitting || disabled,
-      onAnalytics: _ => (),
+      onAnalytics,
       unstyled,
       defaultErrorDisplay,
       defaultLabelBehavior,

@@ -16,6 +16,16 @@ export const secretKey =
   process.env.HYPERSWITCH_SECRET_KEY ?? "";
 
 export const serverURL = process.env.SERVER_URL ?? "";
+export const customerId = process.env.CUSTOMER_ID ?? "demo_customer_id";
+export const sdkLogging = process.env.HYPERSWITCH_LOGGING_ENDPOINT
+  ? {
+      customEndpoints: {
+        overrideEndpoints: {
+          customLoggingEndpoint: process.env.HYPERSWITCH_LOGGING_ENDPOINT,
+        },
+      },
+    }
+  : {};
 export const getCustomisationOptions = (layout: LayoutType = "tabs") : PaymentSheetConfiguration => ({
   subscribedEvents: [
     "PAYMENT_METHOD_INFO_CARD",

@@ -114,3 +114,24 @@ let resolveBaseUrl = (endpoint, ~environment: VaultConfirm.vaultEnvironment): re
   | Ok(None) => Ok(environment->VaultConfirm.vaultBaseUrl)
   | Ok(Some(base)) => Ok(base)
   }
+
+let logsPath = "/logs/sdk"
+
+// Where the logs go, as hyperswitch-client-core's GlobalHooks.getUrl(~urlType=#logs): with
+// overrideEndpoints, its customLoggingEndpoint; without, commonEndpoint's logs path; else the
+// environment's. commonEndpoint is the vault's API base (as in configOf), which already holds
+// client-core's /api. A blank logging endpoint sends no logs.
+let loggingUrl = (custom: option<customEndpoints>, ~environment: VaultConfirm.vaultEnvironment) => {
+  let entry = custom->normalize
+  let custom = switch entry->Option.flatMap(entry => entry.overrideEndpoints) {
+  | Some(over) => over.customLoggingEndpoint
+  | None =>
+    entry
+    ->Option.flatMap(entry => entry.commonEndpoint)
+    ->Option.map(common => common->String.trim->trimTrailingSlashes ++ logsPath)
+  }
+  switch custom {
+  | Some(url) => url->String.trim === "" ? None : Some(url->String.trim)
+  | None => Some(environment->VaultConfirm.vaultBaseUrl ++ logsPath)
+  }
+}
