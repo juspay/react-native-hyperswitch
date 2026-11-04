@@ -60,10 +60,15 @@ function styleToWire(style: MessageElementStyle | undefined) {
   return entries.length ? Object.fromEntries(entries) : undefined;
 }
 
+/* A random suffix keeps keys unguessable, as native's UUID keys are, so interpolated
+   text cannot reference an action. */
+export const randomKeySuffix = () => Math.random().toString(36).slice(2, 10);
+
 /* Converts rich messages to the bridge JSON. Keys only need to be unique within one
    surface: native routes each event to its own widget or sheet. */
 export function preparePaymentMessages(
-  configuration?: PaymentSheetConfiguration
+  configuration?: PaymentSheetConfiguration,
+  keySuffix: string = randomKeySuffix()
 ): {
   configuration: Record<string, unknown> | undefined;
   callbacks: MessageCallback[];
@@ -105,7 +110,7 @@ export function preparePaymentMessages(
       const existing = elements.indexOf(part);
       const key = `m${messageIndex}_a${
         existing === -1 ? elements.length : existing
-      }`;
+      }_${keySuffix}`;
       value += `{{${key}}}`;
       if (existing !== -1) return;
       elements.push(part);

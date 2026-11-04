@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfiguration';
 import {
   dispatchMessageAction,
+  randomKeySuffix,
   preparePaymentMessages,
 } from '../utils/PaymentMessages';
 
@@ -10,7 +11,12 @@ import {
 export function usePaymentMessages(
   options: PaymentSheetConfiguration | undefined
 ) {
-  const prepared = useMemo(() => preparePaymentMessages(options), [options]);
+  /* Stable per view: native keeps the keys it mounted with. */
+  const [keySuffix] = useState(randomKeySuffix);
+  const prepared = useMemo(
+    () => preparePaymentMessages(options, keySuffix),
+    [options, keySuffix]
+  );
   const callbacksRef = useRef(prepared.callbacks);
   callbacksRef.current = prepared.callbacks;
   const dispatch = useCallback(
