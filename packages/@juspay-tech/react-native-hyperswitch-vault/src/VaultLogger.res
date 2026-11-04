@@ -133,7 +133,7 @@ type requestOptions = {
 }
 @val external fetch: (string, requestOptions) => promise<response> = "fetch"
 
-// web's beaconApiCall, over fetch: the batch as one JSON array, sent as text with no credentials. A
+// web's beaconApiCall, over fetch: the batch as one JSON array, sent as text with no auth header. A
 // batch that cannot be sent is dropped: logging never changes what the card form does.
 let beaconApiCall = (url, logs: array<logFile>) =>
   try {
@@ -187,8 +187,8 @@ let startNewSession = (logger: t) => {
 }
 
 // As web's checkForPriorityEvents: an error goes out at once, and so does a queue of more than 8.
-// None of the vault's events is on web's priority list. Unlike web, a DEBUG log waits for the batch:
-// web's are failures, while the vault's are sent each time a form mounts.
+// Unlike web, a DEBUG log, and the first APP_RENDERED (on web's priority list), wait for the batch:
+// web's DEBUG logs are failures, while the vault's are sent each time a form mounts.
 let checkForPriorityEvents = (logs: array<logFile>) =>
   logs->Array.some(log => log.logType === ERROR) || logs->Array.length > 8
 
