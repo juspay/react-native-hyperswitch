@@ -34,8 +34,11 @@ let normalise = (name: string): option<string> =>
 
 let isDev: bool = %raw(`typeof __DEV__ !== "undefined" && __DEV__ === true`)
 
+// The enabledCardSchemes entries the form does not recognise, and so ignores.
+let unknownOf = (names: array<string>) => names->Array.filter(name => name->normalise->Option.isNone)
+
 let normaliseList = (names: array<string>): array<string> => {
-  let unknown = names->Array.filter(name => name->normalise->Option.isNone)
+  let unknown = names->unknownOf
   if isDev && unknown->Array.length > 0 {
     Console.warn(
       `[react-native-hyperswitch-vault] enabledCardSchemes: unknown value(s) ${unknown->Array.join(

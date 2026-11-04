@@ -45,11 +45,13 @@ let make = React.forwardRef((
     unstyled: ?props["unstyled"],
   }
 
-  <BoundCardFields.Expiry
-    ctx
-    styles=?{props["styles"]->Option.map(CardFieldStyles.widenExpiry)}
-    options
-    onFocus=?{props["onFocus"]}
-    onBlur=?{props["onBlur"]}
-  />
+  <VaultWidgetContext.Guarded ctx componentName="cardExpiry">
+    <BoundCardFields.Expiry
+      ctx
+      styles=?{props["styles"]->Option.map(CardFieldStyles.widenExpiry)}
+      options
+      onFocus=?{props["onFocus"]}
+      onBlur=?{props["onBlur"]}
+    />
+  </VaultWidgetContext.Guarded>
 })
