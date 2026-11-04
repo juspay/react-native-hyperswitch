@@ -49,20 +49,22 @@ let make = React.forwardRef((
     cardBrandIcon: ?props["cardBrandIcon"],
   }
 
-  <BoundCardFields.Number
-    ctx
-    styles=?{props["styles"]}
-    options
-    onFocus=?{props["onFocus"]}
-    onBlur=?{props["onBlur"]}
+  <VaultWidgetContext.Guarded ctx componentName="cardNumber">
+    <BoundCardFields.Number
+      ctx
+      styles=?{props["styles"]}
+      options
+      onFocus=?{props["onFocus"]}
+      onBlur=?{props["onBlur"]}
 
-    iconRight={CardNumberAccessory.iconFor(
-      ~ctx,
-      ~brandIconMode=CardFieldOptions.resolveBrandIconMode(
-        Some(options),
-        ~formWide=ctx.brandIconMode,
-        ~unstyled=CardFieldOptions.unstyledFor(props["unstyled"], ~formWide=ctx.unstyled),
-      ),
-    )}
-  />
+      iconRight={CardNumberAccessory.iconFor(
+        ~ctx,
+        ~brandIconMode=CardFieldOptions.resolveBrandIconMode(
+          Some(options),
+          ~formWide=ctx.brandIconMode,
+          ~unstyled=CardFieldOptions.unstyledFor(props["unstyled"], ~formWide=ctx.unstyled),
+        ),
+      )}
+    />
+  </VaultWidgetContext.Guarded>
 })

@@ -48,12 +48,14 @@ let make = React.forwardRef((
     cvcIcon: ?props["cvcIcon"]->Option.orElse(provided.cvcIcon),
   }
 
-  <BoundCardFields.Cvc
-    ctx
-    styles=?{props["styles"]}
-    options
-    savedCard=?{provided.savedCard}
-    onFocus=?{props["onFocus"]}
-    onBlur=?{props["onBlur"]}
-  />
+  <VaultWidgetContext.Guarded ctx componentName="cardCvc">
+    <BoundCardFields.Cvc
+      ctx
+      styles=?{props["styles"]}
+      options
+      savedCard=?{provided.savedCard}
+      onFocus=?{props["onFocus"]}
+      onBlur=?{props["onBlur"]}
+    />
+  </VaultWidgetContext.Guarded>
 })

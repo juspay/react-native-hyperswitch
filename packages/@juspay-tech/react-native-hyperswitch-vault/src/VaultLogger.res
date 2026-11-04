@@ -1,11 +1,12 @@
 // The vault's logs, in hyperswitch-web's structure (HyperLoggerTypes, HyperLogger,
-// LoggerUtils.logApi, Utils.fetchApiWithLogging): the same record, event names and API values, queued
-// and sent as one batch. It logs the vault's own API calls and the card fields' user events: never a
-// request body, never a card value.
+// LoggerUtils.logApi, Utils.fetchApiWithLogging): the same record, event names and API values,
+// queued and sent as one batch. It logs the vault's own API calls, the card fields' user events,
+// how the form was set up and rendered, and crashes inside it: never a request body, never a card
+// value.
 
 type logType = INFO | ERROR
 
-type logCategory = API | USER_EVENT
+type logCategory = API | USER_EVENT | USER_ERROR
 
 type apiLogType = Request | Response | NoResponse | Err
 
@@ -18,6 +19,9 @@ type eventName =
   | FOCUS
   | BLUR
   | CARD_SCHEME_SELECTION
+  | APP_RENDERED
+  | PAYMENT_ELEMENT_OPTIONS
+  | SDK_CRASH
 
 // As LoggerUtils.apiEventInitMapper.
 let apiEventInitMapper = (eventName: eventName): option<eventName> =>
@@ -60,6 +64,7 @@ let logFileToObj = (logFile: logFile) =>
       switch logFile.category {
       | API => "API"
       | USER_EVENT => "USER_EVENT"
+      | USER_ERROR => "USER_ERROR"
       }->JSON.Encode.string,
     ),
     ("source", "HYPERSWITCH_VAULT"->JSON.Encode.string),
@@ -213,6 +218,27 @@ let calculateLatencyHook = (logger: t, ~eventName: eventName) => {
   latency > 0. ? latency->Float.toString : ""
 }
 
+// What the vault sends from an error: the backend's error body, or what was thrown. The vault never
+// puts a field's value into either, and as a backstop any run of twelve or more digits, the shape
+// of a card number, is blanked out of every text in it, however the digits are spaced. Shorter
+// numbers, such as a stack's line and column, are kept.
+let redactDigits = (text: string) =>
+  text->String.replaceRegExp(%re("/\d(?:[\s./-]{0,2}\d){11,}/g"), "[redacted]")
+
+let rec redactCardNumbers = (value: JSON.t): JSON.t =>
+  switch value {
+  | String(text) => text->redactDigits->JSON.Encode.string
+  | Number(number) if Math.abs(number) >= 1e11 => "[redacted]"->JSON.Encode.string
+  | Array(items) => items->Array.map(redactCardNumbers)->JSON.Encode.array
+  | Object(fields) =>
+    fields
+    ->Dict.toArray
+    ->Array.map(((key, field)) => (key, field->redactCardNumbers))
+    ->Dict.fromArray
+    ->JSON.Encode.object
+  | other => other
+  }
+
 let pushLog = (
   logger: t,
   ~value,
@@ -272,9 +298,26 @@ let setLogApi = (
     ~session?,
   )
 
-// As web's setLogInfo: a user event, recorded by name only, e.g. which card field gained focus.
-let setLogInfo = (logger: t, ~value, ~eventName, ~merchantId, ~paymentId) =>
-  logger->pushLog(~value, ~eventName, ~logType=INFO, ~category=USER_EVENT, ~merchantId, ~paymentId)
+// As web's setLogInfo: a user event, recorded by name only, e.g. which card field gained focus. As
+// on web, a latency given here replaces the one measured from an _INIT.
+let setLogInfo = (
+  logger: t,
+  ~value,
+  ~eventName,
+  ~merchantId,
+  ~paymentId,
+  ~latency=?,
+  ~logType=INFO,
+) =>
+  logger->pushLog(
+    ~value,
+    ~eventName,
+    ~logType,
+    ~category=USER_EVENT,
+    ~merchantId,
+    ~paymentId,
+    ~latency?,
+  )
 
 // The identity every log of one API call carries. A call keeps the log session it started in and
 // its own start time, so an answer that arrives after the form's session changed is still filed
@@ -292,11 +335,12 @@ type apiCall = {
 // As LoggerUtils.logApi: what each kind of API log records.
 let logApi = (call: apiCall, ~eventName, ~apiLogType, ~statusCode=0, ~data=JSON.Encode.null) => {
   let url = ("url", call.url->JSON.Encode.string)
+  let response = ("response", data->redactCardNumbers)
   let (value, logType) = switch apiLogType {
   | Request => ([url], INFO)
   | Response => ([url, ("statusCode", statusCode->JSON.Encode.int)], INFO)
-  | NoResponse => ([url, ("statusCode", 504->JSON.Encode.int), ("response", data)], ERROR)
-  | Err => ([url, ("statusCode", statusCode->JSON.Encode.int), ("response", data)], ERROR)
+  | NoResponse => ([url, ("statusCode", 504->JSON.Encode.int), response], ERROR)
+  | Err => ([url, ("statusCode", statusCode->JSON.Encode.int), response], ERROR)
   }
   // As web's calculateLatencyHook, an answer carries the time since its _INIT.
   let latency = switch (apiLogType, call.startedAt) {
@@ -340,10 +384,10 @@ let callAnswered = (call: option<apiCall>, ~status: int, ~response: JSON.t) =>
     }
   )
 
-// The exception as web's Utils.formatException records it, or the value itself when what was thrown
-// is not an Error. Never throws: a value that cannot be written as JSON is recorded as null.
-let formatException = (error: exn) =>
-  switch error->Exn.asJsExn->Option.flatMap(jsExn => jsExn->Nullable.make->Nullable.toOption) {
+// What was thrown, as web's Utils.formatException records an Error, or the value itself when it is
+// not one. Never throws: a value that cannot be written as JSON is recorded as null.
+let formatThrown = (thrown: Exn.t) =>
+  switch thrown->Nullable.make->Nullable.toOption {
   | Some(jsExn) =>
     let fields = [
       ("message", jsExn->Exn.message, "Unknown Error"),
@@ -366,6 +410,9 @@ let formatException = (error: exn) =>
   | None => JSON.Encode.null
   }
 
+let formatException = (error: exn) =>
+  error->Exn.asJsExn->Option.mapOr(JSON.Encode.null, formatThrown)
+
 let callUnanswered = (call: option<apiCall>, ~error: exn) =>
   call->Option.forEach(call =>
     call->logApi(~eventName=call.eventName, ~apiLogType=NoResponse, ~data=error->formatException)
@@ -382,3 +429,33 @@ let callUnreadable = (call: option<apiCall>, ~status: int, ~error: exn) =>
       ~data=error->formatException,
     )
   )
+
+// What tells one crash from another: its type and message. Not its stack, which differs when React
+// renders the failing component again before the error leaves the form.
+let crashSignature = (thrown: Exn.t) =>
+  switch thrown->formatThrown {
+  | Object(fields) =>
+    [fields->Dict.get("type"), fields->Dict.get("message")]
+    ->Array.map(field => field->Option.getOr(JSON.Encode.null))
+    ->JSON.Encode.array
+    ->JSON.stringify
+  | other => other->JSON.stringify
+  }
+
+// As web's ErrorBoundary logs SDK_CRASH: an error in category USER_ERROR, so it goes out at once,
+// with the component that crashed. The exception is recorded as formatThrown records it.
+let logCrash = (logger: t, ~thrown: Exn.t, ~componentName, ~merchantId, ~paymentId) => {
+  let value = switch thrown->formatThrown->redactCardNumbers {
+  | Object(fields) => fields
+  | other => Dict.fromArray([("thrown", other)])
+  }
+  value->Dict.set("componentName", componentName->JSON.Encode.string)
+  logger->pushLog(
+    ~value=value->JSON.Encode.object->JSON.stringify,
+    ~eventName=SDK_CRASH,
+    ~logType=ERROR,
+    ~category=USER_ERROR,
+    ~merchantId,
+    ~paymentId,
+  )
+}
