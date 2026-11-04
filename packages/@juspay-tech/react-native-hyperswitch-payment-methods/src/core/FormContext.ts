@@ -1,5 +1,6 @@
 import { createContext } from 'react';
 import type { ProviderAdapter } from './ProviderAdapter';
+import type { FormLog } from '../logging/formLog';
 import type { MountedField } from './savedCard';
 import type {
   Appearance,
@@ -26,6 +27,9 @@ export interface FormContextValue {
   registerField: (elementType: ElementType, options?: FieldOptions) => void;
 
   forgetField: (elementType: ElementType) => void;
+
+  /* The form's logs; absent outside a session. */
+  log?: FormLog;
 }
 
 export type { MountedField };

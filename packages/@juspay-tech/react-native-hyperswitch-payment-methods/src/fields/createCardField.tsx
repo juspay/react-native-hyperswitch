@@ -24,6 +24,7 @@ import type {
 } from '../core/types';
 import { Placeholder } from './Placeholder';
 import type { FieldProps } from './types';
+import { CrashBoundary } from '../logging/CrashBoundary';
 
 type AliasProps = FieldProps & { cvcIcon?: CvcIconDisplay };
 
@@ -50,6 +51,9 @@ export function createCardField<P extends FieldProps = FieldProps>(
       ...rest
     } = props as AliasProps;
     const ctx = useFormBinding(form);
+    const log = ctx?.log;
+    const logRef = useRef(log);
+    logRef.current = log;
 
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
@@ -61,7 +65,10 @@ export function createCardField<P extends FieldProps = FieldProps>(
       () => ({
         focus: () => fieldRef.current?.focus(),
         blur: () => fieldRef.current?.blur(),
-        clear: () => fieldRef.current?.clear(),
+        clear: () => {
+          logRef.current?.cleared(elementType);
+          fieldRef.current?.clear();
+        },
       }),
       []
     );
@@ -70,6 +77,7 @@ export function createCardField<P extends FieldProps = FieldProps>(
     const handleChange = useCallback(
       (change: FieldChange) => {
         reportChange?.(change);
+        logRef.current?.fieldChanged(change);
         onChangeRef.current?.(change);
       },
       [reportChange]
@@ -133,10 +141,28 @@ export function createCardField<P extends FieldProps = FieldProps>(
       [ctx?.appearances, ownStyles]
     );
 
+    /* When the field mounted, for FIELD_RENDERED's latency even if the logger arrives later. */
+    const mountedAtRef = useRef(0);
+    useEffect(() => {
+      if (mountedAtRef.current === 0) mountedAtRef.current = Date.now();
+      if (!log) return;
+      log.fieldMounted(elementType, mountedAtRef.current);
+      return () => log.fieldUnmounted(elementType);
+    }, [log]);
+
     const mounted = ctx !== null && ctx.collector !== undefined;
     useEffect(() => {
       if (mounted) onReadyRef.current?.({ elementType });
     }, [mounted]);
+
+    useEffect(() => {
+      if (mounted) log?.fieldRendered(elementType);
+    }, [mounted, log]);
+
+    const onCrash = useCallback(
+      (thrown: unknown) => logRef.current?.crashed(elementType, thrown),
+      []
+    );
 
     if (!ctx) {
       throw new Error(
@@ -150,24 +176,26 @@ export function createCardField<P extends FieldProps = FieldProps>(
 
     const Field = ctx.adapter.Field;
     return (
-      <Field
-        {...rest}
-        elementType={elementType}
-        collector={ctx.collector}
-        fieldRef={fieldRef}
-        styles={styles}
-        placeholder={placeholder}
-        label={label}
-        labelBehavior={labelBehavior}
-        errorDisplay={errorDisplay}
-        unstyled={unstyled}
-        cvcIcon={cvcIcon}
-        cardBrandIcon={cardBrandIcon}
-        savedCard={savedCard}
-        onChange={handleChange}
-        onFocus={onFocus}
-        onBlur={onBlur}
-      />
+      <CrashBoundary onCrash={onCrash}>
+        <Field
+          {...rest}
+          elementType={elementType}
+          collector={ctx.collector}
+          fieldRef={fieldRef}
+          styles={styles}
+          placeholder={placeholder}
+          label={label}
+          labelBehavior={labelBehavior}
+          errorDisplay={errorDisplay}
+          unstyled={unstyled}
+          cvcIcon={cvcIcon}
+          cardBrandIcon={cardBrandIcon}
+          savedCard={savedCard}
+          onChange={handleChange}
+          onFocus={onFocus}
+          onBlur={onBlur}
+        />
+      </CrashBoundary>
     );
   });
 

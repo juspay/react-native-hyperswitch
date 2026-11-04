@@ -5,6 +5,7 @@ import type { MountedFields } from './savedCard';
 import { checkConfiguration } from './savedCard';
 import { tokenizedCardOf } from './results';
 import type { ProviderAdapter } from './ProviderAdapter';
+import type { FormLog } from '../logging/formLog';
 import type {
   Appearance,
   CardDetails,
@@ -27,6 +28,8 @@ export interface FormCore {
   readonly fields: Partial<Record<ElementType, FieldChange>>;
   readonly mounted: MountedFields;
   details: Partial<CardDetails>;
+  /* The form's logs; absent outside a session. */
+  readonly log?: FormLog;
   subscribe(listener: () => void): () => void;
   notify(): void;
   registerField(elementType: ElementType, options?: FieldOptions): void;
@@ -38,7 +41,8 @@ export interface FormCore {
 export function createFormCore(
   adapter: ProviderAdapter,
   appearances: readonly Appearance[],
-  readyTimeoutMs?: number
+  readyTimeoutMs?: number,
+  log?: FormLog
 ): FormCore {
   const listeners = new Set<() => void>();
   const session = createFormSession(
@@ -56,6 +60,7 @@ export function createFormCore(
     fields: {},
     mounted: {},
     details: {},
+    ...(log ? { log } : {}),
 
     subscribe(listener) {
       listeners.add(listener);
@@ -76,19 +81,22 @@ export function createFormCore(
     },
 
     async tokenize(providerData?: unknown) {
-      const problem = checkConfiguration(core.vaultType, core.mounted);
-      if (problem) return problem;
+      const run = async (): Promise<TokenizeResult> => {
+        const problem = checkConfiguration(core.vaultType, core.mounted);
+        if (problem) return problem;
 
-      const result = await session.tokenize(providerData);
-      core.status = session.status;
-      core.notify();
-      if (result.status !== 'success') return result;
+        const result = await session.tokenize(providerData);
+        core.status = session.status;
+        core.notify();
+        if (result.status !== 'success') return result;
 
-      const card = tokenizedCardOf(core.details);
-      return withSavedCard(
-        card ? { ...result, card } : result,
-        savedCardOf(core.mounted)
-      );
+        const card = tokenizedCardOf(core.details);
+        return withSavedCard(
+          card ? { ...result, card } : result,
+          savedCardOf(core.mounted)
+        );
+      };
+      return log ? log.tokenize(core.vaultType, adapter, run) : run();
     },
   };
 
