@@ -30,7 +30,9 @@ export function dispatchMessageAction(
   if (event.eventName !== MESSAGE_EVENT) return false;
   const data = parsePayload(event.payload);
   if (data && typeof data.key === 'string' && data.type === 'action') {
-    callbacks.find(({ key }) => key === data.key)?.onClick();
+    /* The key is `suffix_index`; the full key must match, so a guessed index does nothing. */
+    const callback = callbacks[Number(data.key.split('_')[1])];
+    if (callback?.key === data.key) callback.onClick();
   }
   return true;
 }
@@ -42,11 +44,6 @@ function styleToWire(style: MessageElementStyle | undefined) {
   const { color, fontSize, fontWeight, fontStyle, textDecoration } = style;
   const validFontSize =
     typeof fontSize === 'number' && Number.isFinite(fontSize) && fontSize >= 0;
-  if (fontSize !== undefined && !validFontSize) {
-    console.warn(
-      '[Hyperswitch] Message fontSize must be finite and nonnegative; ignoring it.'
-    );
-  }
   const wire = {
     color,
     fontSize: validFontSize ? fontSize : undefined,
@@ -60,15 +57,15 @@ function styleToWire(style: MessageElementStyle | undefined) {
   return entries.length ? Object.fromEntries(entries) : undefined;
 }
 
-/* A random suffix keeps keys unguessable, as native's UUID keys are, so interpolated
+/* A random prefix keeps keys unguessable, as native's random message ids do, so interpolated
    text cannot reference an action. */
-export const randomKeySuffix = () => Math.random().toString(36).slice(2, 10);
+export const randomKeyPrefix = () => Math.random().toString(36).slice(2, 10);
 
 /* Converts rich messages to the bridge JSON. Keys only need to be unique within one
    surface: native routes each event to its own widget or sheet. */
 export function preparePaymentMessages(
   configuration?: PaymentSheetConfiguration,
-  keySuffix: string = randomKeySuffix()
+  keyPrefix: string = randomKeyPrefix()
 ): {
   configuration: Record<string, unknown> | undefined;
   callbacks: MessageCallback[];
@@ -81,7 +78,7 @@ export function preparePaymentMessages(
     };
   }
 
-  function convert(message: PaymentMethodMessage, messageIndex: number) {
+  function convert(message: PaymentMethodMessage) {
     const actionDefaults = styleToWire(message.elementStyles?.action);
     const base = {
       ...(message.displayMode !== undefined
@@ -100,6 +97,7 @@ export function preparePaymentMessages(
         : { ...base, value: message.value };
     }
     const elements: MessageElement[] = [];
+    const keys: string[] = [];
     const actions: Record<string, unknown>[] = [];
     let value = '';
     message.value.parts.forEach((part) => {
@@ -108,12 +106,11 @@ export function preparePaymentMessages(
         return;
       }
       const existing = elements.indexOf(part);
-      const key = `m${messageIndex}_a${
-        existing === -1 ? elements.length : existing
-      }_${keySuffix}`;
+      const key = keys[existing] ?? `${keyPrefix}_${callbacks.length}`;
       value += `{{${key}}}`;
       if (existing !== -1) return;
       elements.push(part);
+      keys.push(key);
       const { label, style, onClick } = part.options;
       const wireStyle = styleToWire(style);
       actions.push({ key, label, ...(wireStyle ? { style: wireStyle } : {}) });
@@ -126,16 +123,9 @@ export function preparePaymentMessages(
     };
   }
 
-  let messageIndex = 0;
   function withWireMessage<T extends { message?: unknown } | null>(entry: T) {
     return entry?.message != null && typeof entry.message === 'object'
-      ? {
-          ...entry,
-          message: convert(
-            entry.message as PaymentMethodMessage,
-            messageIndex++
-          ),
-        }
+      ? { ...entry, message: convert(entry.message as PaymentMethodMessage) }
       : entry;
   }
 

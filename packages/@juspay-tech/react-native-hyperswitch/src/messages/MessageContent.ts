@@ -1,7 +1,16 @@
 export interface MessageElementStyle {
   readonly color?: string;
   readonly fontSize?: number;
-  readonly fontWeight?: '400' | '500' | '600' | '700';
+  readonly fontWeight?:
+    | '100'
+    | '200'
+    | '300'
+    | '400'
+    | '500'
+    | '600'
+    | '700'
+    | '800'
+    | '900';
   readonly fontStyle?: 'normal' | 'italic';
   readonly textDecoration?: 'none' | 'underline';
 }
