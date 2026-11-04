@@ -455,15 +455,17 @@ test('BLUR names what the customer left in the field, in the public field error 
   );
 });
 
-test('APP_RENDERED is a USER_EVENT carrying the field name and the time it took to show', () => {
+test('APP_RENDERED is a DEBUG USER_EVENT carrying the field name and the time it took to show', () => {
   const logger = VaultLogger.make(LOG_URL, 'android');
-  VaultLogger.setLogInfo(logger, 'cardNumber', 'APP_RENDERED', PUBLISHABLE_KEY, SESSION_ID, 42);
+  VaultLogger.setLogInfo(logger, 'cardNumber', 'APP_RENDERED', PUBLISHABLE_KEY, SESSION_ID, 42, 'DEBUG');
+  // A DEBUG log waits for the batch.
+  assert.equal(batches.length, 0);
   VaultLogger.sendLogs(logger);
   const [rendered] = logs();
   assert.equal(rendered.event_name, 'APP_RENDERED');
   assert.equal(rendered.value, 'cardNumber');
   assert.equal(rendered.latency, '42');
-  assert.equal(rendered.log_type, 'INFO');
+  assert.equal(rendered.log_type, 'DEBUG');
   assert.equal(rendered.category, 'USER_EVENT');
 });
 

@@ -323,7 +323,7 @@ let useHost = (
         logger->VaultLogger.setLogInfo(
           ~eventName=PAYMENT_ELEMENT_OPTIONS,
           ~value=settings,
-          ~logType=loggedSessionStatus->VaultLogValues.isUnusableSession ? ERROR : INFO,
+          ~logType=loggedSessionStatus->VaultLogValues.isUnusableSession ? ERROR : DEBUG,
           ~merchantId,
           ~paymentId,
         )
@@ -391,6 +391,7 @@ let useHost = (
         ~eventName=APP_RENDERED,
         ~value=field->fieldName,
         ~latency,
+        ~logType=DEBUG,
         ~merchantId,
         ~paymentId,
       )
