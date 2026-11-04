@@ -73,7 +73,7 @@ let updateSavedPaymentMethod = async (
         )
       let outcome =
         (
-          await VaultConfirm.sendWithLogging(
+          await VaultConfirm.sendVaultRequest(
             ~url,
             ~options,
             ~signal=request.signal,

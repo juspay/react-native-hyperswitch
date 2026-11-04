@@ -38,8 +38,6 @@ const appearance = {
   input: { color: "#111827", fontSize: 16 },
 };
 
-// A saved card of the session's customer, as the server lists it
-// (GET /v1/payment-method-sessions/{id}/list-payment-methods).
 interface SavedCard {
   token: string;
   network?: string;
@@ -79,7 +77,6 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
   const [canPay, setCanPay] = useState(false);
   const [busy, setBusy] = useState(false);
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
-  // The saved card to pay with; null pays with a new card.
   const [selectedCard, setSelectedCard] = useState<SavedCard | null>(null);
 
   const selectCard = (card: SavedCard | null) => {
@@ -135,7 +132,6 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
       const result = await vaultRef.current?.tokenize();
       if (result?.status === "success") {
         setStatus(`Tokenized: ${JSON.stringify(result.data?.tokens)}`);
-        // A payment-method session saves one card: drop it, so the next card starts a new one.
         setSdkAuthorization(null);
         setSavedCards([]);
         setSelectedCard(null);
@@ -189,7 +185,6 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
 
           {selectedCard ? (
             selectedCard.requiresCvv ? (
-              // A saved card needs only its CVC: the CVC field must be the form's only field.
               <CardForm
                 key={selectedCard.token}
                 ref={vaultRef}

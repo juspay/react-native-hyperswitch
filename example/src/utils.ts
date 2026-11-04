@@ -16,11 +16,7 @@ export const secretKey =
   process.env.HYPERSWITCH_SECRET_KEY ?? "";
 
 export const serverURL = process.env.SERVER_URL ?? "";
-// The customer whose payment-method sessions the Payment Method flow creates.
-export const customerId =
-  process.env.CUSTOMER_ID ?? "12345_cus_019d109101b07911be86fc8bab029d45";
-// Set HYPERSWITCH_LOGGING_ENDPOINT to send the SDKs' logs there instead, e.g. a local collector.
-// The vault SDK accepts https, or plain http to localhost outside PROD (adb reverse on Android).
+export const customerId = process.env.CUSTOMER_ID ?? "demo_customer_id";
 export const sdkLogging = process.env.HYPERSWITCH_LOGGING_ENDPOINT
   ? {
       customEndpoints: {

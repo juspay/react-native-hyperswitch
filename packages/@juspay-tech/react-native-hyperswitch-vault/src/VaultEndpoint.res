@@ -117,28 +117,21 @@ let resolveBaseUrl = (endpoint, ~environment: VaultConfirm.vaultEnvironment): re
 
 let logsPath = "/logs/sdk"
 
-let validUrl = (url: string, ~environment) =>
-  switch Some({baseUrl: url})->validateEndpoint(~environment) {
-  | Ok(Some(valid)) => Some(valid)
-  | Ok(None) | Error() => None
-  }
-
-// Where the logs go, after hyperswitch-client-core's GlobalHooks.getLoggingUrl but on the backend
-// the vault itself calls (configOf, so commonEndpoint wins over overrideEndpoints, unlike in
-// client-core): the merchant's logging endpoint; else their common endpoint's; else none when only
-// the backend is overridden, so a self-hosted backend's logs never reach Hyperswitch; else the
-// environment's. A logging endpoint that would not pass as a backend gets no logs either.
+// Where the logs go, as hyperswitch-client-core's GlobalHooks.getUrl(~urlType=#logs): with
+// overrideEndpoints, its customLoggingEndpoint; without, commonEndpoint's logs path; else the
+// environment's. commonEndpoint is the vault's API base (as in configOf), which already holds
+// client-core's /api. A blank logging endpoint sends no logs.
 let loggingUrl = (custom: option<customEndpoints>, ~environment: VaultConfirm.vaultEnvironment) => {
   let entry = custom->normalize
-  let overrides = entry->Option.flatMap(entry => entry.overrideEndpoints)
-  switch (
-    overrides->Option.flatMap(over => over.customLoggingEndpoint),
-    entry->Option.flatMap(entry => entry.commonEndpoint),
-    overrides->Option.flatMap(over => over.customBackendEndpoint),
-  ) {
-  | (Some(url), _, _) => url->validUrl(~environment)
-  | (None, Some(common), _) => common->validUrl(~environment)->Option.map(base => base ++ logsPath)
-  | (None, None, Some(_)) => None
-  | (None, None, None) => Some(environment->VaultConfirm.vaultBaseUrl ++ logsPath)
+  let custom = switch entry->Option.flatMap(entry => entry.overrideEndpoints) {
+  | Some(over) => over.customLoggingEndpoint
+  | None =>
+    entry
+    ->Option.flatMap(entry => entry.commonEndpoint)
+    ->Option.map(common => common->String.trim->trimTrailingSlashes ++ logsPath)
+  }
+  switch custom {
+  | Some(url) => url->String.trim === "" ? None : Some(url->String.trim)
+  | None => Some(environment->VaultConfirm.vaultBaseUrl ++ logsPath)
   }
 }
