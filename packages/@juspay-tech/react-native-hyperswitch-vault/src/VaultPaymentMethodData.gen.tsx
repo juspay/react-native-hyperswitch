@@ -24,3 +24,13 @@ export type hostBilling = {
 };
 
 export type hostPaymentMethodData = { readonly billing?: hostBilling; readonly nickName?: string };
+
+export type acceptanceType = "online" | "offline";
+
+export type hostOnlineAcceptance = { readonly userAgent?: string };
+
+export type hostCustomerAcceptance = {
+  readonly acceptanceType: acceptanceType; 
+  readonly acceptedAt: string; 
+  readonly online: hostOnlineAcceptance
+};

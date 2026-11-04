@@ -114,6 +114,9 @@ let make = React.forwardRef((
     ~onReady=props["onReady"],
     ~onChange=props["onChange"],
     ~unstyled=props["unstyled"]->Option.getOr(CardFieldOptions.defaultUnstyled),
+    // HyperswitchVaultForm is the hosted payment surface — PMM's
+    // always-send-acceptance belongs to the management flow only, so false here.
+    ~alwaysSendCustomerAcceptance=false,
 
     ~defaultErrorDisplay=CardFieldOptions.defaultErrorDisplayReadyMade,
   )

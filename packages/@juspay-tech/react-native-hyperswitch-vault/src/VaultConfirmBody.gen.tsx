@@ -3,11 +3,13 @@
 /* eslint-disable */
 /* tslint:disable */
 
+import type {hostCustomerAcceptance as VaultPaymentMethodData_hostCustomerAcceptance} from './VaultPaymentMethodData.gen';
+
+import type {hostOnlineAcceptance as VaultPaymentMethodData_hostOnlineAcceptance} from './VaultPaymentMethodData.gen';
+
 export type paymentMethodType = "credit" | "debit";
 
 export type paymentType = "new_mandate" | "setup_mandate";
-
-export type acceptanceType = "online" | "offline";
 
 export type confirmTokenMode = "payment_token" | "vault_card";
 
@@ -26,13 +28,9 @@ export type hostBrowserInfo = {
   readonly osVersion?: string
 };
 
-export type hostOnlineAcceptance = { readonly userAgent?: string };
+export type hostOnlineAcceptance = VaultPaymentMethodData_hostOnlineAcceptance;
 
-export type hostCustomerAcceptance = {
-  readonly acceptanceType: acceptanceType; 
-  readonly acceptedAt: string; 
-  readonly online: hostOnlineAcceptance
-};
+export type hostCustomerAcceptance = VaultPaymentMethodData_hostCustomerAcceptance;
 
 export type providerTokenizedCard = {
   readonly cardNumberAlias: string; 

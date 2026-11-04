@@ -5,9 +5,6 @@ type paymentMethodType = [#credit | #debit]
 type paymentType = [#new_mandate | #setup_mandate]
 
 @genType
-type acceptanceType = [#online | #offline]
-
-@genType
 type confirmTokenMode = [#payment_token | #vault_card]
 
 @genType
@@ -26,15 +23,16 @@ type hostBrowserInfo = {
   osVersion?: string,
 }
 
-@genType
-type hostOnlineAcceptance = {userAgent?: string}
+/* The acceptance types live in VaultPaymentMethodData: that module is a leaf
+   (no VaultConfirm dependency), so both VaultConfirmBody and VaultConfirm can
+   reference them without forming a module cycle. */
+type acceptanceType = VaultPaymentMethodData.acceptanceType
 
 @genType
-type hostCustomerAcceptance = {
-  acceptanceType: acceptanceType,
-  acceptedAt: string,
-  online: hostOnlineAcceptance,
-}
+type hostOnlineAcceptance = VaultPaymentMethodData.hostOnlineAcceptance
+
+@genType
+type hostCustomerAcceptance = VaultPaymentMethodData.hostCustomerAcceptance
 
 let paymentMethodTypeToWire = (value: paymentMethodType) =>
   switch value {
@@ -46,12 +44,6 @@ let paymentTypeToWire = (value: paymentType) =>
   switch value {
   | #new_mandate => "new_mandate"
   | #setup_mandate => "setup_mandate"
-  }
-
-let acceptanceTypeToWire = (value: acceptanceType) =>
-  switch value {
-  | #online => "online"
-  | #offline => "offline"
   }
 
 let backendCardNetworks = [
@@ -102,19 +94,7 @@ let encodeBrowserInfo = (info: hostBrowserInfo): option<JSON.t> =>
     stringEntry("os_version", info.osVersion),
   ])
 
-let encodeCustomerAcceptance = (acceptance: hostCustomerAcceptance): JSON.t => {
-  let online =
-    VaultPaymentMethodData.objectOf([stringEntry("user_agent", acceptance.online.userAgent)])
-    ->Option.getOr(Dict.make()->JSON.Encode.object)
-
-  [
-    ("acceptance_type", acceptance.acceptanceType->acceptanceTypeToWire->JSON.Encode.string),
-    ("accepted_at", acceptance.acceptedAt->JSON.Encode.string),
-    ("online", online),
-  ]
-  ->Dict.fromArray
-  ->JSON.Encode.object
-}
+let encodeCustomerAcceptance = VaultPaymentMethodData.encodeCustomerAcceptance
 
 let vaultCardSubtree = (~token: string, ~metadata: VaultConfirm.vaultCardMetadata): JSON.t =>
   [

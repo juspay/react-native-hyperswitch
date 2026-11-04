@@ -25,6 +25,8 @@ type confirmRequest = {
 
   nickName?: string,
 
+  customerAcceptance?: VaultPaymentMethodData.hostCustomerAcceptance,
+
   timeoutMs?: int,
 
   signal?: abortSignal,
@@ -249,6 +251,7 @@ let buildConfirmBody = (
   ~nickName: option<string>=?,
 
   ~cardNetwork: option<string>=?,
+  ~customerAcceptance: option<VaultPaymentMethodData.hostCustomerAcceptance>=?,
 ) => {
   let cardObject =
     [
@@ -263,10 +266,16 @@ let buildConfirmBody = (
     ->Dict.fromArray
     ->JSON.Encode.object
 
+  let acceptanceEntry =
+    customerAcceptance
+    ->Option.map(acceptance => [("customer_acceptance", VaultPaymentMethodData.encodeCustomerAcceptance(acceptance))])
+    ->Option.getOr([])
+
   [
     ("payment_method_type", "card"->JSON.Encode.string),
     ("payment_method_data", [("card", cardObject)]->Dict.fromArray->JSON.Encode.object),
   ]
+  ->Array.concat(acceptanceEntry)
   ->Dict.fromArray
   ->JSON.Encode.object
 }
@@ -424,6 +433,7 @@ let confirmPaymentMethodSession = async (request: confirmRequest): confirmOutcom
           ~cardholderName=?request.cardholderName,
           ~nickName=?request.nickName,
           ~cardNetwork=?request.cardNetwork,
+          ~customerAcceptance=?request.customerAcceptance,
         )
         ->JSON.stringify,
         signal: ?Some(controller->controllerSignal),

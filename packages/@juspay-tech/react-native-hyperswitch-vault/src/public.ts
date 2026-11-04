@@ -41,6 +41,9 @@ import type {
   vaultFormFields as VaultFormFieldsInternal,
   cardDetails,
 } from './VaultPublicState.gen';
+import type { hostPaymentMethodData as HostPaymentMethodDataInternal } from './VaultPaymentMethodData.gen';
+
+export type VaultHostPaymentMethodData = HostPaymentMethodDataInternal;
 
 export type VaultField = 'cardNumber' | 'cardExpiry' | 'cardCvc' | 'cardholderName';
 
@@ -55,7 +58,8 @@ export type SafeVaultErrorCode =
   | 'tokenization_failed'
   | 'invalid_session'
   | 'unsupported_configuration'
-  | 'unknown_outcome';
+  | 'unknown_outcome'
+  | 'forbidden_card_data';
 
 export type SafeVaultError = {
   readonly code: SafeVaultErrorCode;
@@ -78,7 +82,12 @@ export type VaultTokenizeResult =
 
 export type VaultFormHandleShape = {
 
-  tokenize(): Promise<VaultTokenizeResult>;
+  /**
+   * Tokenize the mounted card details for the current payment-method-session.
+   * Optional `paymentMethodData` — e.g. `{ nickName }` — is forwarded to the
+   * payment-method-session `confirm` call for the new card.
+   */
+  tokenize(paymentMethodData?: VaultHostPaymentMethodData): Promise<VaultTokenizeResult>;
   reset(): void;
   focus(field: VaultField): void;
 };
@@ -149,7 +158,7 @@ export type CardFormInstance = {
 
   readonly Form: React.ComponentType<Partial<CardFormProps> & { children: React.ReactNode }>;
 
-  tokenize(): Promise<VaultTokenizeResult>;
+  tokenize(paymentMethodData?: VaultHostPaymentMethodData): Promise<VaultTokenizeResult>;
   reset(): void;
   focus(field: VaultField): void;
 
