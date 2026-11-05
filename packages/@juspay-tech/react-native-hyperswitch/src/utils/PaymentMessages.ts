@@ -1,14 +1,14 @@
 import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfiguration';
 import {
   MessageContent,
-  type MessageElement,
   type MessageElementStyle,
   type PaymentMethodMessage,
 } from '../messages/MessageContent';
 
 export const MESSAGE_EVENT = 'customMessageElementClicked';
 
-export type MessageCallback = { key: string; onClick: () => void };
+/* In the order the actions are written, which is the order the tap `index` counts in. */
+export type MessageCallback = () => void;
 
 function parsePayload(payload: unknown): Record<string, unknown> | undefined {
   try {
@@ -29,11 +29,7 @@ export function dispatchMessageAction(
 ): boolean {
   if (event.eventName !== MESSAGE_EVENT) return false;
   const data = parsePayload(event.payload);
-  if (data && typeof data.key === 'string' && data.type === 'action') {
-    /* The key is `suffix_index`; the full key must match, so a guessed index does nothing. */
-    const callback = callbacks[Number(data.key.split('_')[1])];
-    if (callback?.key === data.key) callback.onClick();
-  }
+  if (typeof data?.index === 'number') callbacks[data.index]?.();
   return true;
 }
 
@@ -57,15 +53,10 @@ function styleToWire(style: MessageElementStyle | undefined) {
   return entries.length ? Object.fromEntries(entries) : undefined;
 }
 
-/* A random prefix keeps keys unguessable, as native's random message ids do, so interpolated
-   text cannot reference an action. */
-export const randomKeyPrefix = () => Math.random().toString(36).slice(2, 10);
-
-/* Converts rich messages to the bridge JSON. Keys only need to be unique within one
-   surface: native routes each event to its own widget or sheet. */
+/* Converts rich messages to the bridge JSON: text and tappable segments, no placeholders.
+   Native routes each event to its own widget or sheet. */
 export function preparePaymentMessages(
-  configuration?: PaymentSheetConfiguration,
-  keyPrefix: string = randomKeyPrefix()
+  configuration?: PaymentSheetConfiguration
 ): {
   configuration: Record<string, unknown> | undefined;
   callbacks: MessageCallback[];
@@ -94,33 +85,22 @@ export function preparePaymentMessages(
       }
       return message.value === undefined
         ? base
-        : { ...base, value: message.value };
+        : { ...base, value: [{ text: message.value }] };
     }
-    const elements: MessageElement[] = [];
-    const keys: string[] = [];
-    const actions: Record<string, unknown>[] = [];
-    let value = '';
-    message.value.parts.forEach((part) => {
-      if (typeof part === 'string') {
-        value += part;
-        return;
-      }
-      const existing = elements.indexOf(part);
-      const key = keys[existing] ?? `${keyPrefix}_${callbacks.length}`;
-      value += `{{${key}}}`;
-      if (existing !== -1) return;
-      elements.push(part);
-      keys.push(key);
-      const { label, style, onClick } = part.options;
-      const wireStyle = styleToWire(style);
-      actions.push({ key, label, ...(wireStyle ? { style: wireStyle } : {}) });
-      callbacks.push({ key, onClick });
-    });
-    return {
-      ...base,
-      value,
-      ...(actions.length ? { elements: { action: actions } } : {}),
-    };
+    const value = message.value.parts
+      .filter((part) => part !== '')
+      .map((part) => {
+        if (typeof part === 'string') return { text: part };
+        const { label, style, onClick } = part.options;
+        callbacks.push(onClick);
+        const wireStyle = styleToWire(style);
+        return {
+          text: label,
+          tappable: true,
+          ...(wireStyle ? { style: wireStyle } : {}),
+        };
+      });
+    return { ...base, value };
   }
 
   function withWireMessage<T extends { message?: unknown } | null>(entry: T) {
@@ -129,6 +109,7 @@ export function preparePaymentMessages(
       : entry;
   }
 
+  /* Each payment method's message, then its types' messages: the order client-core counts in. */
   const wire: Record<string, unknown> = {
     ...configuration,
     paymentMethodsConfig: configuration.paymentMethodsConfig.map((config) => {

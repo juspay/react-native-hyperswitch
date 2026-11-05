@@ -216,9 +216,9 @@ public class NativeHyperswitchModuleImpl: NSObject {
                 viewController: vc,
                 params: sheetProps,
                 onChange: { event in
-                    guard let data = try? JSONSerialization.data(withJSONObject: event.payload),
-                          let payload = String(data: data, encoding: .utf8) else { return }
-                    onEvent(["eventName": event.type, "payload": payload])
+                    let payload = (try? JSONSerialization.data(withJSONObject: event.payload))
+                        .flatMap { String(data: $0, encoding: .utf8) }
+                    onEvent(["eventName": event.type, "payload": payload ?? ""])
                 },
                 completion: { result in
                     switch result {
