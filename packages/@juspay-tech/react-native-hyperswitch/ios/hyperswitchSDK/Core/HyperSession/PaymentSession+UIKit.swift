@@ -57,12 +57,14 @@ extension PaymentSession {
         viewController: UIViewController,
         params: [String: Any],
         subscribe: ((PaymentEventSubscriptionBuilder) -> Void)? = nil,
+        onMessageAction: (([String: Any]) -> Void)? = nil,
         completion: @escaping (PaymentResult) -> Void
     ) {
         let paymentSheet = PaymentSheet(
             paymentSessionConfiguration: paymentSessionConfiguration,
             hyperswitchConfiguration: hyperswitchConfiguration ?? nil
         )
+        paymentSheet.messageAction = onMessageAction
 
         if let subscribe {
             let builder = PaymentEventSubscriptionBuilder()

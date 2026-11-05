@@ -221,12 +221,20 @@ class PaymentSessionReactLauncher(
    *
    * The bundle is expected to contain a `props` bundle with `configuration`, `sdkParams`, etc.
    */
-  fun presentSheet(bundle: Bundle, host: Activity = activity): Boolean {
+  fun presentSheet(
+    bundle: Bundle,
+    host: Activity = activity,
+    messageAction: ((paymentMethod: String, paymentMethodType: String, index: Int, text: String) -> Unit)? = null,
+  ): Boolean {
     applyFonts(bundle)
-    return presentSheetInternal(bottomInsetToDIPFromPixel(bundle), host)
+    return presentSheetInternal(bottomInsetToDIPFromPixel(bundle), host, messageAction)
   }
 
-  private fun presentSheetInternal(bundle: Bundle, host: Activity): Boolean {
+  private fun presentSheetInternal(
+    bundle: Bundle,
+    host: Activity,
+    messageAction: ((paymentMethod: String, paymentMethodType: String, index: Int, text: String) -> Unit)?,
+  ): Boolean {
     if (host is DefaultHardwareBackBtnHandler && host is FragmentActivity) {
       val fragmentActivity = host as FragmentActivity
       val fragmentManager = fragmentActivity.supportFragmentManager
@@ -245,6 +253,7 @@ class PaymentSessionReactLauncher(
           .setLaunchOptions(bundle)
           .setFabricEnabled(BuildConfig.IS_NEW_ARCHITECTURE_ENABLED)
           .build()
+      messageAction?.let { newReactNativeFragmentSheet.setOnMessageAction(it) }
 
       fragmentActivity.onBackPressedDispatcher.addCallback {
         newReactNativeFragmentSheet.onBackPressed()
@@ -256,6 +265,7 @@ class PaymentSessionReactLauncher(
 
       return true
     } else {
+      PaymentSheetCallbackManager.messageAction = messageAction
       host.startActivity(
         Intent(
           host.applicationContext,

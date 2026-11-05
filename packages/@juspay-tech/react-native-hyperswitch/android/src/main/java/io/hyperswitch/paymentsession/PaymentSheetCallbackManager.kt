@@ -8,6 +8,10 @@ object PaymentSheetCallbackManager {
     private val callback = AtomicReference<Callback?>(null)
     private var isFragment: Boolean = true
 
+    /* Message action of the Activity-fallback sheet, which has no fragment to hold one. */
+    @Volatile
+    var messageAction: ((paymentMethod: String, paymentMethodType: String, index: Int, text: String) -> Unit)? = null
+
     fun setCallback(newCallback: Callback, newIsFragment: Boolean = true) {
         callback.set(newCallback)
         isFragment = newIsFragment
@@ -31,6 +35,7 @@ object PaymentSheetCallbackManager {
 //            else -> PaymentResult.Completed(status)
 //        }
 
+        messageAction = null
         // Atomically get and clear callback to prevent double-invocation
         val currentCallback = callback.getAndSet(null)
         currentCallback?.invoke(data) ?: println("No callback set")

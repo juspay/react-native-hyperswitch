@@ -21,6 +21,7 @@ import {
 } from "./utils";
 import DemoPopup from "./pages/DemoPopup";
 import PaymentMethodFlow from "./pages/PaymentMethodFlow";
+import { paymentMessages } from './paymentMessages';
 
 type Flow = "home" | "payment" | "paymentMethod";
 let hyperSingleton: Promise<HyperswitchSession> | null = null;
@@ -93,6 +94,7 @@ export default function App() {
     }
     let result = await session.presentPaymentSheet({
       merchantDisplayName: "Hyperswitch Demo",
+      paymentMethodsConfig: paymentMessages,
       appearance: {
         theme: "Glass",
       },

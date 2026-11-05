@@ -111,6 +111,7 @@ public class NativePaymentWidgetView: UIView {
     @objc public var options: [String: Any]?
     @objc internal var onPaymentEvent: RCTDirectEventBlock?
     @objc internal var onPaymentResult: RCTDirectEventBlock?
+    @objc internal var onMessageAction: RCTDirectEventBlock?
     private var responseSenderCallback: RCTResponseSenderBlock?
     private var updateIntentInitCallback: RCTResponseSenderBlock?
     private var updateIntentCompleteCallback: RCTResponseSenderBlock?
@@ -297,6 +298,7 @@ public class NativePaymentWidgetView: UIView {
                 subscribe: nil
             )
             payment.setPaymentEventListener(listener)
+            payment.messageAction = { [weak self] action in self?.onMessageAction?(action) }
             paymentWidget = payment
             widget = payment
         }
