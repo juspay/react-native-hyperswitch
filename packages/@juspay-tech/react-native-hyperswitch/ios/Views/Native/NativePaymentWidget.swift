@@ -298,7 +298,7 @@ public class NativePaymentWidgetView: UIView {
                 subscribe: nil
             )
             payment.setPaymentEventListener(listener)
-            payment.messageAction = { [weak self] index in self?.onMessageAction?(["index": index]) }
+            payment.messageAction = { [weak self] action in self?.onMessageAction?(action) }
             paymentWidget = payment
             widget = payment
         }

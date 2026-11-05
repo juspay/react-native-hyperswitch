@@ -60,10 +60,10 @@ RCT_EXPORT_METHOD(presentPaymentSheet:(nonnull NSDictionary *)params
 {
     __weak NativeHyperswitchModule *weakSelf = self;
     [[self moduleImpl] presentPaymentSheet:params
-                           onMessageAction:^(NSInteger index) {
+                           onMessageAction:^(NSDictionary *action) {
         NativeHyperswitchModule *strongSelf = weakSelf;
         if (strongSelf && strongSelf->_eventEmitterCallback) {
-            [strongSelf emitOnPaymentSheetMessageAction:@{@"index": @(index)}];
+            [strongSelf emitOnPaymentSheetMessageAction:action];
         }
     }
                                    resolve:resolve

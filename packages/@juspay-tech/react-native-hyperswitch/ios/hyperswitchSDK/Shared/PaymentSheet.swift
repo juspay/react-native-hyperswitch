@@ -30,6 +30,6 @@ public class PaymentSheet {
     internal var subscribedEvents: [String]?
     internal var paymentEventListener: PaymentEventListener?
     /// A tapped payment method message action; set by the presenter.
-    internal var messageAction: ((Int) -> Void)?
+    internal var messageAction: (([String: Any]) -> Void)?
     internal var shouldProceedWithPaymentCallback: ((PaymentRequestData, @escaping (Bool) -> Void) -> Void)?
 }

@@ -23,7 +23,12 @@ export interface NativeProps extends ViewProps {
     payload: string;
   }>;
   // A tapped payment method message action; separate from payment events.
-  onMessageAction?: DirectEventHandler<{ index: Int32 }>;
+  onMessageAction?: DirectEventHandler<{
+    paymentMethod: string;
+    paymentMethodType: string;
+    index: Int32;
+    text: string;
+  }>;
 }
 
 export default codegenNativeComponent<NativeProps>('RCTNativePaymentWidget');

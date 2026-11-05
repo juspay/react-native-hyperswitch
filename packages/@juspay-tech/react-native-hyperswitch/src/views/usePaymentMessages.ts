@@ -3,18 +3,20 @@ import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfigurati
 import {
   dispatchMessageAction,
   preparePaymentMessages,
+  type MessageAction,
 } from '../utils/PaymentMessages';
 
 /* Native options are initial props, like every other widget option. The latest
-   render's callbacks are read at tap time, so recreated callbacks need no remount. */
+   render's options are read at tap time, so recreated callbacks need no remount. */
 export function usePaymentMessages(
   options: PaymentSheetConfiguration | undefined
 ) {
   const prepared = useMemo(() => preparePaymentMessages(options), [options]);
-  const callbacksRef = useRef(prepared.callbacks);
-  callbacksRef.current = prepared.callbacks;
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
   const dispatch = useCallback(
-    (index: number) => dispatchMessageAction(callbacksRef.current, index),
+    (action: MessageAction) =>
+      dispatchMessageAction(optionsRef.current, action),
     []
   );
   return { configuration: prepared.configuration, dispatch };

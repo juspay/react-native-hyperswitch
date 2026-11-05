@@ -7,7 +7,10 @@ import type {
 
 export type CustomEndpoints = Object;
 export type MessageActionEvent = {
+  paymentMethod: string;
+  paymentMethodType: string;
   index: Int32;
+  text: string;
 };
 
 export interface Spec extends TurboModule {

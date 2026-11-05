@@ -54,7 +54,7 @@ class PaymentElementViewManager : SimpleViewManager<PaymentWidgetView>(),
           emitOnPaymentEvent(this@apply, event)
         }
       })
-      onMessageAction { index -> emitOnMessageAction(this@apply, index) }
+      onMessageAction { method, type, index, text -> emitOnMessageAction(this@apply, method, type, index, text) }
       onPaymentResult(object : PaymentResultListener {
         override fun onPaymentResult(result: String) {
           emitOnPaymentResult(this@apply, result)
@@ -116,10 +116,10 @@ class PaymentElementViewManager : SimpleViewManager<PaymentWidgetView>(),
     }
   }
 
-  private fun emitOnMessageAction(container: PaymentWidgetView, index: Int) {
+  private fun emitOnMessageAction(container: PaymentWidgetView, method: String, type: String, index: Int, text: String) {
     reactContext?.let {
       UIManagerHelper.getEventDispatcher(it, uiManagerType)
-        ?.dispatchEvent(MessageActionEvent(UIManagerHelper.getSurfaceId(container), container.id, index))
+        ?.dispatchEvent(MessageActionEvent(UIManagerHelper.getSurfaceId(container), container.id, method, type, index, text))
     }
   }
 

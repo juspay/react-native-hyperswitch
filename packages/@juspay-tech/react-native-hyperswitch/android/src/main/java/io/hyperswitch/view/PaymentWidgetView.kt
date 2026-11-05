@@ -173,10 +173,10 @@ open class PaymentWidgetView : FrameLayout {
     this.fragment?.setOnEventCallback(listener)
   }
 
-  private var messageAction: ((Int) -> Unit)? = null
+  private var messageAction: ((paymentMethod: String, paymentMethodType: String, index: Int, text: String) -> Unit)? = null
 
   /** A tapped payment method message action; separate from payment events. */
-  fun onMessageAction(handler: (Int) -> Unit) {
+  fun onMessageAction(handler: (paymentMethod: String, paymentMethodType: String, index: Int, text: String) -> Unit) {
     this.messageAction = handler
     this.fragment?.setOnMessageAction(handler)
   }

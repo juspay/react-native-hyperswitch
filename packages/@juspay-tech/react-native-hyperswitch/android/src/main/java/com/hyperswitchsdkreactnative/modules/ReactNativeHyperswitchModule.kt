@@ -3,7 +3,6 @@ package com.hyperswitchsdkreactnative.modules
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
-import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReadableMap
@@ -12,6 +11,7 @@ import com.facebook.react.uimanager.UIManagerHelper
 import com.facebook.react.uimanager.common.UIManagerType
 import com.hyperswitchsdkreactnative.BuildConfig
 import com.hyperswitchsdkreactnative.NativeHyperswitchModuleSpec
+import com.hyperswitchsdkreactnative.model.MessageActionEvent
 import io.hyperswitch.model.CustomEndpointConfiguration
 import io.hyperswitch.model.HyperswitchConfiguration
 import io.hyperswitch.model.HyperswitchEnvironment
@@ -286,8 +286,8 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
           failed("SHEET_REPLACED", "Replaced by a newer presentPaymentSheet call")
         )
       }
-      val isFragment = paymentSessionReactLauncher?.presentSheet(bundle, activity) { index ->
-        emitOnPaymentSheetMessageAction(Arguments.createMap().apply { putInt("index", index) })
+      val isFragment = paymentSessionReactLauncher?.presentSheet(bundle, activity) { method, type, index, text ->
+        emitOnPaymentSheetMessageAction(MessageActionEvent.data(method, type, index, text))
       }
       val resultCallback: (String) -> Unit = { it ->
         promise?.resolve(it)

@@ -164,7 +164,7 @@ public class NativeHyperswitchModuleImpl: NSObject {
     @objc(presentPaymentSheet:onMessageAction:resolve:reject:)
     public func presentPaymentSheet(
         params: [String: Any],
-        onMessageAction: @escaping (Int) -> Void,
+        onMessageAction: @escaping ([String: Any]) -> Void,
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {

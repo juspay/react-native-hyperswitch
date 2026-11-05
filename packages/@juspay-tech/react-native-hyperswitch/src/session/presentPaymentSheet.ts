@@ -54,13 +54,15 @@ export async function presentPaymentSheetWithPayload(
   setSheetPresented(true);
   let subscription: { remove(): void } | undefined;
   try {
-    const { configuration, callbacks } = preparePaymentMessages(
-      payload.configuration as PaymentSheetConfiguration
+    const merchantConfiguration =
+      payload.configuration as PaymentSheetConfiguration;
+    const { configuration, hasActions } = preparePaymentMessages(
+      merchantConfiguration
     );
-    if (callbacks.length) {
+    if (hasActions) {
       subscription = NativeHyperswitchModule.onPaymentSheetMessageAction(
         (event: MessageActionEvent) => {
-          dispatchMessageAction(callbacks, event.index);
+          dispatchMessageAction(merchantConfiguration, event);
         }
       );
     }

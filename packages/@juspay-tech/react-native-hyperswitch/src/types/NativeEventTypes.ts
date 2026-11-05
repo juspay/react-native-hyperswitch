@@ -105,7 +105,14 @@ export type NativePaymentWidgetPropTypes = {
   style?: ViewStyle;
   onPaymentEvent?: (event: PaymentEventNative) => void;
   /** A tapped payment method message action; separate from payment events. */
-  onMessageAction?: (event: { nativeEvent: { index: number } }) => void;
+  onMessageAction?: (event: {
+    nativeEvent: {
+      paymentMethod: string;
+      paymentMethodType: string;
+      index: number;
+      text: string;
+    };
+  }) => void;
 };
 /** @deprecated Use {@link NativePaymentWidgetPropTypes}. */
 export type nativePaymentWidgetType = NativePaymentWidgetPropTypes;

@@ -318,11 +318,13 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
   }
 
   @ReactMethod
-  override fun emitMessageAction(rootTag: Double, index: Double) {
+  override fun emitMessageAction(
+    rootTag: Double, paymentMethod: String, paymentMethodType: String, index: Double, text: String
+  ) {
     findViewWithRootTag(rootTag.toInt(), { fragment ->
       /* The Activity-fallback sheet is not hosted in a fragment. */
-      fragment?.onMessageAction(index.toInt())
-        ?: PaymentSheetCallbackManager.messageAction?.invoke(index.toInt())
+      fragment?.onMessageAction(paymentMethod, paymentMethodType, index.toInt(), text)
+        ?: PaymentSheetCallbackManager.messageAction?.invoke(paymentMethod, paymentMethodType, index.toInt(), text)
     })
   }
 

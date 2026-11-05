@@ -175,7 +175,10 @@ static NSDictionary * _Nullable dynamicToDict(const folly::dynamic &dyn)
         if (!em) return;
 
         RCTNativePaymentWidgetEventEmitter::OnMessageAction action;
+        action.paymentMethod = std::string([event[@"paymentMethod"] UTF8String] ?: "");
+        action.paymentMethodType = std::string([event[@"paymentMethodType"] UTF8String] ?: "");
         action.index = [event[@"index"] intValue];
+        action.text = std::string([event[@"text"] UTF8String] ?: "");
         em->onMessageAction(std::move(action));
     };
 }

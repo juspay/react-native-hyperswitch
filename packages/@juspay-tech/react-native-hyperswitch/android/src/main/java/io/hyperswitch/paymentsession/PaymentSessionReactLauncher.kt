@@ -224,7 +224,7 @@ class PaymentSessionReactLauncher(
   fun presentSheet(
     bundle: Bundle,
     host: Activity = activity,
-    messageAction: ((Int) -> Unit)? = null,
+    messageAction: ((paymentMethod: String, paymentMethodType: String, index: Int, text: String) -> Unit)? = null,
   ): Boolean {
     applyFonts(bundle)
     return presentSheetInternal(bottomInsetToDIPFromPixel(bundle), host, messageAction)
@@ -233,7 +233,7 @@ class PaymentSessionReactLauncher(
   private fun presentSheetInternal(
     bundle: Bundle,
     host: Activity,
-    messageAction: ((Int) -> Unit)?,
+    messageAction: ((paymentMethod: String, paymentMethodType: String, index: Int, text: String) -> Unit)?,
   ): Boolean {
     if (host is DefaultHardwareBackBtnHandler && host is FragmentActivity) {
       val fragmentActivity = host as FragmentActivity

@@ -92,7 +92,13 @@ export interface Spec extends TurboModule {
     payload: Object
   ): void;
   /* A tapped payment method message action; separate from payment events. */
-  emitMessageAction(rootTag: number, index: number): void;
+  emitMessageAction(
+    rootTag: number,
+    paymentMethod: string,
+    paymentMethodType: string,
+    index: number,
+    text: string
+  ): void;
   onUpdateIntentEvent(rootTag: number, type: string, result: string): void;
   onPaymentConfirmButtonClick(
     rootTag: number,

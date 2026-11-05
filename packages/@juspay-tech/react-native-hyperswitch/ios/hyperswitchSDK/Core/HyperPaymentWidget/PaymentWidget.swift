@@ -23,7 +23,7 @@ public class PaymentWidget: UIControl {
     private var subscribedEventNames: [String]?
     internal var paymentEventListener: PaymentEventListener?
     /// A tapped payment method message action; set by the host view.
-    internal var messageAction: ((Int) -> Void)?
+    internal var messageAction: (([String: Any]) -> Void)?
 
     public init(
         paymentSession: PaymentSession,

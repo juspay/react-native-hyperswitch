@@ -1,18 +1,43 @@
 import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfiguration';
 import {
   MessageContent,
+  MessageElement,
   type MessageElementStyle,
   type PaymentMethodMessage,
 } from '../messages/MessageContent';
 
-/* In the order the actions are written, which is the order the tap `index` counts in. */
-export type MessageCallback = () => void;
+/* A tap names its message: `paymentMethodType` is empty when the shown text is the payment
+   method's own message, `index` is the segment's position in that message's `value`, and
+   `text` is what it showed. A segment with other text is not the one tapped. */
+export type MessageAction = {
+  paymentMethod: string;
+  paymentMethodType: string;
+  index: number;
+  text: string;
+};
+
+/* The segments as sent: empty text is dropped, so positions match the bridge `value`. */
+const segmentsOf = (content: MessageContent) =>
+  content.parts.filter((part) => part !== '');
 
 export function dispatchMessageAction(
-  callbacks: readonly MessageCallback[],
-  index: number
+  configuration: PaymentSheetConfiguration | undefined,
+  { paymentMethod, paymentMethodType, index, text }: MessageAction
 ) {
-  callbacks[index]?.();
+  const config = configuration?.paymentMethodsConfig?.find(
+    (entry) => entry.paymentMethod === paymentMethod
+  );
+  const message =
+    paymentMethodType === ''
+      ? config?.message
+      : config?.paymentMethodTypes?.find(
+          (entry) => entry.paymentMethodType === paymentMethodType
+        )?.message;
+  if (!(message?.value instanceof MessageContent)) return;
+  const segment = segmentsOf(message.value)[index];
+  if (segment instanceof MessageElement && segment.options.label === text) {
+    segment.options.onClick();
+  }
 }
 
 /* Copies only the supported keys. The bundle validates values, but a non-finite fontSize
@@ -41,13 +66,13 @@ export function preparePaymentMessages(
   configuration?: PaymentSheetConfiguration
 ): {
   configuration: Record<string, unknown> | undefined;
-  callbacks: MessageCallback[];
+  hasActions: boolean;
 } {
-  const callbacks: MessageCallback[] = [];
+  let hasActions = false;
   if (!Array.isArray(configuration?.paymentMethodsConfig)) {
     return {
       configuration: configuration as Record<string, unknown> | undefined,
-      callbacks,
+      hasActions,
     };
   }
 
@@ -69,19 +94,17 @@ export function preparePaymentMessages(
         ? base
         : { ...base, value: [{ text: message.value }] };
     }
-    const value = message.value.parts
-      .filter((part) => part !== '')
-      .map((part) => {
-        if (typeof part === 'string') return { text: part };
-        const { label, style, onClick } = part.options;
-        callbacks.push(onClick);
-        const wireStyle = styleToWire(style);
-        return {
-          text: label,
-          tappable: true,
-          ...(wireStyle ? { style: wireStyle } : {}),
-        };
-      });
+    const value = segmentsOf(message.value).map((part) => {
+      if (typeof part === 'string') return { text: part };
+      const { label, style } = part.options;
+      hasActions = true;
+      const wireStyle = styleToWire(style);
+      return {
+        text: label,
+        tappable: true,
+        ...(wireStyle ? { style: wireStyle } : {}),
+      };
+    });
     return { ...base, value };
   }
 
@@ -91,7 +114,6 @@ export function preparePaymentMessages(
       : entry;
   }
 
-  /* Each payment method's message, then its types' messages: the order client-core counts in. */
   const wire: Record<string, unknown> = {
     ...configuration,
     paymentMethodsConfig: configuration.paymentMethodsConfig.map((config) => {
@@ -104,5 +126,5 @@ export function preparePaymentMessages(
         : entry;
     }),
   };
-  return { configuration: wire, callbacks };
+  return { configuration: wire, hasActions };
 }
