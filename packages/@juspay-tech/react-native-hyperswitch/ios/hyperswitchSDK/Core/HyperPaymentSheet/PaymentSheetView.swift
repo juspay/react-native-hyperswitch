@@ -49,7 +49,7 @@ internal extension PaymentSheet {
 
         let sdkParams = SDKParams.getSDKParams()
         var propsDict = props
-        if let subscribedEvents { propsDict["subscribedEvents"] = subscribedEvents }
+        propsDict["subscribedEvents"] = subscribedEvents
 
         let props: [String: Any] = [
             "type": "payment",

@@ -27,8 +27,6 @@ import com.hyperswitchsdkreactnative.modules.NativeLog
 import io.hyperswitch.payments.GooglePayCallbackManager
 import io.hyperswitch.paymentsession.LaunchOptions
 import io.hyperswitch.paymentsession.PaymentSheetCallbackManager
-import io.hyperswitch.PaymentEvent
-import io.hyperswitch.utils.ConversionUtils
 import io.hyperswitch.webview.utils.HSWebViewManagerImpl
 import io.hyperswitch.webview.utils.HSWebViewWrapper
 import java.util.concurrent.atomic.AtomicBoolean
@@ -311,15 +309,20 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
   @ReactMethod
   override fun emitPaymentEvent(rootTag: Double, eventType: String, payload: ReadableMap) {
     findViewWithRootTag(rootTag.toInt(), { fragment ->
-      val sheetListener = PaymentSheetCallbackManager.eventListener
-      if (fragment == null && sheetListener != null) {
-        /* The Activity-fallback sheet is not hosted in a fragment. */
-        sheetListener.onPaymentEvent(PaymentEvent(eventType, ConversionUtils.readableMapToMap(payload)))
-      } else if (fragment == null) {
+      if (fragment == null) {
         Log.w("HyperModule", "emitPaymentEvent: no fragment found for rootTag=$rootTag")
       } else {
         fragment.notifyEvent(eventType, payload)
       }
+    })
+  }
+
+  @ReactMethod
+  override fun emitMessageAction(rootTag: Double, index: Double) {
+    findViewWithRootTag(rootTag.toInt(), { fragment ->
+      /* The Activity-fallback sheet is not hosted in a fragment. */
+      fragment?.onMessageAction(index.toInt())
+        ?: PaymentSheetCallbackManager.messageAction?.invoke(index.toInt())
     })
   }
 

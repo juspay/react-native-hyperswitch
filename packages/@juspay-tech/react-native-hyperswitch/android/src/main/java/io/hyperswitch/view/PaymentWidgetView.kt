@@ -173,6 +173,14 @@ open class PaymentWidgetView : FrameLayout {
     this.fragment?.setOnEventCallback(listener)
   }
 
+  private var messageAction: ((Int) -> Unit)? = null
+
+  /** A tapped payment method message action; separate from payment events. */
+  fun onMessageAction(handler: (Int) -> Unit) {
+    this.messageAction = handler
+    this.fragment?.setOnMessageAction(handler)
+  }
+
   fun setSubscribedEvents(events: List<String>) {
     this.subscribedEvents = events
   }
@@ -319,6 +327,7 @@ open class PaymentWidgetView : FrameLayout {
     this.fragment?.setOnPaymentResult(::dispatchResult)
     this.fragment?.setOnPaymentConfirmButtonClick(::dispatchConfirmTriggered)
     onEventCallback?.let { this.fragment?.setOnEventCallback(it) }
+    messageAction?.let { this.fragment?.setOnMessageAction(it) }
     this.fragment?.setOnExit {
       removeWidget()
     }

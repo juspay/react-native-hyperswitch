@@ -104,6 +104,8 @@ export type NativePaymentWidgetPropTypes = {
 }}) => void;
   style?: ViewStyle;
   onPaymentEvent?: (event: PaymentEventNative) => void;
+  /** A tapped payment method message action; separate from payment events. */
+  onMessageAction?: (event: { nativeEvent: { index: number } }) => void;
 };
 /** @deprecated Use {@link NativePaymentWidgetPropTypes}. */
 export type nativePaymentWidgetType = NativePaymentWidgetPropTypes;

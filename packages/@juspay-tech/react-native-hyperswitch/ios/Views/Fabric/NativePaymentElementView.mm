@@ -39,6 +39,7 @@
 @interface NativePaymentWidgetView (FabricEvents)
 @property (nonatomic, copy) RCTDirectEventBlock onPaymentResult;
 @property (nonatomic, copy) RCTDirectEventBlock onPaymentEvent;
+@property (nonatomic, copy) RCTDirectEventBlock onMessageAction;
 @property (nonatomic, copy, nullable) NSString *widgetType;
 @property (nonatomic, copy, nullable) NSString *sdkAuthorization;
 @property (nonatomic, copy, nullable) NSDictionary *options;
@@ -94,6 +95,7 @@ static NSDictionary * _Nullable dynamicToDict(const folly::dynamic &dyn)
     [[NativePaymentWidgetViewRegistry shared] unregisterForTag:@(self.tag)];
     _widgetView.onPaymentResult = nil;
     _widgetView.onPaymentEvent = nil;
+    _widgetView.onMessageAction = nil;
 }
 
 - (void)willMoveToWindow:(nullable UIWindow *)newWindow
@@ -163,9 +165,18 @@ static NSDictionary * _Nullable dynamicToDict(const folly::dynamic &dyn)
 
         RCTNativePaymentWidgetEventEmitter::OnPaymentEvent paymentEvent;
         paymentEvent.eventName = std::string([eventName UTF8String]);
-        NSString *payload = event[@"payload"] ?: @"";
-        paymentEvent.payload = std::string([payload UTF8String]);
         em->onPaymentEvent(std::move(paymentEvent));
+    };
+
+    _widgetView.onMessageAction = ^(NSDictionary *event) {
+        NativePaymentElementView *strongSelf = weakSelf;
+        if (!strongSelf) return;
+        auto em = std::dynamic_pointer_cast<const RCTNativePaymentWidgetEventEmitter>(strongSelf->_eventEmitter);
+        if (!em) return;
+
+        RCTNativePaymentWidgetEventEmitter::OnMessageAction action;
+        action.index = [event[@"index"] intValue];
+        em->onMessageAction(std::move(action));
     };
 }
 

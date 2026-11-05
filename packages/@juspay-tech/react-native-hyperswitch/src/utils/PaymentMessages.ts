@@ -5,32 +5,14 @@ import {
   type PaymentMethodMessage,
 } from '../messages/MessageContent';
 
-export const MESSAGE_EVENT = 'customMessageElementClicked';
-
 /* In the order the actions are written, which is the order the tap `index` counts in. */
 export type MessageCallback = () => void;
 
-function parsePayload(payload: unknown): Record<string, unknown> | undefined {
-  try {
-    const value: unknown =
-      typeof payload === 'string' ? JSON.parse(payload) : payload;
-    return value !== null && typeof value === 'object'
-      ? (value as Record<string, unknown>)
-      : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Consumes every internal event, even stale or malformed ones, so none reaches public onChange. */
 export function dispatchMessageAction(
   callbacks: readonly MessageCallback[],
-  event: { eventName: string; payload: unknown }
-): boolean {
-  if (event.eventName !== MESSAGE_EVENT) return false;
-  const data = parsePayload(event.payload);
-  if (typeof data?.index === 'number') callbacks[data.index]?.();
-  return true;
+  index: number
+) {
+  callbacks[index]?.();
 }
 
 /* Copies only the supported keys. The bundle validates values, but a non-finite fontSize
@@ -54,7 +36,7 @@ function styleToWire(style: MessageElementStyle | undefined) {
 }
 
 /* Converts rich messages to the bridge JSON: text and tappable segments, no placeholders.
-   Native routes each event to its own widget or sheet. */
+   Native routes each tap to its own widget or sheet. */
 export function preparePaymentMessages(
   configuration?: PaymentSheetConfiguration
 ): {
@@ -122,11 +104,5 @@ export function preparePaymentMessages(
         : entry;
     }),
   };
-  if (callbacks.length) {
-    wire.subscribedEvents = [
-      ...(configuration.subscribedEvents ?? []),
-      MESSAGE_EVENT,
-    ];
-  }
   return { configuration: wire, callbacks };
 }

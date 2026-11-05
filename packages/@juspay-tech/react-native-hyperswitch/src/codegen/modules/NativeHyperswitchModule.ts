@@ -1,11 +1,13 @@
 import type { TurboModule } from 'react-native';
 import { NativeModules, TurboModuleRegistry } from 'react-native';
-import type { EventEmitter } from 'react-native/Libraries/Types/CodegenTypes';
+import type {
+  EventEmitter,
+  Int32,
+} from 'react-native/Libraries/Types/CodegenTypes';
 
 export type CustomEndpoints = Object;
-export type PaymentSheetEvent = {
-  eventName: string;
-  payload: string;
+export type MessageActionEvent = {
+  index: Int32;
 };
 
 export interface Spec extends TurboModule {
@@ -18,7 +20,7 @@ export interface Spec extends TurboModule {
   ): Promise<string>;
 
   presentPaymentSheet(params: Object): Promise<string>;
-  readonly onPaymentSheetEvent: EventEmitter<PaymentSheetEvent>;
+  readonly onPaymentSheetMessageAction: EventEmitter<MessageActionEvent>;
 
   getCustomerSavedPaymentMethods(params?: Object): Promise<string>;
 

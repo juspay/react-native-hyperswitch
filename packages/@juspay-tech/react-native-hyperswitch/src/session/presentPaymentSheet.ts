@@ -1,5 +1,5 @@
 import NativeHyperswitchModule from '../codegen/modules/NativeHyperswitchModule';
-import type { PaymentSheetEvent } from '../codegen/modules/NativeHyperswitchModule';
+import type { MessageActionEvent } from '../codegen/modules/NativeHyperswitchModule';
 import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfiguration';
 import {
   dispatchMessageAction,
@@ -58,9 +58,9 @@ export async function presentPaymentSheetWithPayload(
       payload.configuration as PaymentSheetConfiguration
     );
     if (callbacks.length) {
-      subscription = NativeHyperswitchModule.onPaymentSheetEvent(
-        (event: PaymentSheetEvent) => {
-          dispatchMessageAction(callbacks, event);
+      subscription = NativeHyperswitchModule.onPaymentSheetMessageAction(
+        (event: MessageActionEvent) => {
+          dispatchMessageAction(callbacks, event.index);
         }
       );
     }

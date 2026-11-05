@@ -112,6 +112,17 @@ class HyperFragment : ReactFragment() {
     paymentEventListener = listener
   }
 
+  /** A tapped payment method message action; its owner runs the merchant callback. */
+  private var messageAction: ((Int) -> Unit)? = null
+
+  fun setOnMessageAction(handler: (Int) -> Unit) {
+    messageAction = handler
+  }
+
+  internal fun onMessageAction(index: Int) {
+    messageAction?.invoke(index)
+  }
+
   private fun emitDeviceEvent(
     eventName: String,
     payload: Any?
@@ -530,6 +541,7 @@ class HyperFragment : ReactFragment() {
       callbacks.clear()
       onExit = null
       paymentEventListener = null
+      messageAction = null
     } finally {
       super.onDestroyView()
     }
@@ -544,6 +556,7 @@ class HyperFragment : ReactFragment() {
       callbacks.clear()
       onExit = null
       paymentEventListener = null
+      messageAction = null
     } finally {
       super.onDestroy()
     }

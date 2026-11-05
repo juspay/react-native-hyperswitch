@@ -111,6 +111,7 @@ public class NativePaymentWidgetView: UIView {
     @objc public var options: [String: Any]?
     @objc internal var onPaymentEvent: RCTDirectEventBlock?
     @objc internal var onPaymentResult: RCTDirectEventBlock?
+    @objc internal var onMessageAction: RCTDirectEventBlock?
     private var responseSenderCallback: RCTResponseSenderBlock?
     private var updateIntentInitCallback: RCTResponseSenderBlock?
     private var updateIntentCompleteCallback: RCTResponseSenderBlock?
@@ -265,10 +266,9 @@ public class NativePaymentWidgetView: UIView {
         configuration["type"] = widgetType
 
         let listener = PaymentEventListener { [weak self] event in
-            let json = (try? JSONSerialization.data(withJSONObject: event.payload)).flatMap { String(data: $0, encoding: .utf8) }
             self?.onPaymentEvent?([
                 "eventName": event.type,
-                "payload": json ?? "",
+                "payload": event.payload,
             ])
         }
 
@@ -298,6 +298,7 @@ public class NativePaymentWidgetView: UIView {
                 subscribe: nil
             )
             payment.setPaymentEventListener(listener)
+            payment.messageAction = { [weak self] index in self?.onMessageAction?(["index": index]) }
             paymentWidget = payment
             widget = payment
         }

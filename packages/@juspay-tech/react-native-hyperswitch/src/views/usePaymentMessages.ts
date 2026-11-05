@@ -14,8 +14,7 @@ export function usePaymentMessages(
   const callbacksRef = useRef(prepared.callbacks);
   callbacksRef.current = prepared.callbacks;
   const dispatch = useCallback(
-    (event: { eventName: string; payload: unknown }) =>
-      dispatchMessageAction(callbacksRef.current, event),
+    (index: number) => dispatchMessageAction(callbacksRef.current, index),
     []
   );
   return { configuration: prepared.configuration, dispatch };

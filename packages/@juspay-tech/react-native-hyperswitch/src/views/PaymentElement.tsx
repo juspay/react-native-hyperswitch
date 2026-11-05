@@ -137,7 +137,7 @@ export const PaymentElement = forwardRef<
   };
 
   const onPaymentEventInternal = (event: PaymentEventNative) => {
-    if (!messages.dispatch(event.nativeEvent)) onChange?.(event.nativeEvent);
+    onChange?.(event.nativeEvent);
   };
 
   return (
@@ -146,6 +146,7 @@ export const PaymentElement = forwardRef<
       sdkAuthorization={paymentSessionConfig?.sdkAuthorization ?? ''}
       widgetType="widgetPaymentSheet"
       onPaymentEvent={onPaymentEventInternal}
+      onMessageAction={(event) => messages.dispatch(event.nativeEvent.index)}
       onPaymentResult={onPaymentResultInternal}
       options={{
         hyperswitchConfig: hyperswitchConfig || undefined,
