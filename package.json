@@ -46,7 +46,20 @@
     ]
   },
   "resolutions": {
-    "nx/undici": "7.30.1"
+    "nx/undici": "7.30.1",
+    "cacache/glob": "^14.0.2",
+    "npm-packlist/glob": "^14.0.2",
+    "@npmcli/package-json/glob": "^14.0.2",
+    "@npmcli/map-workspaces/glob": "^14.0.2",
+    "glob@npm:^10.5.0": "^14.0.2",
+    "glob@npm:^13.0.6": "^14.0.2",
+    "@typescript-eslint/typescript-estree/minimatch": "^11.0.1",
+    "nx/minimatch": "^11.0.1",
+    "@nx/devkit/minimatch": "^11.0.1",
+    "@npmcli/arborist/minimatch": "^11.0.1",
+    "@npmcli/map-workspaces/minimatch": "^11.0.1",
+    "ignore-walk/minimatch": "^11.0.1",
+    "@tufjs/models/minimatch": "^11.0.1"
   },
   "packageManager": "yarn@3.6.1"
 }
