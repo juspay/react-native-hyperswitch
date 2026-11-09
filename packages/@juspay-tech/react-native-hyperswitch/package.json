@@ -68,12 +68,14 @@
     "@react-native-community/cli": "20.2.0",
     "@react-native/babel-preset": "0.79.2",
     "@react-native/eslint-config": "^0.78.0",
+    "@react-native/jest-preset": "0.86.2",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-terser": "^1.0.0",
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/jest": "^30.0.0",
     "@types/react": "^18.2.6",
+    "@types/react-test-renderer": "^19.1.0",
     "commitlint": "^19.6.1",
     "del-cli": "^5.1.0",
     "eslint": "^9.22.0",
@@ -84,6 +86,7 @@
     "react": "*",
     "react-native": "*",
     "react-native-builder-bob": "^0.40.8",
+    "react-test-renderer": "19.2.8",
     "rollup": "^4.52.5",
     "turbo": "^2.9.16",
     "typescript": "^5.9.2"
@@ -97,7 +100,10 @@
     "react-native-webview": "*"
   },
   "jest": {
-    "preset": "react-native",
+    "preset": "@react-native/jest-preset",
+    "testPathIgnorePatterns": [
+      "\\.typecheck\\.ts$"
+    ],
     "modulePathIgnorePatterns": [
       "<rootDir>/example/node_modules",
       "<rootDir>/lib/"
