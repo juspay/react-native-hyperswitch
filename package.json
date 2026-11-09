@@ -7,7 +7,6 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "lerna": "lerna",
-    "release": "release-it",
     "example": "yarn workspace react-native-hyperswitch-example",
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\""
@@ -20,15 +19,13 @@
     "@commitlint/config-conventional": "^17.0.2",
     "@eslint/compat": "^2.1.1",
     "@react-native/eslint-config": "^0.79.1",
-    "@release-it/conventional-changelog": "^10.0.1",
     "commitlint": "^17.0.2",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-ft-flow": "^3.0.11",
     "eslint-plugin-prettier": "^5.5.6",
-    "lerna": "^8.2.2",
-    "prettier": "^2.0.5",
-    "release-it": "^19.0.5"
+    "lerna": "^10.1.1",
+    "prettier": "^2.0.5"
   },
   "author": "Hyperswitch",
   "license": "MIT",
@@ -48,22 +45,25 @@
       "@commitlint/config-conventional"
     ]
   },
-  "release-it": {
-    "git": {
-      "commitMessage": "chore: release ${version}",
-      "tagName": "v${version}"
-    },
-    "npm": {
-      "publish": false
-    },
-    "github": {
-      "release": true
-    },
-    "plugins": {
-      "@release-it/conventional-changelog": {
-        "preset": "angular"
-      }
-    }
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "resolutions": {
+    "nx/undici": "7.30.1",
+    "cacache/glob": "^14.0.2",
+    "npm-packlist/glob": "^14.0.2",
+    "@npmcli/package-json/glob": "^14.0.2",
+    "@npmcli/map-workspaces/glob": "^14.0.2",
+    "@sentry/bundler-plugins/glob": "^14.0.2",
+    "glob@npm:^10.5.0": "^14.0.2",
+    "glob@npm:^13.0.6": "^14.0.2",
+    "@typescript-eslint/typescript-estree/minimatch": "^11.0.1",
+    "nx/minimatch": "^11.0.1",
+    "@nx/devkit/minimatch": "^11.0.1",
+    "@npmcli/arborist/minimatch": "^11.0.1",
+    "@npmcli/map-workspaces/minimatch": "^11.0.1",
+    "ignore-walk/minimatch": "^11.0.1",
+    "@tufjs/models/minimatch": "^11.0.1"
   },
   "packageManager": "yarn@3.6.1"
 }

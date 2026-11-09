@@ -40,6 +40,12 @@ target 'HyperswitchSdkReactNativeExample' do
           config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
         end
       end
+      # Newer Xcode rejects pods (e.g. RNSVG) that still declare iOS 12.4.
+      target.build_configurations.each do |config|
+        if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < min_ios_version_supported.to_f
+          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version_supported
+        end
+      end
     end
   end
 end
