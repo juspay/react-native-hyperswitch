@@ -79,7 +79,7 @@
     "react-native": "0.78.2",
     "react-native-builder-bob": "^0.39.1",
     "release-it": "^19.0.5",
-    "turbo": "^1.10.7",
+    "turbo": "^2.9.16",
     "typescript": "^5.2.2"
   },
   "peerDependencies": {
