@@ -7,7 +7,6 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "lerna": "lerna",
-    "release": "release-it",
     "example": "yarn workspace react-native-hyperswitch-example",
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\""
@@ -20,15 +19,13 @@
     "@commitlint/config-conventional": "^17.0.2",
     "@eslint/compat": "^2.1.1",
     "@react-native/eslint-config": "^0.79.1",
-    "@release-it/conventional-changelog": "^10.0.1",
     "commitlint": "^17.0.2",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-ft-flow": "^3.0.11",
     "eslint-plugin-prettier": "^5.5.6",
     "lerna": "^10.1.1",
-    "prettier": "^2.0.5",
-    "release-it": "^19.0.5"
+    "prettier": "^2.0.5"
   },
   "author": "Hyperswitch",
   "license": "MIT",
@@ -48,26 +45,7 @@
       "@commitlint/config-conventional"
     ]
   },
-  "release-it": {
-    "git": {
-      "commitMessage": "chore: release ${version}",
-      "tagName": "v${version}"
-    },
-    "npm": {
-      "publish": false
-    },
-    "github": {
-      "release": true
-    },
-    "plugins": {
-      "@release-it/conventional-changelog": {
-        "preset": "angular"
-      }
-    }
-  },
   "resolutions": {
-    "undici@npm:6.23.0": "6.29.1",
-    "undici@npm:7.28.0": "7.30.1",
     "nx/undici": "7.30.1"
   },
   "packageManager": "yarn@3.6.1"
