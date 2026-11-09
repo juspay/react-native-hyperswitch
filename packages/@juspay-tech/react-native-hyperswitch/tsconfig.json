@@ -2,7 +2,13 @@
   "compilerOptions": {
     "rootDir": ".",
     "paths": {
-      "@juspay-tech/react-native-hyperswitch": ["./src/index"]
+      "@juspay-tech/react-native-hyperswitch": ["./src/index"],
+      "react-native/Libraries/Utilities/codegenNativeComponent": [
+        "./node_modules/react-native/types_generated/Libraries/Utilities/codegenNativeComponent.d.ts"
+      ],
+      "react-native/Libraries/Types/CodegenTypes": [
+        "./node_modules/react-native/types_generated/Libraries/Types/CodegenTypes.d.ts"
+      ]
     },
     "allowJs": true,
     "allowUnreachableCode": false,
@@ -12,7 +18,7 @@
     "jsx": "react-jsx",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "noEmit": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,

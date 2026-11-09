@@ -2,6 +2,12 @@ require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 
+# React Native 0.87 removed bridgelessEnabled from the factory delegate (always bridgeless).
+react_native_package = `node -p "require.resolve('react-native/package.json', { paths: ['#{__dir__}'] })"`.strip
+react_native_major, react_native_minor = JSON.parse(File.read(react_native_package))["version"].split(".").map(&:to_i)
+swift_flags = "-enable-experimental-feature AccessLevelOnImport"
+swift_flags += " -DHYPERSWITCH_RN_87_PLUS" if react_native_major > 0 || react_native_minor >= 87
+
 Pod::Spec.new do |s|
   s.name         = "HyperswitchSdkReactNative"
   s.version      = package["version"]
@@ -37,7 +43,7 @@ Pod::Spec.new do |s|
   
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
-    'OTHER_SWIFT_FLAGS' => "-enable-experimental-feature AccessLevelOnImport"
+    'OTHER_SWIFT_FLAGS' => swift_flags
   }
 
   s.dependency 'ReactAppDependencyProvider'

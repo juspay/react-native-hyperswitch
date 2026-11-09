@@ -103,9 +103,13 @@ internal class RNHeadlessManager: RCTDefaultReactNativeFactoryDelegate, ReactHos
         }
     }
 
+    /* React Native 0.87 removed this delegate method and is always bridgeless;
+       the podspec sets HYPERSWITCH_RN_87_PLUS for those versions. */
+#if !HYPERSWITCH_RN_87_PLUS
     public override func bridgelessEnabled() -> Bool {
         return true
     }
+#endif
 
     override func sourceURL(for bridge: RCTBridge) -> URL? {
         return bundleURL()
