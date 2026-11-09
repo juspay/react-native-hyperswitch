@@ -36,13 +36,9 @@ internal class RNFactoryDelegate: RCTDefaultReactNativeFactoryDelegate {
 
     internal weak var manager: ReactHostManager?
 
-    /* React Native 0.87 removed this delegate method and is always bridgeless;
-       the podspec sets HYPERSWITCH_RN_87_PLUS for those versions. */
-#if !HYPERSWITCH_RN_87_PLUS
     public override func bridgelessEnabled() -> Bool {
         return true
     }
-#endif
 
     @objc(getModuleInstanceFromClass:)
     internal func getModuleInstanceFromClass(_ moduleClass: AnyClass) -> AnyObject? {

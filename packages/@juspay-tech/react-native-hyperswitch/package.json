@@ -75,7 +75,6 @@
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/jest": "^30.0.0",
     "@types/react": "^18.2.6",
-    "@types/react-test-renderer": "^19.1.0",
     "commitlint": "^19.6.1",
     "del-cli": "^5.1.0",
     "eslint": "^9.22.0",
@@ -86,7 +85,6 @@
     "react": "19.3.1",
     "react-native": "0.88.1",
     "react-native-builder-bob": "^0.40.8",
-    "react-test-renderer": "19.3.1",
     "rollup": "^4.52.5",
     "turbo": "^2.9.16",
     "typescript": "^5.9.2"
@@ -101,9 +99,6 @@
   },
   "jest": {
     "preset": "@react-native/jest-preset",
-    "testPathIgnorePatterns": [
-      "\\.typecheck\\.ts$"
-    ],
     "modulePathIgnorePatterns": [
       "<rootDir>/example/node_modules",
       "<rootDir>/lib/"
