@@ -12,6 +12,7 @@ import {
   createLogger,
   formatThrown,
   redactCardNumbers,
+  redactDigits,
   setLogTransport,
 } from '../logger';
 import { loggingUrl } from '../loggingUrl';
@@ -355,6 +356,30 @@ describe('what a log may carry', () => {
       digits: '[redacted]',
       nested: ['[redacted]'],
     });
+  });
+
+  it('blanks a card number however many spaces, line breaks, dots, slashes or dashes it has', () => {
+    for (const text of [
+      '4242   4242   4242   4242',
+      '4242 - 4242 - 4242 - 4242',
+      '4242\n4242\n4242\n4242',
+      '4242\t\t\t4242\t\t\t4242\t\t\t4242',
+      '4242 . 4242 / 4242 -- 4242',
+    ]) {
+      expect(redactDigits(`card ${text} end`)).toBe('card [redacted] end');
+    }
+    for (const kept of [
+      'at render (index.android.bundle:12:3456)',
+      'order 1234 5678',
+      'IR_16',
+    ]) {
+      expect(redactDigits(kept)).toBe(kept);
+    }
+    /* Separators and digits never overlap, so a long text takes no time. */
+    const long = `1${' '.repeat(1_000_000)}x`;
+    const startedAt = performance.now();
+    expect(redactDigits(long)).toBe(long);
+    expect(performance.now() - startedAt).toBeLessThan(1000);
   });
 
   it('records an Error as web’s formatException, and anything else as itself', () => {

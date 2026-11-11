@@ -102,10 +102,12 @@ export function setLogTransport(next?: LogTransport): void {
   transport = next ?? fetchTransport;
 }
 
-/* Any run of twelve or more digits, the shape of a card number, however it is spaced. Shorter
-   numbers, such as a stack's line and column, are kept. */
+/* Any run of twelve or more digits, the shape of a card number, with any number of spaces, line
+   breaks, dots, slashes or dashes between the digits. Shorter numbers, such as a stack's line and
+   column, are kept. Separators and digits never overlap, so the match takes time in proportion to
+   the text. */
 export function redactDigits(text: string): string {
-  return text.replace(/\d(?:[\s./-]{0,2}\d){11,}/g, '[redacted]');
+  return text.replace(/\d(?:[\s./-]*\d){11,}/g, '[redacted]');
 }
 
 export function redactCardNumbers(value: unknown): unknown {
