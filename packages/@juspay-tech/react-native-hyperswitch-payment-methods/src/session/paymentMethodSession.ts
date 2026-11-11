@@ -4,7 +4,11 @@ import { isMissingSdkError, resolveAdapter } from '../providers/registry';
 import { fetchVaultDetails } from './fetchVaultDetails';
 import { createFormLog } from '../logging/formLog';
 import type { FormLog } from '../logging/formLog';
-import { createLogger, logSessionStart } from '../logging/logger';
+import {
+  createLogger,
+  logSessionStart,
+  vaultDetailsAuthorization,
+} from '../logging/logger';
 import type { Logger } from '../logging/logger';
 import { loggingUrl } from '../logging/loggingUrl';
 import type { HyperswitchConfiguration } from './config';
@@ -120,7 +124,11 @@ function sessionLogger(
     const logger = createLogger(
       loggingUrl(config.environment, config.customEndpoints)
     );
-    logger.identify(options.sdkAuthorization, config.publishableKey);
+    logger.identify(
+      options.sdkAuthorization ||
+        vaultDetailsAuthorization(options.vaultDetails),
+      config.publishableKey
+    );
     logSessionStart(
       logger,
       'initPaymentMethodSession',

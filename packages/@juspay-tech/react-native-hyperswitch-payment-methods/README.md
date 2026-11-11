@@ -433,7 +433,12 @@ SDK sends logs in the web SDK's structure, as the Hyperswitch vault does. It log
 - the card form's lifecycle: created, each field mounted, rendered and unmounted, the fields
   complete, `clear()`, and why a form never became usable;
 - each `tokenize()` and its outcome: the vault type and the error code;
-- a VGS submit's HTTP status, and a crash while a field renders, which is then thrown on unchanged.
+- a VGS submit's HTTP status, and a crash while a field renders, which is then thrown on unchanged
+  (for a provider other than the Hyperswitch vault, only the error's type, never its text).
+
+Each log names the payment-method session from `sdkAuthorization`; with `vaultDetails` alone, from
+the Hyperswitch vault's `vaultData.sdkAuthorization`. Another vault's details carry no session id,
+so pass `sdkAuthorization` as well if you want its logs tied to the session.
 
 It never logs a card value, a token, a request body or the `sdkAuthorization`. Logs are queued and
 sent in batches: 20 seconds after the last one, at once on an error, and when a `<CardForm>` or

@@ -9,6 +9,7 @@ import {
 
 import { createFormLog, logVgsSubmit } from '../formLog';
 import { createLogger, setLogTransport } from '../logger';
+import { registerAdapter } from '../../providers/registry';
 import { errorResult } from '../../core/results';
 import { fieldChange } from '../../core/fieldChange';
 import type { ProviderAdapter } from '../../core/ProviderAdapter';
@@ -297,6 +298,47 @@ describe('PAYMENT_METHOD_SESSION_DATA_FILLED', () => {
 describe('tokenize', () => {
   const builtIn = { vaultType: 'hyperswitch' } as ProviderAdapter;
 
+  it('files the outcome under the session the attempt started in', async () => {
+    const { logger, log, sent } = setup();
+    const authorization = (sessionId: string) =>
+      Buffer.from(
+        `publishable_key=pk_snd_test,payment_method_session_id=${sessionId}`,
+        'utf8'
+      ).toString('base64');
+    logger.identify(authorization('0a_pms_first'), 'pk_snd_test');
+    const firstSession = logger.sessionId;
+    let finish: (result: TokenizeResult) => void = () => {};
+    const attempt = log.tokenize(
+      'hyperswitch',
+      builtIn,
+      () =>
+        new Promise<TokenizeResult>((resolve) => {
+          finish = resolve;
+        })
+    );
+    logger.identify(authorization('0a_pms_second'), 'pk_snd_test');
+    expect(logger.sessionId).not.toBe(firstSession);
+    finish({
+      status: 'success',
+      vaultType: 'hyperswitch',
+      data: { tokens: { payment_method_token: 'token_secret_value' } },
+    });
+    await attempt;
+
+    expect(
+      sent()
+        .filter((entry) => entry.event_name?.includes('TOKENIZE'))
+        .map((entry) => [
+          entry.event_name,
+          entry.payment_id,
+          entry.session_id === firstSession,
+        ])
+    ).toEqual([
+      ['PAYMENT_METHOD_SESSION_TOKENIZE_INIT', '0a_pms_first', true],
+      ['PAYMENT_METHOD_SESSION_TOKENIZE', '0a_pms_first', true],
+    ]);
+  });
+
   it('logs a tokenize called again while one is in flight once', async () => {
     const { log, sent } = setup();
     let finish: (result: TokenizeResult) => void = () => {};
@@ -383,11 +425,46 @@ describe('tokenize', () => {
 });
 
 describe('crashes and VGS', () => {
+  const hyperswitchVault = { vaultType: 'hyperswitch' } as ProviderAdapter;
+
+  it('keeps a crash’s error text only for the Hyperswitch vault, as a tokenize message', () => {
+    const { log, sent } = setup();
+    const crash = () => new Error('Invalid CVC: 973; token: tok_review_secret');
+    log.crashed('cardCvc', crash(), { vaultType: 'vgs' } as ProviderAdapter);
+    const custom = { vaultType: 'hyperswitch' } as ProviderAdapter;
+    const unregister = registerAdapter(custom);
+    try {
+      log.crashed('cardNumber', crash(), custom);
+    } finally {
+      unregister();
+    }
+    log.crashed('cardExpiry', crash(), null);
+    log.crashed('cardholderName', crash(), hyperswitchVault);
+
+    const crashes = sent()
+      .filter((entry) => entry.event_name === 'SDK_CRASH')
+      .map((entry) => JSON.parse(entry.value!));
+    expect(crashes.slice(0, 3)).toEqual([
+      { type: 'Error', vaultType: 'vgs', componentName: 'cardCvc' },
+      { type: 'Error', vaultType: 'hyperswitch', componentName: 'cardNumber' },
+      { type: 'Error', vaultType: '', componentName: 'cardExpiry' },
+    ]);
+    expect(JSON.stringify(crashes.slice(0, 3))).not.toMatch(/973|tok_review/);
+    expect(crashes[3]).toMatchObject({
+      message: 'Invalid CVC: 973; token: tok_review_secret',
+      componentName: 'cardholderName',
+    });
+  });
+
   it('logs only the kind of value a field threw when it is not an Error', () => {
     const { log, sent } = setup();
-    log.crashed('cardCvc', { cvc: '123', expiry: '12/30', name: 'Jane Doe' });
-    log.crashed('cardExpiry', ['12', '30']);
-    log.crashed('cardholderName', null);
+    log.crashed(
+      'cardCvc',
+      { cvc: '123', expiry: '12/30', name: 'Jane Doe' },
+      hyperswitchVault
+    );
+    log.crashed('cardExpiry', ['12', '30'], hyperswitchVault);
+    log.crashed('cardholderName', null, null);
     const crashes = sent().filter((entry) => entry.event_name === 'SDK_CRASH');
     expect(crashes.map((entry) => JSON.parse(entry.value!))).toEqual([
       { thrown: 'object', componentName: 'cardCvc' },
@@ -402,9 +479,9 @@ describe('crashes and VGS', () => {
     const first = new Error('render failed at 4242 4242 4242 4242');
     const again = new Error('render failed at 4242 4242 4242 4242');
     again.stack = `${again.stack}\n    at a React retry frame`;
-    log.crashed('cardNumber', first);
-    log.crashed('cardNumber', again);
-    log.crashed('cardCvc', 'boom');
+    log.crashed('cardNumber', first, hyperswitchVault);
+    log.crashed('cardNumber', again, hyperswitchVault);
+    log.crashed('cardCvc', 'boom', hyperswitchVault);
 
     const crashes = sent().filter((entry) => entry.event_name === 'SDK_CRASH');
     expect(crashes).toHaveLength(2);

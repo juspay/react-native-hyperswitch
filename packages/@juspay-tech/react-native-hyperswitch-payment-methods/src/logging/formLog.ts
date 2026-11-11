@@ -8,7 +8,7 @@ import type {
 } from '../core/types';
 import { DEFAULT_READY_TIMEOUT_MS } from '../core/formSession';
 import { formatThrown, redactCardNumbers, redactDigits } from './logger';
-import type { Logger } from './logger';
+import type { Identity, Logger } from './logger';
 
 /* Why a card form never became usable. Web does not log this; it answers "was the card form
    shown?". */
@@ -38,7 +38,12 @@ export interface FormLog {
   fieldUnmounted(elementType: ElementType): void;
   fieldChanged(change: FieldChange): void;
   cleared(elementType: ElementType): void;
-  crashed(elementType: ElementType, thrown: unknown): void;
+  /* adapter: the provider whose field crashed. */
+  crashed(
+    elementType: ElementType,
+    thrown: unknown,
+    adapter: ProviderAdapter | null
+  ): void;
   /* Logs PAYMENT_METHOD_SESSION_TOKENIZE_INIT, runs the tokenize and logs its outcome. The
      result is returned unchanged. */
   tokenize(
@@ -77,9 +82,16 @@ export function logVgsSubmit(collector: unknown, status?: number): void {
   }
 }
 
-/* The message is kept only where the SDK writes it, as web keeps it for the Hyperswitch vault
-   only: other providers, a custom adapter or a caught exception can put the vault's data or the
-   merchant's own text into it. */
+/* Whether text the provider wrote can be logged: only the built-in Hyperswitch vault's, as web
+   keeps it for the Hyperswitch vault only. Another provider, a custom adapter or a caught
+   exception can put a CVC, a token or the merchant's own text into it. */
+function isHyperswitchVault(
+  vaultType: VaultType | undefined,
+  adapter: ProviderAdapter | null
+): boolean {
+  return vaultType === 'hyperswitch' && !isRegisteredAdapter(adapter);
+}
+
 function loggedMessage(
   result: TokenizeResult,
   vaultType: VaultType | undefined,
@@ -88,17 +100,28 @@ function loggedMessage(
   if (result.status === 'success') return '';
   const { code, message } = result.error;
   const authored =
-    vaultType === 'hyperswitch' &&
-    code !== 'tokenization_failed' &&
-    !isRegisteredAdapter(adapter);
+    isHyperswitchVault(vaultType, adapter) && code !== 'tokenization_failed';
   return authored && typeof message === 'string' ? redactDigits(message) : '';
 }
 
-/* What a crash recorded: an Error's message, type and stack, or only the kind of value thrown,
-   since any other value a provider throws can carry what the customer typed. */
-function recordCrash(thrown: unknown): Record<string, unknown> {
+/* What a crash recorded. The field is the provider's code, so an Error's message, type and stack
+   are kept only for the Hyperswitch vault, by the same rule as a tokenize message; for any other
+   provider, only the error's type and the provider. Any other value thrown is recorded only as
+   its kind, since it can carry what the customer typed. */
+function recordCrash(
+  thrown: unknown,
+  adapter: ProviderAdapter | null
+): Record<string, unknown> {
   if (thrown instanceof Error) {
-    return redactCardNumbers(formatThrown(thrown)) as Record<string, unknown>;
+    if (isHyperswitchVault(adapter?.vaultType, adapter)) {
+      return redactCardNumbers(formatThrown(thrown)) as Record<string, unknown>;
+    }
+    return {
+      type: /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(thrown.name)
+        ? thrown.name
+        : 'Error',
+      vaultType: adapter?.vaultType ?? '',
+    };
   }
   return {
     thrown:
@@ -225,7 +248,8 @@ export function createFormLog(logger: Logger): FormLog {
     if (settleScheduled) deferred.push(write);
     else write();
   };
-  const log: Logger['log'] = (entry) => later(() => logger.log(entry));
+  const log: Logger['log'] = (entry, from) =>
+    later(() => logger.log(entry, from));
 
   const failed = (problem: FormProblem) => {
     stopReadyTimer();
@@ -349,9 +373,9 @@ export function createFormLog(logger: Logger): FormLog {
       safely(() => log({ eventName: 'CLEAR', value: elementType }));
     },
 
-    crashed(elementType, thrown) {
+    crashed(elementType, thrown, adapter) {
       safely(() => {
-        const recorded = recordCrash(thrown);
+        const recorded = recordCrash(thrown, adapter);
         /* React renders a failing component more than once, each time with another stack: one
            log per session for each type and message. */
         const signature = JSON.stringify([
@@ -390,12 +414,19 @@ export function createFormLog(logger: Logger): FormLog {
     adapter: ProviderAdapter | null,
     run: () => Promise<TokenizeResult>
   ): Promise<TokenizeResult> {
-    safely(() =>
-      log({
-        eventName: 'PAYMENT_METHOD_SESSION_TOKENIZE_INIT',
-        value: vaultType ?? '',
-      })
-    );
+    /* The outcome is filed under the session the attempt started in, even if the session is
+       replaced while it runs, as an API call's answer is. */
+    let from: Identity | undefined;
+    safely(() => {
+      from = logger.currentIdentity();
+      log(
+        {
+          eventName: 'PAYMENT_METHOD_SESSION_TOKENIZE_INIT',
+          value: vaultType ?? '',
+        },
+        from
+      );
+    });
     const tokenizeStartedAt = Date.now();
     const result = await run();
     safely(() => {
@@ -418,7 +449,8 @@ export function createFormLog(logger: Logger): FormLog {
               logType: 'ERROR',
               category: 'USER_ERROR',
               latency,
-            }
+            },
+        from
       );
     });
     return result;

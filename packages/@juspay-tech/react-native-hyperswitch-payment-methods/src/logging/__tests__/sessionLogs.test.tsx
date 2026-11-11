@@ -424,8 +424,10 @@ describe('a payment-method session', () => {
     await waitFor(() => expect(events()).toContain('SDK_CRASH'));
     const logged = logs().filter((log) => log.event_name === 'SDK_CRASH');
     expect(logged).toHaveLength(1);
-    expect(JSON.parse(logged[0]!.value!)).toMatchObject({
-      message: 'field render failed',
+    /* Another provider's error text is not logged: only its type and the provider. */
+    expect(JSON.parse(logged[0]!.value!)).toEqual({
+      type: 'Error',
+      vaultType: 'vgs',
       componentName: 'cardNumber',
     });
   });
@@ -486,6 +488,51 @@ describe('a session made with initPaymentMethodSession', () => {
       new Set(['0a_pms_flow'])
     );
     expect(JSON.stringify(batches)).not.toContain(AUTH);
+  });
+
+  it('names the session a Hyperswitch vaultDetails carries when no sdkAuthorization is passed', async () => {
+    installMock({ vaultType: 'hyperswitch' });
+    const hyperswitchDetails = {
+      vaultType: 'hyperswitch',
+      vaultData: { sdkAuthorization: AUTH },
+    };
+    const { view } = renderSession({ vaultDetails: hyperswitchDetails });
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-field-cardCvc')).toBeTruthy()
+    );
+    view.unmount();
+    await initPaymentMethodSession(SANDBOX, {
+      vaultDetails: hyperswitchDetails,
+    } as never);
+    sendQueuedLogs();
+
+    const initiated = logs().filter(
+      (log) => log.event_name === 'PAYMENT_METHOD_SESSION_INITIATED'
+    );
+    expect(initiated.map((log) => JSON.parse(log.value!))).toEqual([
+      { entry: 'HyperPaymentMethodSession', pmSessionId: '0a_pms_flow' },
+      { entry: 'initPaymentMethodSession', pmSessionId: '0a_pms_flow' },
+    ]);
+    expect(new Set(logs().map((log) => log.payment_id))).toEqual(
+      new Set(['0a_pms_flow'])
+    );
+    expect(new Set(logs().map((log) => log.merchant_id))).toEqual(
+      new Set(['pk_snd_flow'])
+    );
+    expect(JSON.stringify(batches)).not.toContain(AUTH);
+  });
+
+  it('names no session for another vault’s details passed without sdkAuthorization', async () => {
+    installMock();
+    const { view } = renderSession({
+      vaultDetails: { vaultType: 'vgs', vaultData: {} },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-field-cardCvc')).toBeTruthy()
+    );
+    view.unmount();
+    expect(events()).toContain('PAYMENT_METHOD_SESSION_INITIATED');
+    expect(new Set(logs().map((log) => log.payment_id))).toEqual(new Set(['']));
   });
 
   it('logs the parameter it lacks, and still throws as before', async () => {

@@ -6,7 +6,11 @@ import type { PaymentMethodsSession } from './SessionContext';
 import type { HyperswitchConfiguration } from './config';
 import { fetchVaultDetails } from './fetchVaultDetails';
 import type { Appearance, VaultDetails } from '../core/types';
-import { createLogger, logSessionStart } from '../logging/logger';
+import {
+  createLogger,
+  logSessionStart,
+  vaultDetailsAuthorization,
+} from '../logging/logger';
 import type { Logger } from '../logging/logger';
 import { LoggerContext } from '../logging/LoggerContext';
 import { loggingUrl } from '../logging/loggingUrl';
@@ -134,11 +138,14 @@ export function HyperPaymentMethodSession({
   );
   /* Every log names the session's merchant and payment-method session. Set in the commit's layout
      phase, before any effect of the card forms inside logs, and never during a render React may
-     discard. */
+     discard. A Hyperswitch vaultDetails passed without sdkAuthorization names it in its
+     vaultData. */
   const publishableKey = resolvedHyper?.publishableKey;
+  const loggedAuthorization =
+    sdkAuthorization || vaultDetailsAuthorization(providedVaultDetails);
   useLayoutEffect(() => {
-    logger?.identify(sdkAuthorization, publishableKey);
-  }, [logger, sdkAuthorization, publishableKey]);
+    logger?.identify(loggedAuthorization, publishableKey);
+  }, [logger, loggedAuthorization, publishableKey]);
 
   useEffect(() => {
     if (!logger) return;

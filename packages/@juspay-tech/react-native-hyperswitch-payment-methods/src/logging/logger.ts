@@ -40,8 +40,9 @@ export interface LogEntry {
   latency?: number;
 }
 
-/* The session a log belongs to. An API answer keeps the one its request started in. */
-interface Identity {
+/* The session a log belongs to. An API answer, or a tokenize's outcome, keeps the one its
+   request started in. */
+export interface Identity {
   sessionId: string;
   merchantId: string;
   paymentId: string;
@@ -177,11 +178,30 @@ export interface Logger {
      replaces another starts afresh, as web loads its frames afresh for each: a new session_id,
      first_event and per-event counts. */
   identify(sdkAuthorization: unknown, publishableKey: unknown): void;
-  log(entry: LogEntry): void;
+  /* A copy of the session logs are filed under now, for an operation that awaits to keep, as an
+     API call does. */
+  currentIdentity(): Identity;
+  /* from: the session the log belongs to, if not the current one. */
+  log(entry: LogEntry, from?: Identity): void;
   apiCall(eventName: ApiEventName, url: string): ApiCallLog;
   /* Sends everything queued: web does when the page unloads, this package when a form or
      session closes and when the app leaves the foreground. */
   sendLogs(): void;
+}
+
+/* The sdkAuthorization a Hyperswitch vaultDetails carries in its vaultData, for a merchant who
+   passes vaultDetails without sdkAuthorization: it names the same payment-method session. Other
+   vaults carry no session id. */
+export function vaultDetailsAuthorization(vaultDetails: unknown): string {
+  if (typeof vaultDetails !== 'object' || vaultDetails === null) return '';
+  const { vaultType, vaultData } = vaultDetails as {
+    vaultType?: unknown;
+    vaultData?: unknown;
+  };
+  if (vaultType !== 'hyperswitch') return '';
+  if (typeof vaultData !== 'object' || vaultData === null) return '';
+  const { sdkAuthorization } = vaultData as { sdkAuthorization?: unknown };
+  return typeof sdkAuthorization === 'string' ? sdkAuthorization : '';
 }
 
 /* As web's manageErrorWarning(REQUIRED_PARAMETER): the parameter named, never a value. */
@@ -355,9 +375,13 @@ export function createLogger(url: string | undefined): Logger {
       }
     },
 
-    log(entry) {
+    currentIdentity() {
+      return { ...identity };
+    },
+
+    log(entry, from) {
       try {
-        push(entry);
+        push(entry, from);
       } catch {
         /* Logging never changes what the SDK does. */
       }

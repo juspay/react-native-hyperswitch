@@ -54,6 +54,8 @@ export function createCardField<P extends FieldProps = FieldProps>(
     const log = ctx?.log;
     const logRef = useRef(log);
     logRef.current = log;
+    const adapterRef = useRef(ctx?.adapter ?? null);
+    adapterRef.current = ctx?.adapter ?? null;
 
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
@@ -160,7 +162,8 @@ export function createCardField<P extends FieldProps = FieldProps>(
     }, [mounted, log]);
 
     const onCrash = useCallback(
-      (thrown: unknown) => logRef.current?.crashed(elementType, thrown),
+      (thrown: unknown) =>
+        logRef.current?.crashed(elementType, thrown, adapterRef.current),
       []
     );
 
