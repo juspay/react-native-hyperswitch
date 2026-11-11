@@ -223,10 +223,11 @@ let calculateLatencyHook = (logger: t, ~eventName: eventName) => {
 
 // What the vault sends from an error: the backend's error body, or what was thrown. The vault never
 // puts a field's value into either, and as a backstop any run of twelve or more digits, the shape
-// of a card number, is blanked out of every text in it, however the digits are spaced. Shorter
-// numbers, such as a stack's line and column, are kept.
+// of a card number, is blanked out of every text in it, with any number of spaces, line breaks,
+// dots, slashes or dashes between the digits. Shorter numbers, such as a stack's line and column,
+// are kept. Separators and digits never overlap, so the match takes time in proportion to the text.
 let redactDigits = (text: string) =>
-  text->String.replaceRegExp(%re("/\d(?:[\s./-]{0,2}\d){11,}/g"), "[redacted]")
+  text->String.replaceRegExp(%re("/\d(?:[\s./-]*\d){11,}/g"), "[redacted]")
 
 let rec redactCardNumbers = (value: JSON.t): JSON.t =>
   switch value {

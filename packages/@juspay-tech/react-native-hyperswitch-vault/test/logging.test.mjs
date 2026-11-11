@@ -565,6 +565,37 @@ test('the merchant’s own text is logged only when it looks like a locale or a 
   assert.equal('cardholderName' in named, false);
 });
 
+test('a card number or a name passed by mistake in the form settings is never logged', () => {
+  const settings = (unknownCardSchemes, cardholderNameMode) =>
+    VaultLogValues.optionsValue({
+      environment: 'PROD',
+      sessionStatus: 'valid',
+      sessionProblem: '',
+      customEndpoints: undefined,
+      enabledCardSchemes: [],
+      unknownCardSchemes,
+      cardholderNameMode,
+      locale: '',
+      fields: [],
+      savedCard: false,
+    });
+  const value = settings(
+    ['4242424242424242', '4242 4242 4242 4242', 'Visa 4242424242424242', 'Mastercad'],
+    'Jane Q. Customer',
+  );
+  assert.deepEqual(JSON.parse(value).unknownCardSchemes, [
+    'unrecognised',
+    'unrecognised',
+    'Visa [redacted]',
+    'Mastercad',
+  ]);
+  assert.equal(JSON.parse(value).cardholderNameMode, 'unrecognised');
+  assert.doesNotMatch(value, /4242|Jane/);
+  for (const mode of ['collect', 'external', 'omit']) {
+    assert.equal(JSON.parse(settings([], mode)).cardholderNameMode, mode);
+  }
+});
+
 test('no part of a crash record carries a run of digits shaped like a card number', () => {
   const logger = VaultLogger.make(LOG_URL, 'android');
   const error = new Error('Unexpected value 4242 4242 4242 4242 at index 12');
@@ -602,6 +633,26 @@ test('no part of a crash record carries a run of digits shaped like a card numbe
   assert.equal(thrown.thrown, 'bad input [redacted]');
   assert.deepEqual(object.input, { pan: '[redacted]', digits: '[redacted]' });
   assert.doesNotMatch(JSON.stringify(logs()), /4242|4111/);
+});
+
+test('a card number is blanked however many spaces, line breaks, dots, slashes or dashes it has', () => {
+  for (const text of [
+    '4242   4242   4242   4242',
+    '4242 - 4242 - 4242 - 4242',
+    '4242\n4242\n4242\n4242',
+    '4242\t\t\t4242\t\t\t4242\t\t\t4242',
+    '4242 . 4242 / 4242 -- 4242',
+  ]) {
+    assert.equal(VaultLogger.redactDigits(`card ${text} end`), 'card [redacted] end', text);
+  }
+  for (const kept of ['at render (index.android.bundle:12:3456)', 'order 1234 5678', 'IR_16']) {
+    assert.equal(VaultLogger.redactDigits(kept), kept);
+  }
+  // Separators and digits never overlap, so a long text takes no time.
+  const long = `1${' '.repeat(1_000_000)}x`;
+  const startedAt = performance.now();
+  assert.equal(VaultLogger.redactDigits(long), long);
+  assert.ok(performance.now() - startedAt < 1000);
 });
 
 test('an error body from the vault carries no run of digits shaped like a card number', async () => {
