@@ -27,8 +27,9 @@ let isUnusableSession = (sessionStatus: string) =>
   | _ => false
   }
 
-// The merchant's own text (a locale, a card scheme name) is kept only when it looks like one, so a
-// value passed by mistake is never copied into a log.
+// The merchant's own text (a locale, a card scheme name, the name field's mode) is kept only when it
+// looks like one, so a value passed by mistake is never copied into a log. A scheme name has a letter
+// in it, so digits alone, such as a card number, are not one.
 let unrecognised = "unrecognised"
 let keepIf = (value: string, pattern: RegExp.t) =>
   pattern->RegExp.test(value) ? value : unrecognised
@@ -37,7 +38,12 @@ let localeOf = (locale: string) =>
 let schemeNamesOf = (names: array<string>) =>
   names
   ->Array.slice(~start=0, ~end=10)
-  ->Array.map(name => name->keepIf(%re("/^[A-Za-z0-9 _-]{1,32}$/")))
+  ->Array.map(name => name->keepIf(%re("/^(?=[^A-Za-z]*[A-Za-z])[A-Za-z0-9 _-]{1,32}$/")))
+let cardholderNameModeOf = (mode: string) =>
+  switch mode {
+  | "collect" | "external" | "omit" => mode
+  | _ => unrecognised
+  }
 
 type formOptions = {
   environment: string,
@@ -56,7 +62,8 @@ let isSet = (endpoint: option<string>) => endpoint->Option.mapOr(false, value =>
 
 // PAYMENT_ELEMENT_OPTIONS's value, the event web logs a merchant's options under: the settings that
 // decide what the form accepts and where it confirms. A custom endpoint is recorded only as set or
-// not, never as its URL.
+// not, never as its URL. As a backstop, a run of digits shaped like a card number is blanked out of
+// the whole value, as out of the vault's error logs.
 let optionsValue = (options: formOptions) => {
   let endpoints = options.customEndpoints->VaultEndpoint.normalize
   let overrides = endpoints->Option.flatMap(endpoints => endpoints.overrideEndpoints)
@@ -85,7 +92,7 @@ let optionsValue = (options: formOptions) => {
     ("enabledCardSchemes", options.enabledCardSchemes->strings),
     ("unknownCardSchemes", options.unknownCardSchemes->schemeNamesOf->strings),
     // How the form treats the name field (collect, external or omit), never a name.
-    ("cardholderNameMode", options.cardholderNameMode->JSON.Encode.string),
+    ("cardholderNameMode", options.cardholderNameMode->cardholderNameModeOf->JSON.Encode.string),
     ("locale", options.locale->localeOf->JSON.Encode.string),
     ("fields", options.fields->strings),
     ("savedCard", options.savedCard->JSON.Encode.bool),
@@ -93,4 +100,5 @@ let optionsValue = (options: formOptions) => {
   ->Dict.fromArray
   ->JSON.Encode.object
   ->JSON.stringify
+  ->VaultLogger.redactDigits
 }
