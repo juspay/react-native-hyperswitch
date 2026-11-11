@@ -47,7 +47,8 @@ const sepaMandate = MessageElement.action({
 });
 
 export const paymentMessages: PaymentMethodConfig[] = [
-  /* Payment method level: applies to every card type. */
+  /* Payment method level: applies to every card type. On a mandate intent it is also the
+   saved-card terms checkbox label; remove it to see the default terms. */
   {
     paymentMethod: "card",
     message: {
@@ -55,10 +56,15 @@ export const paymentMessages: PaymentMethodConfig[] = [
       elementStyles: actionDefaults,
     },
   },
-  /* Payment method level, plain text only. */
+  /* Shown once below the wallet buttons on a mandate intent, in place of the SDK's
+   "Wallet details will be saved" text. Use { displayMode: "hidden" } to show nothing, or
+   { displayMode: "default_sdk_message" } for the SDK text. */
   {
     paymentMethod: "wallet",
-    message: { value: "Wallet: you will confirm the payment in your wallet app." },
+    message: {
+      value: messageContent`Wallet: your wallet will be saved for later. See the ${terms}.`,
+      elementStyles: actionDefaults,
+    },
   },
   /* Method level for every bank debit type, overridden for SEPA and hidden for ACH. */
   {
