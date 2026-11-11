@@ -1,9 +1,6 @@
 import type { TurboModule } from 'react-native';
 import { NativeModules, TurboModuleRegistry } from 'react-native';
-import type {
-  EventEmitter,
-  Int32,
-} from 'react-native/Libraries/Types/CodegenTypes';
+import type { EventEmitter } from 'react-native/Libraries/Types/CodegenTypes';
 
 export type CustomEndpoints = Object;
 /* A tap names its message: `paymentMethodType` is empty when the shown text is the payment
@@ -12,7 +9,7 @@ export type CustomEndpoints = Object;
 export type MessageActionEvent = {
   paymentMethod: string;
   paymentMethodType: string;
-  index: Int32;
+  index: number;
   text: string;
 };
 
