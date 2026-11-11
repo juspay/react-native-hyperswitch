@@ -1,7 +1,7 @@
 import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfiguration';
 import {
-  MessageContent,
   MessageElement,
+  type MessageContent,
   type MessageElementStyle,
   type PaymentMethodMessage,
 } from '../messages/MessageContent';
@@ -18,7 +18,7 @@ export type MessageAction = {
 
 /* The segments as sent: empty text is dropped, so positions match the bridge `value`. */
 const segmentsOf = (content: MessageContent) =>
-  content.parts.filter((part) => part !== '');
+  content.filter((part) => part !== '');
 
 export function dispatchMessageAction(
   configuration: PaymentSheetConfiguration | undefined,
@@ -33,7 +33,7 @@ export function dispatchMessageAction(
       : config?.paymentMethodTypes?.find(
           (entry) => entry.paymentMethodType === paymentMethodType
         )?.message;
-  if (!(message?.value instanceof MessageContent)) return;
+  if (!Array.isArray(message?.value)) return;
   const segment = segmentsOf(message.value)[index];
   if (segment instanceof MessageElement && segment.options.label === text) {
     segment.options.onClick();
@@ -84,17 +84,22 @@ export function preparePaymentMessages(
         : {}),
       ...(actionDefaults ? { elementStyles: { action: actionDefaults } } : {}),
     };
-    if (!(message.value instanceof MessageContent)) {
-      if (message.value != null && typeof message.value !== 'string') {
-        throw new TypeError(
-          'Use the messageContent tagged template for rich message values.'
-        );
-      }
-      return message.value === undefined
-        ? base
-        : { ...base, value: [{ text: message.value }] };
+    const { value: content } = message;
+    if (content == null) return base;
+    if (typeof content === 'string') {
+      return { ...base, value: [{ text: content }] };
     }
-    const value = segmentsOf(message.value).map((part) => {
+    if (
+      !Array.isArray(content) ||
+      content.some(
+        (part) => typeof part !== 'string' && !(part instanceof MessageElement)
+      )
+    ) {
+      throw new TypeError(
+        'A message value is text, or messageContent / an array of text and MessageElement actions.'
+      );
+    }
+    const value = segmentsOf(content).map((part) => {
       if (typeof part === 'string') return { text: part };
       const { label, style } = part.options;
       hasActions = true;

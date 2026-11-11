@@ -92,10 +92,9 @@ static NSDictionary * _Nullable dynamicToDict(const folly::dynamic &dyn)
 - (void)prepareForRecycle
 {
     [super prepareForRecycle];
+    /* The callbacks stay: setupEventForwarding runs only in init, and they resolve
+       the current mount's _eventEmitter through weakSelf when they fire. */
     [[NativePaymentWidgetViewRegistry shared] unregisterForTag:@(self.tag)];
-    _widgetView.onPaymentResult = nil;
-    _widgetView.onPaymentEvent = nil;
-    _widgetView.onMessageAction = nil;
 }
 
 - (void)willMoveToWindow:(nullable UIWindow *)newWindow

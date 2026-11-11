@@ -50,35 +50,24 @@ export class MessageElement {
   }
 }
 
+/** Message text and actions, in display order. Build it with `messageContent` or as an array. */
+export type MessageContent = readonly (string | MessageElement)[];
+
 /** A tagged template retains the actual elements; no string parser is needed in RN. */
-export class MessageContent {
-  private constructor(
-    /** @internal */ readonly parts: readonly (string | MessageElement)[]
-  ) {}
-
-  /** @internal */
-  static fromTemplate(
-    strings: TemplateStringsArray,
-    values: readonly (MessageElement | string | number)[]
-  ): MessageContent {
-    const parts: (string | MessageElement)[] = [strings[0] ?? ''];
-    values.forEach((part, index) => {
-      if (part instanceof MessageElement) {
-        parts.push(part);
-      } else if (typeof part === 'string' || typeof part === 'number') {
-        parts.push(String(part));
-      } else {
-        throw new TypeError('Use MessageElement factories in messageContent.');
-      }
-      parts.push(strings[index + 1] ?? '');
-    });
-    return new MessageContent(parts);
-  }
-}
-
 export function messageContent(
   strings: TemplateStringsArray,
   ...values: readonly (MessageElement | string | number)[]
 ): MessageContent {
-  return MessageContent.fromTemplate(strings, values);
+  const parts: (string | MessageElement)[] = [strings[0] ?? ''];
+  values.forEach((part, index) => {
+    if (part instanceof MessageElement) {
+      parts.push(part);
+    } else if (typeof part === 'string' || typeof part === 'number') {
+      parts.push(String(part));
+    } else {
+      throw new TypeError('Use MessageElement factories in messageContent.');
+    }
+    parts.push(strings[index + 1] ?? '');
+  });
+  return parts;
 }
