@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useRef } from 'react';
+import type { MessageActionEvent } from '../codegen/modules/NativeHyperswitchModule';
 import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfiguration';
 import {
   dispatchMessageAction,
   preparePaymentMessages,
-  type MessageAction,
 } from '../utils/PaymentMessages';
 
 /* Native options are initial props, like every other widget option. The latest
@@ -15,7 +15,7 @@ export function usePaymentMessages(
   const optionsRef = useRef(options);
   optionsRef.current = options;
   const dispatch = useCallback(
-    (action: MessageAction) =>
+    (action: MessageActionEvent) =>
       dispatchMessageAction(optionsRef.current, action),
     []
   );

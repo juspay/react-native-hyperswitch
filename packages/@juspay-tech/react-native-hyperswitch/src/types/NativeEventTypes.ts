@@ -1,6 +1,7 @@
 /** Result payload delivered by the widget bridge for a single payment attempt. */
 
 import type { ViewStyle } from 'react-native';
+import type { MessageActionEvent } from '../codegen/modules/NativeHyperswitchModule';
 import type {
   HyperswitchConfiguration,
   PaymentSessionConfiguration,
@@ -105,14 +106,7 @@ export type NativePaymentWidgetPropTypes = {
   style?: ViewStyle;
   onPaymentEvent?: (event: PaymentEventNative) => void;
   /** A tapped payment method message action; separate from payment events. */
-  onMessageAction?: (event: {
-    nativeEvent: {
-      paymentMethod: string;
-      paymentMethodType: string;
-      index: number;
-      text: string;
-    };
-  }) => void;
+  onMessageAction?: (event: { nativeEvent: MessageActionEvent }) => void;
 };
 /** @deprecated Use {@link NativePaymentWidgetPropTypes}. */
 export type nativePaymentWidgetType = NativePaymentWidgetPropTypes;

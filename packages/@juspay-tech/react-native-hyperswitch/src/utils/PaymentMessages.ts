@@ -1,3 +1,4 @@
+import type { MessageActionEvent } from '../codegen/modules/NativeHyperswitchModule';
 import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfiguration';
 import {
   MessageElement,
@@ -6,23 +7,13 @@ import {
   type PaymentMethodMessage,
 } from '../messages/MessageContent';
 
-/* A tap names its message: `paymentMethodType` is empty when the shown text is the payment
-   method's own message, `index` is the segment's position in that message's `value`, and
-   `text` is what it showed. A segment with other text is not the one tapped. */
-export type MessageAction = {
-  paymentMethod: string;
-  paymentMethodType: string;
-  index: number;
-  text: string;
-};
-
 /* The segments as sent: empty text is dropped, so positions match the bridge `value`. */
 const segmentsOf = (content: MessageContent) =>
   content.filter((part) => part !== '');
 
 export function dispatchMessageAction(
   configuration: PaymentSheetConfiguration | undefined,
-  { paymentMethod, paymentMethodType, index, text }: MessageAction
+  { paymentMethod, paymentMethodType, index, text }: MessageActionEvent
 ) {
   const config = configuration?.paymentMethodsConfig?.find(
     (entry) => entry.paymentMethod === paymentMethod

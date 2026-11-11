@@ -6,6 +6,9 @@ import type {
 } from 'react-native/Libraries/Types/CodegenTypes';
 
 export type CustomEndpoints = Object;
+/* A tap names its message: `paymentMethodType` is empty when the shown text is the payment
+   method's own message, `index` is the segment's position in that message's `value`, and
+   `text` is what it showed. */
 export type MessageActionEvent = {
   paymentMethod: string;
   paymentMethodType: string;
