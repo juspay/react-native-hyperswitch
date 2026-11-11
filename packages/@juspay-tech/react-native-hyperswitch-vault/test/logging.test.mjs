@@ -70,7 +70,7 @@ const confirmCall = logger => ({
   url: CONFIRM_URL,
   merchantId: PUBLISHABLE_KEY,
   paymentId: SESSION_ID,
-  logSessionId: logger.sessionId,
+  logSession: VaultLogger.currentSession(logger),
   startedAt: undefined,
 });
 
@@ -450,11 +450,13 @@ test('an answer that arrives after the session changed stays with the session th
     calls.map(log => [log.event_name, log.session_id === firstSession ? 'first' : 'second', log.first_event]),
     [
       ['PAYMENT_METHOD_SESSION_CONFIRM_CALL_INIT', 'first', 'true'],
-      ['PAYMENT_METHOD_SESSION_CONFIRM_CALL', 'first', 'false'],
+      ['PAYMENT_METHOD_SESSION_CONFIRM_CALL', 'first', 'true'],
       ['PAYMENT_METHOD_SESSION_CONFIRM_CALL_INIT', 'second', 'true'],
       ['PAYMENT_METHOD_SESSION_CONFIRM_CALL', 'second', 'true'],
     ],
   );
+  // The late answer counted in its own session, not in the one that replaced it.
+  assert.equal(logger.counts.PAYMENT_METHOD_SESSION_CONFIRM_CALL, 1);
   assert.notEqual(firstSession, secondSession);
   assert.ok(Number(calls[1].latency) >= 20, `late answer latency ${calls[1].latency}`);
 });
