@@ -80,6 +80,8 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
   const [selectedCard, setSelectedCard] = useState<SavedCard | null>(null);
 
   const selectCard = (card: SavedCard | null) => {
+    // Tapping the row already selected keeps its form and validity, so canPay stays as it is.
+    if (card?.token === selectedCard?.token) return;
     setCanPay(false);
     setSelectedCard(card);
   };

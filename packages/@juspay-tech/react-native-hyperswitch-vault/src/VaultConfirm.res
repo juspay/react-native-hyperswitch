@@ -501,7 +501,7 @@ let apiCallOf = (
     url,
     merchantId: sdkAuthorization->publishableKeyOf,
     paymentId: sessionId,
-    logSessionId: logger.sessionId,
+    logSession: logger->VaultLogger.currentSession,
     startedAt: None,
   })
 

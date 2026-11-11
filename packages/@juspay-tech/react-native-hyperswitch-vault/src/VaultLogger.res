@@ -88,8 +88,8 @@ type t = {
   url: option<string>,
   mutable sessionId: string,
   platform: string,
-  events: Dict.t<float>,
-  counts: Dict.t<int>,
+  mutable events: Dict.t<float>,
+  mutable counts: Dict.t<int>,
   mainLogFile: array<logFile>,
   mutable timeOut: option<timerId>,
 }
@@ -155,13 +155,28 @@ let sendLogs = (logger: t) => {
   }
 }
 
+// A log session: its session_id, when each event was last logged (first_event and latency) and how
+// many of each were queued (the per-event cap).
+type session = {
+  id: string,
+  events: Dict.t<float>,
+  counts: Dict.t<int>,
+}
+
+let currentSession = (logger: t) => {
+  id: logger.sessionId,
+  events: logger.events,
+  counts: logger.counts,
+}
+
 // A new vault session on the same form, as web loads its frames afresh for each: what is queued goes
-// out, then the session gets its own session_id, first_event and per-event counts.
+// out, then the session gets its own session_id, first_event and per-event counts. They are new
+// dictionaries, so a call still in flight keeps counting in the session it started in.
 let startNewSession = (logger: t) => {
   logger->sendLogs
   logger.sessionId = newSessionId()
-  logger.events->Dict.keysToArray->Array.forEach(key => logger.events->Dict.delete(key))
-  logger.counts->Dict.keysToArray->Array.forEach(key => logger.counts->Dict.delete(key))
+  logger.events = Dict.make()
+  logger.counts = Dict.make()
 }
 
 // As web's checkForPriorityEvents: an error goes out at once, and so does a queue of more than 8.
@@ -180,10 +195,10 @@ let checkLogSizeAndSendData = (logger: t) => {
 // As web's maxLogsPushedPerEventName.
 let maxLogsPushedPerEventName = 100
 
-let conditionalLogPush = (logger: t, log: logFile) => {
+let conditionalLogPush = (logger: t, log: logFile, ~counts: Dict.t<int>) => {
   let key = (log.eventName :> string)
-  let count = logger.counts->Dict.get(key)->Option.getOr(0) + 1
-  logger.counts->Dict.set(key, count)
+  let count = counts->Dict.get(key)->Option.getOr(0) + 1
+  counts->Dict.set(key, count)
   if count <= maxLogsPushedPerEventName {
     logger.mainLogFile->Array.push(log)
   }
@@ -207,20 +222,21 @@ let pushLog = (
   ~merchantId,
   ~paymentId,
   ~latency: option<float>=?,
-  ~sessionId: option<string>=?,
+  ~session: option<session>=?,
 ) =>
   if logger->isLoggerEnabled {
     let key = (eventName :> string)
     let timestamp = Date.now()
-    // A log that belongs to a session the form has since left keeps that session's id, and leaves
-    // the current session's first_event and latencies alone.
-    let current = sessionId->Option.mapOr(true, sessionId => sessionId === logger.sessionId)
-    logger->conditionalLogPush({
+    // A log that belongs to a session the form has since left keeps that session's id, first_event
+    // and counts, and leaves the current session's alone.
+    let session = session->Option.getOr(logger->currentSession)
+    let current = session.id === logger.sessionId
+    logger->conditionalLogPush(~counts=session.counts, {
       timestamp: timestamp->Float.toString,
       logType,
       category,
       value,
-      sessionId: sessionId->Option.getOr(logger.sessionId),
+      sessionId: session.id,
       merchantId,
       paymentId,
       platform: logger.platform,
@@ -229,12 +245,10 @@ let pushLog = (
       | Some(latency) => latency->Float.toString
       | None => current ? logger->calculateLatencyHook(~eventName) : ""
       },
-      firstEvent: current && logger.events->Dict.get(key)->Option.isNone,
+      firstEvent: session.events->Dict.get(key)->Option.isNone,
     })
     logger->checkLogSizeAndSendData
-    if current {
-      logger.events->Dict.set(key, timestamp)
-    }
+    session.events->Dict.set(key, timestamp)
   }
 
 let setLogApi = (
@@ -245,7 +259,7 @@ let setLogApi = (
   ~merchantId,
   ~paymentId,
   ~latency=?,
-  ~sessionId=?,
+  ~session=?,
 ) =>
   logger->pushLog(
     ~value=value->Dict.fromArray->JSON.Encode.object->JSON.stringify,
@@ -255,7 +269,7 @@ let setLogApi = (
     ~merchantId,
     ~paymentId,
     ~latency?,
-    ~sessionId?,
+    ~session?,
   )
 
 // As web's setLogInfo: a user event, recorded by name only, e.g. which card field gained focus.
@@ -264,14 +278,14 @@ let setLogInfo = (logger: t, ~value, ~eventName, ~merchantId, ~paymentId) =>
 
 // The identity every log of one API call carries. A call keeps the log session it started in and
 // its own start time, so an answer that arrives after the form's session changed is still filed
-// under the session that sent it, with its real latency.
+// under the session that sent it, with that session's first_event and count and its real latency.
 type apiCall = {
   logger: t,
   eventName: eventName,
   url: string,
   merchantId: string,
   paymentId: string,
-  logSessionId: string,
+  logSession: session,
   mutable startedAt: option<float>,
 }
 
@@ -298,7 +312,7 @@ let logApi = (call: apiCall, ~eventName, ~apiLogType, ~statusCode=0, ~data=JSON.
     ~merchantId=call.merchantId,
     ~paymentId=call.paymentId,
     ~latency?,
-    ~sessionId=call.logSessionId,
+    ~session=call.logSession,
   )
 }
 
