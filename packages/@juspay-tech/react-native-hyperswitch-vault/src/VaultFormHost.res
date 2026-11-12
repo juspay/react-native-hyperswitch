@@ -58,13 +58,16 @@ let useHost = (
       | (Some(session), _, _) => session->VaultFormCoordinator.readSession
       | (None, Some(details), _) =>
         VaultFormCoordinator.sessionFromVaultDetails(~details, ~sdkAuthorization)
-      | (None, None, Some(authorization)) =>
-        VaultFormCoordinator.sessionFromAuthorization(authorization)
+      | (None, None, Some(sdkAuthorization)) =>
+        VaultFormCoordinator.sessionFromAuthorization(sdkAuthorization)
       | (None, None, None) => VaultFormCoordinator.Unusable("No card-vault session was supplied.")
       },
     (session, vaultDetails, sdkAuthorization),
   )
-  let authorization = switch sessionState {
+  // The authorization of the session the form uses, as web's resolveSdkAuthorization: the
+  // sdkAuthorization the merchant passed, the Hyperswitch vaultDetails' one, or the session's own.
+  // Empty when that session cannot be used.
+  let resolvedSdkAuthorization = switch sessionState {
   | Ready({authorization}) => authorization
   | Unusable(_) => ""
   }
@@ -74,29 +77,30 @@ let useHost = (
   )
   // A session that replaces another starts the logger afresh, as web loads its frames afresh for
   // each. The first session to arrive does not: what the customer did before it keeps its session_id.
-  let loggedAuthorizationRef = React.useRef("")
+  let lastResolvedSdkAuthorizationRef = React.useRef("")
   React.useEffect2(() => {
-    if authorization !== "" {
-      let previous = loggedAuthorizationRef.current
-      if previous !== "" && previous !== authorization {
+    if resolvedSdkAuthorization !== "" {
+      let previous = lastResolvedSdkAuthorizationRef.current
+      if previous !== "" && previous !== resolvedSdkAuthorization {
         logger->VaultLogger.startNewSession
       }
-      loggedAuthorizationRef.current = authorization
+      lastResolvedSdkAuthorizationRef.current = resolvedSdkAuthorization
     }
     None
-  }, (logger, authorization))
-  // The merchant and session every log names. A session the form cannot use is still named by its
-  // sdk_authorization when that can be read, so the logs that explain why can be found.
-  let loggedAuthorization = switch sessionState {
-  | Ready(_) => authorization
+  }, (logger, resolvedSdkAuthorization))
+  // What every log's merchant_id and payment_id are read from: the resolved authorization, or, for
+  // a session the form cannot use, the sdkAuthorization the merchant passed, so the logs that
+  // explain why that session was rejected still carry its payment_id.
+  let logSdkAuthorization = switch sessionState {
+  | Ready(_) => resolvedSdkAuthorization
   | Unusable(_) => sdkAuthorization->Option.getOr("")
   }
   let (merchantId, paymentId) = React.useMemo1(
     () => (
-      loggedAuthorization->VaultConfirm.publishableKeyOf,
-      loggedAuthorization->VaultConfirm.resolveSessionId->Result.getOr(""),
+      logSdkAuthorization->VaultConfirm.publishableKeyOf,
+      logSdkAuthorization->VaultConfirm.resolveSessionId->Result.getOr(""),
     ),
-    [loggedAuthorization],
+    [logSdkAuthorization],
   )
   // Queued logs go out when the form closes or the app leaves the foreground, as web sends them when
   // the page unloads.
@@ -337,7 +341,7 @@ let useHost = (
       let timer = setTimeout(logSettings, 1000)
       Some(() => clearTimeout(timer))
     }
-  }, (settings, authorization, logger, hasFields))
+  }, (settings, resolvedSdkAuthorization, logger, hasFields))
 
   // The card fields' user events. The co-badged network picker is logged as web's
   // CardSchemeComponent logs it. FOCUS and BLUR record the customer moving between fields, by field
@@ -404,7 +408,8 @@ let useHost = (
   // A crash inside a field, once per logger session for each distinct error: React can render a
   // failing component more than once before the error leaves the form.
   let crashesLoggedRef = React.useRef(Dict.make())
-  let onCrash = (componentName, thrown) => {
+  let onCrash = (componentName: VaultWidgetContext.componentName, thrown) => {
+    let componentName = (componentName :> string)
     let key = `${logger.sessionId}|${componentName}|${thrown->VaultLogger.crashSignature}`
     if crashesLoggedRef.current->Dict.get(key)->Option.isNone {
       crashesLoggedRef.current->Dict.set(key, true)
@@ -420,7 +425,7 @@ let useHost = (
       logUserEvent(~eventName=CARD_SCHEME_SELECTION, ~value="Card detected as co-badged")
     }
     None
-  }, (controller.values.isCoBadged, authorization, logger))
+  }, (controller.values.isCoBadged, resolvedSdkAuthorization, logger))
 
   let buildFormChange = () => {
     let snapshot = controller.publicSnapshot()

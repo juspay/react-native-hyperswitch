@@ -1,5 +1,8 @@
 open ReactNative
 
+// What a crash is logged under: a card field, by its public name, or the whole form.
+type componentName = [VaultPublicState.elementType | #cardForm]
+
 type contextValue = {
   controller: VaultCardController.controller,
   theme: CardFormTypes.cardTheme,
@@ -13,7 +16,7 @@ type contextValue = {
   isProcessing: bool,
   onAnalytics: CardFormTypes.analyticsEvent => unit,
   // Logs a crash inside the named field (SDK_CRASH).
-  onCrash: (string, Exn.t) => unit,
+  onCrash: (componentName, Exn.t) => unit,
 
   unstyled: bool,
 
@@ -69,7 +72,7 @@ module CrashBoundary = {
 // unchanged. Only the vault's components are inside it, never the merchant's.
 module Guarded = {
   @react.component
-  let make = (~ctx: contextValue, ~componentName: string, ~children: React.element) =>
+  let make = (~ctx: contextValue, ~componentName: componentName, ~children: React.element) =>
     <CrashBoundary onCrash={thrown => ctx.onCrash(componentName, thrown)}> children </CrashBoundary>
 }
 

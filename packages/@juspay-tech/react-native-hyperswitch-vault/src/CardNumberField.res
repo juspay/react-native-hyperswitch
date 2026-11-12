@@ -49,7 +49,7 @@ let make = React.forwardRef((
     cardBrandIcon: ?props["cardBrandIcon"],
   }
 
-  <VaultWidgetContext.Guarded ctx componentName="cardNumber">
+  <VaultWidgetContext.Guarded ctx componentName=#cardNumber>
     <BoundCardFields.Number
       ctx
       styles=?{props["styles"]}
