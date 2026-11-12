@@ -45,7 +45,7 @@ let make = React.forwardRef((
     unstyled: ?props["unstyled"],
   }
 
-  <VaultWidgetContext.Guarded ctx componentName="cardExpiry">
+  <VaultWidgetContext.Guarded ctx componentName=#cardExpiry>
     <BoundCardFields.Expiry
       ctx
       styles=?{props["styles"]->Option.map(CardFieldStyles.widenExpiry)}

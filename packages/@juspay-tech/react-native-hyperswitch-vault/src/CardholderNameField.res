@@ -45,7 +45,7 @@ let make = React.forwardRef((
     unstyled: ?props["unstyled"],
   }
 
-  <VaultWidgetContext.Guarded ctx componentName="cardholderName">
+  <VaultWidgetContext.Guarded ctx componentName=#cardholderName>
     <BoundCardFields.CardholderName
       ctx
       styles=?{props["styles"]}
