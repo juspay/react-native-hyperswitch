@@ -45,7 +45,9 @@ export interface LogEntry {
   value: string;
   logType?: LogType;
   category?: LogCategory;
-  /* Replaces the latency measured from the event's _INIT, as on web. */
+  /* How long the event took, in ms, measured by the caller from its own start: an API call's
+     request, a tokenize's TOKENIZE_INIT, a field's mount. Web works it out from the event's _INIT
+     log instead (calculateLatencyHook). */
   latency?: number;
 }
 
@@ -294,19 +296,12 @@ export function createLogger(url: string | undefined): Logger {
     }
   }
 
-  /* As web's calculateLatencyHook: an answer carries the time since its _INIT. */
-  function latencyFromInit(eventName: EventName): string {
-    const startedAt = events.get(`${eventName}_INIT`);
-    const latency = startedAt === undefined ? 0 : Date.now() - startedAt;
-    return latency > 0 ? String(latency) : '';
-  }
-
   function push(entry: LogEntry, from?: Identity): void {
     if (url === undefined) return;
     const timestamp = Date.now();
     const key = entry.eventName;
     /* A log that belongs to a session this logger has since left keeps that session's identity,
-       and leaves the current session's first_event and latencies alone. */
+       and leaves the current session's first_event alone. */
     const current = !from || from.sessionId === identity.sessionId;
     /* Errors have their own allowance, so a form's lifecycle logs cannot crowd out its failures
        under the same event name. */
@@ -321,12 +316,7 @@ export function createLogger(url: string | undefined): Logger {
         category: entry.category ?? 'USER_EVENT',
         value: entry.value,
         eventName: key,
-        latency:
-          entry.latency !== undefined
-            ? String(entry.latency)
-            : current
-              ? latencyFromInit(key)
-              : '',
+        latency: entry.latency !== undefined ? String(entry.latency) : '',
         firstEvent: current && !events.has(key),
       });
     }

@@ -126,15 +126,17 @@ export function HyperPaymentMethodSession({
     };
   }, [hyper]);
 
-  /* One logger per session, made once the instance names the environment and endpoints. Fields
-     mounted before the sdkAuthorization arrives keep the session_id it then joins. */
+  /* One logger per session, made once the instance names the environment and endpoints and the
+     options, when a promise, have settled, so even the first log names the session. Fields
+     mounted before then are logged when it is made. */
   const hasHyper = resolvedHyper !== null;
+  const optionsSettled = resolvedOptions !== null || optionsError !== null;
   const logUrl = resolvedHyper
     ? loggingUrl(resolvedHyper.environment, resolvedHyper.customEndpoints)
     : undefined;
   const logger = useMemo<Logger | null>(
-    () => (hasHyper ? createLogger(logUrl) : null),
-    [hasHyper, logUrl]
+    () => (hasHyper && optionsSettled ? createLogger(logUrl) : null),
+    [hasHyper, optionsSettled, logUrl]
   );
   /* Every log names the session's merchant and payment-method session. Set in the commit's layout
      phase, before any effect of the card forms inside logs, and never during a render React may

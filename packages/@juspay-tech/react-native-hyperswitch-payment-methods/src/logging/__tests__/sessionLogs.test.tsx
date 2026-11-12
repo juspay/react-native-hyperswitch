@@ -239,6 +239,36 @@ describe('a payment-method session', () => {
     expect(Number(rendered.latency)).toBeGreaterThanOrEqual(25);
   });
 
+  it('names the session on every log when the options arrive after the fields mount', async () => {
+    installMock({ vaultType: 'vgs' });
+    answer(200, vgsSession);
+    let resolveOptions: (options: {
+      sdkAuthorization: string;
+    }) => void = () => {};
+    const options = new Promise<{ sdkAuthorization: string }>((resolve) => {
+      resolveOptions = resolve;
+    });
+    const view = render(
+      <HyperPaymentMethodSession hyper={SANDBOX} options={options}>
+        <CardForm>
+          <CardNumberField />
+        </CardForm>
+      </HyperPaymentMethodSession>
+    );
+    expect(screen.getByTestId('hs-placeholder-cardNumber')).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    await act(async () => resolveOptions({ sdkAuthorization: AUTH }));
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-field-cardNumber')).toBeTruthy()
+    );
+    view.unmount();
+    await Promise.resolve();
+
+    expect(new Set(logs().map((log) => log.payment_id))).toEqual(
+      new Set(['0a_pms_flow'])
+    );
+  });
+
   it('logs the parameter it lacks, never its value', async () => {
     installMock();
     const garbled = 'not*base64!';

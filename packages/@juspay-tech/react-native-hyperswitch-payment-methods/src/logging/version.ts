@@ -1,3 +1,4 @@
-/* The version every log carries. `prepare` writes package.json's version in here before each
-   build (scripts/stamp-version.js); a test checks the two agree. */
-export const SDK_VERSION = '1.0.6';
+import packageJson from '@juspay-tech/react-native-hyperswitch-payment-methods/package.json';
+
+/* The version every log carries: the installed package's own, read from its package.json. */
+export const SDK_VERSION: string = packageJson.version;

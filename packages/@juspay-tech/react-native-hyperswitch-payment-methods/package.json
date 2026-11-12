@@ -41,7 +41,7 @@
   "scripts": {
     "example": "yarn workspace react-native-hyperswitch-example",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
-    "prepare": "node scripts/stamp-version.js && bob build",
+    "prepare": "bob build",
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "test": "jest",
@@ -190,9 +190,6 @@
     ]
   },
   "release-it": {
-    "hooks": {
-      "after:bump": "node scripts/stamp-version.js"
-    },
     "git": {
       "commitMessage": "chore: release ${version}",
       "tagName": "v${version}"

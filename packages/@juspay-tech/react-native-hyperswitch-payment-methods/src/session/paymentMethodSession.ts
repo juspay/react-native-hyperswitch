@@ -37,25 +37,25 @@ export interface PaymentMethodSession {
 
 /* Logs why a detached form could not be made, then throws what was thrown, unchanged. */
 function failing<T>(
-  log: FormLog | undefined,
+  log: FormLog,
   problem: (error: unknown) => Parameters<FormLog['failed']>[0],
   make: () => T
 ): T {
   try {
     return make();
   } catch (error) {
-    log?.failed(problem(error));
+    log.failed(problem(error));
     throw error;
   }
 }
 
 function createCardForm(
   vaultDetails: VaultDetails,
-  options: CreateCardFormOptions = {},
-  logger?: Logger
+  logger: Logger,
+  options: CreateCardFormOptions = {}
 ): CardFormInstance {
-  const log = logger ? createFormLog(logger) : undefined;
-  log?.created();
+  const log = createFormLog(logger);
+  log.created();
 
   const adapter = failing(
     log,
@@ -65,7 +65,7 @@ function createCardForm(
   );
 
   if (!adapter.createCollector) {
-    log?.failed('detached_unsupported');
+    log.failed('detached_unsupported');
     throw new Error(
       `The ${vaultDetails.vaultType} SDK builds its client from a React provider, so its ` +
         'fields cannot be mounted detached. Use <HyperPaymentMethodSession> with <CardForm> ' +
@@ -85,19 +85,19 @@ function createCardForm(
     log
   );
 
-  log?.providerStarting(options.readyTimeoutMs);
+  log.providerStarting(options.readyTimeoutMs);
   adapter.createCollector(data).then(
     (collector) => {
       core.collector = collector;
       core.session.attachCollector(collector);
       core.status = 'ready';
-      log?.ready(collector, core.vaultType);
+      log.ready(collector, core.vaultType);
       core.notify();
     },
     (error: unknown) => {
       core.session.fail(error);
       core.status = 'error';
-      log?.failed('provider_failed');
+      log.failed('provider_failed');
       core.notify();
     }
   );
@@ -115,11 +115,12 @@ function createCardForm(
 }
 
 /* The session's logger, as HyperPaymentMethodSession makes one: the merchant and session named,
-   then web's PAYMENT_METHOD_SESSION_INITIATED, or the parameter that is missing. */
+   then web's PAYMENT_METHOD_SESSION_INITIATED, or the parameter that is missing. A configuration
+   too malformed to read gets a logger that sends nothing, so logging never stops the session. */
 function sessionLogger(
   config: HyperswitchConfiguration,
   options: PaymentMethodSessionOptions
-): Logger | undefined {
+): Logger {
   try {
     const logger = createLogger(
       loggingUrl(config.environment, config.customEndpoints)
@@ -136,7 +137,7 @@ function sessionLogger(
     );
     return logger;
   } catch {
-    return undefined;
+    return createLogger(undefined);
   }
 }
 
@@ -166,6 +167,6 @@ export async function initPaymentMethodSession(
   return {
     vaultDetails,
     createCardForm: (formOptions?: CreateCardFormOptions) =>
-      createCardForm(vaultDetails, formOptions, logger),
+      createCardForm(vaultDetails, logger, formOptions),
   };
 }
