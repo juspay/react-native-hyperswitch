@@ -48,7 +48,7 @@ let make = React.forwardRef((
     cvcIcon: ?props["cvcIcon"]->Option.orElse(provided.cvcIcon),
   }
 
-  <VaultWidgetContext.Guarded ctx componentName="cardCvc">
+  <VaultWidgetContext.Guarded ctx componentName=#cardCvc>
     <BoundCardFields.Cvc
       ctx
       styles=?{props["styles"]}
