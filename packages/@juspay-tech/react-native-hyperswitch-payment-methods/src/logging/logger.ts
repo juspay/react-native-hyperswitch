@@ -11,12 +11,10 @@ export type LogType = 'DEBUG' | 'INFO' | 'ERROR';
 
 export type LogCategory = 'API' | 'USER_EVENT' | 'USER_ERROR';
 
-export type ApiEventName = 'PAYMENT_METHOD_SESSION_RETRIEVE_CALL';
-
 export type EventName =
   | 'PAYMENT_METHOD_SESSION_INITIATED'
-  | ApiEventName
-  | `${ApiEventName}_INIT`
+  | 'PAYMENT_METHOD_SESSION_RETRIEVE_CALL_INIT'
+  | 'PAYMENT_METHOD_SESSION_RETRIEVE_CALL'
   | 'REQUIRED_PARAMETER'
   | 'INVALID_FORMAT'
   | 'CARD_FORM_FLOW'
@@ -28,6 +26,17 @@ export type EventName =
   | 'PAYMENT_METHOD_SESSION_TOKENIZE'
   | 'VGS_VAULT_FLOW'
   | 'SDK_CRASH';
+
+/* As web's LoggerUtils.apiEventInitMapper and the vault's: the event an API call logs before its
+   request is sent. */
+function apiEventInitMapper(eventName: EventName): EventName | undefined {
+  switch (eventName) {
+    case 'PAYMENT_METHOD_SESSION_RETRIEVE_CALL':
+      return 'PAYMENT_METHOD_SESSION_RETRIEVE_CALL_INIT';
+    default:
+      return undefined;
+  }
+}
 
 export const LOG_SOURCE = 'HYPERSWITCH_PAYMENT_METHODS';
 
@@ -183,7 +192,7 @@ export interface Logger {
   currentIdentity(): Identity;
   /* from: the session the log belongs to, if not the current one. */
   log(entry: LogEntry, from?: Identity): void;
-  apiCall(eventName: ApiEventName, url: string): ApiCallLog;
+  apiCall(eventName: EventName, url: string): ApiCallLog;
   /* Sends everything queued: web does when the page unloads, this package when a form or
      session closes and when the app leaves the foreground. */
   sendLogs(): void;
@@ -414,9 +423,11 @@ export function createLogger(url: string | undefined): Logger {
         started() {
           try {
             startedAt = Date.now();
+            const initEventName = apiEventInitMapper(eventName);
+            if (initEventName === undefined) return;
             push(
               {
-                eventName: `${eventName}_INIT`,
+                eventName: initEventName,
                 value: JSON.stringify({ url: callUrl }),
                 category: 'API',
               },
