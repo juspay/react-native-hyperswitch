@@ -43,6 +43,16 @@ const commit = () => Promise.resolve();
 const named = (logs: Array<Record<string, string>>) =>
   logs.map((log) => `${log.event_name} ${log.log_type} ${log.value}`);
 
+/* A field's mount, as web's PaymentMethodSession logs a field's create and then its mount. */
+const mountedLines = (elementType: ElementType) => [
+  `CARD_FORM_FLOW INFO ${elementType} created`,
+  `PAYMENT_METHOD_SESSION_FIELD_MOUNTED INFO ${elementType}`,
+  `CARD_FORM_FLOW INFO ${elementType} mounted`,
+];
+
+const CLOSED =
+  'CARD_FORM_FLOW INFO Payment method session card form deinitialized';
+
 const complete = (elementType: ElementType, done = true) =>
   fieldChange(elementType, {
     empty: !done,
@@ -67,26 +77,24 @@ describe('the card form’s lifecycle', () => {
 
     const logs = sent();
     expect(named(logs)).toEqual([
-      'CARD_FORM_FLOW INFO Card form created',
-      'PAYMENT_METHOD_SESSION_FIELD_MOUNTED INFO cardNumber',
+      ...mountedLines('cardNumber'),
       'PAYMENT_METHOD_SESSION_FIELD_RENDERED INFO cardNumber',
       'CLEAR INFO cardNumber',
       'CARD_FORM_FLOW INFO cardNumber unmounted',
-      'CARD_FORM_FLOW INFO Card form deinitialized',
+      CLOSED,
     ]);
-    expect(logs[2]!.latency).toBe('40');
+    expect(logs[3]!.latency).toBe('40');
   });
 
-  it('logs the form before the fields React mounted first', async () => {
+  it('logs each field’s create and mount, in the order React mounted them', async () => {
     const { log, sent } = setup();
     log.fieldMounted('cardNumber');
     log.fieldMounted('cardCvc');
     log.created();
     await commit();
     expect(named(sent())).toEqual([
-      'CARD_FORM_FLOW INFO Card form created',
-      'PAYMENT_METHOD_SESSION_FIELD_MOUNTED INFO cardNumber',
-      'PAYMENT_METHOD_SESSION_FIELD_MOUNTED INFO cardCvc',
+      ...mountedLines('cardNumber'),
+      ...mountedLines('cardCvc'),
     ]);
   });
 
@@ -106,11 +114,10 @@ describe('the card form’s lifecycle', () => {
 
     const logs = sent();
     expect(named(logs)).toEqual([
-      'CARD_FORM_FLOW INFO Card form created',
-      'PAYMENT_METHOD_SESSION_FIELD_MOUNTED INFO cardNumber',
+      ...mountedLines('cardNumber'),
       'PAYMENT_METHOD_SESSION_FIELD_RENDERED INFO cardNumber',
     ]);
-    expect(logs[2]!.latency).toBe('40');
+    expect(logs[3]!.latency).toBe('40');
   });
 
   it('sends the fields’ unmounts with the form’s close, after the form closed first', async () => {
@@ -127,16 +134,15 @@ describe('the card form’s lifecycle', () => {
 
     expect(batches).toHaveLength(1);
     expect(named(batches[0]!)).toEqual([
-      'CARD_FORM_FLOW INFO Card form created',
-      'PAYMENT_METHOD_SESSION_FIELD_MOUNTED INFO cardNumber',
-      'PAYMENT_METHOD_SESSION_FIELD_MOUNTED INFO cardCvc',
+      ...mountedLines('cardNumber'),
+      ...mountedLines('cardCvc'),
       'CARD_FORM_FLOW INFO cardNumber unmounted',
       'CARD_FORM_FLOW INFO cardCvc unmounted',
-      'CARD_FORM_FLOW INFO Card form deinitialized',
+      CLOSED,
     ]);
   });
 
-  it('keeps the form first when the logger arrives after the fields are ready', async () => {
+  it('logs the fields’ mounts before their renders when the logger arrives after the fields are ready', async () => {
     const { log, sent } = setup();
     const mountedAt = Date.now() - 300;
     /* Fields' effects run before their form's: each mounts and is already rendered. */
@@ -150,14 +156,13 @@ describe('the card form’s lifecycle', () => {
 
     const logs = sent();
     expect(named(logs)).toEqual([
-      'CARD_FORM_FLOW INFO Card form created',
-      'PAYMENT_METHOD_SESSION_FIELD_MOUNTED INFO cardNumber',
-      'PAYMENT_METHOD_SESSION_FIELD_MOUNTED INFO cardCvc',
+      ...mountedLines('cardNumber'),
+      ...mountedLines('cardCvc'),
       'PAYMENT_METHOD_SESSION_FIELD_RENDERED INFO cardNumber',
       'PAYMENT_METHOD_SESSION_FIELD_RENDERED INFO cardCvc',
       'VGS_VAULT_FLOW INFO VGS collect form created',
     ]);
-    expect(Number(logs[3]!.latency)).toBeGreaterThanOrEqual(300);
+    expect(Number(logs[6]!.latency)).toBeGreaterThanOrEqual(300);
   });
 
   it('logs nothing for a development double effect', async () => {
@@ -169,10 +174,7 @@ describe('the card form’s lifecycle', () => {
     log.created();
     log.fieldMounted('cardNumber');
     await commit();
-    expect(named(sent())).toEqual([
-      'CARD_FORM_FLOW INFO Card form created',
-      'PAYMENT_METHOD_SESSION_FIELD_MOUNTED INFO cardNumber',
-    ]);
+    expect(named(sent())).toEqual(mountedLines('cardNumber'));
   });
 
   it('says the form never became usable when no provider is ready in time', async () => {
@@ -183,7 +185,6 @@ describe('the card form’s lifecycle', () => {
     log.providerStarting(3_000);
     jest.advanceTimersByTime(3_000);
     expect(named(sent())).toEqual([
-      'CARD_FORM_FLOW INFO Card form created',
       'CARD_FORM_FLOW ERROR Card form failed: not_ready_after_3000ms',
     ]);
   });
@@ -199,7 +200,7 @@ describe('the card form’s lifecycle', () => {
     jest.advanceTimersByTime(2_000);
     log.ready({}, 'hyperswitch');
     jest.advanceTimersByTime(60_000);
-    expect(named(sent())).toEqual(['CARD_FORM_FLOW INFO Card form created']);
+    expect(named(sent())).toEqual([]);
   });
 
   it('says when a form logged as not ready became ready after all', async () => {
@@ -212,7 +213,6 @@ describe('the card form’s lifecycle', () => {
     log.ready({}, 'hyperswitch');
     log.ready({}, 'hyperswitch');
     expect(named(sent())).toEqual([
-      'CARD_FORM_FLOW INFO Card form created',
       'CARD_FORM_FLOW ERROR Card form failed: not_ready_after_3000ms',
       'CARD_FORM_FLOW INFO Card form ready after 4500ms',
     ]);

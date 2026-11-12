@@ -148,10 +148,8 @@ export function createFormLog(logger: Logger): FormLog {
 
   /* The lifecycle is logged once React's commit is over. React runs a tree's unmount cleanups
      parent first and its mount effects child first, and remounts the fields when the provider
-     arrives. Settling after the commit logs the form before its fields, a field that remounts in
-     the same commit once, and the fields' unmounts before the form's close, whose send then
-     carries them. */
-  let createdPending = false;
+     arrives. Settling after the commit logs a field that remounts in the same commit once, and
+     the fields' unmounts before the form's close, whose send then carries them. */
   const mountsPending: ElementType[] = [];
   const unmountsPending = new Set<ElementType>();
   let closing = false;
@@ -206,18 +204,17 @@ export function createFormLog(logger: Logger): FormLog {
     }
   };
 
-  /* The form first, then its mounted fields, then whatever else the commit logged, then the
-     fields' unmounts and the form's close. */
+  /* The mounted fields first, then whatever else the commit logged, then the fields' unmounts
+     and the form's close. A field is created when it mounts, so each mount is logged as web's
+     PaymentMethodSession logs a field's create and then its mount. */
   const settle = () => {
-    if (createdPending) {
-      createdPending = false;
-      flow('Card form created');
-    }
     for (const type of mountsPending.splice(0)) {
+      flow(`${type} created`);
       logger.log({
         eventName: 'PAYMENT_METHOD_SESSION_FIELD_MOUNTED',
         value: type,
       });
+      flow(`${type} mounted`);
     }
     for (const write of deferred.splice(0)) write();
     for (const type of unmountsPending) {
@@ -228,7 +225,7 @@ export function createFormLog(logger: Logger): FormLog {
     unmountsPending.clear();
     if (closing) {
       closing = false;
-      flow('Card form deinitialized');
+      flow('Payment method session card form deinitialized');
       logger.sendLogs();
     }
   };
@@ -270,13 +267,9 @@ export function createFormLog(logger: Logger): FormLog {
   return {
     created() {
       safely(() => {
-        /* Created again before a close settled (a development double effect): the same form. */
-        if (closing) {
-          closing = false;
-          return;
-        }
-        createdPending = true;
-        scheduleSettle();
+        /* Created again before a close settled (a development double effect): the same form.
+           Web logs no event for the form itself, only for its fields. */
+        closing = false;
       });
     },
 

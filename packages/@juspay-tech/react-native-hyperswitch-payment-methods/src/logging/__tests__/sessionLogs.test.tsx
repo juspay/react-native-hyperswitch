@@ -131,7 +131,7 @@ describe('a payment-method session', () => {
       'cardNumber unmounted',
       'cardExpiry unmounted',
       'cardCvc unmounted',
-      'Card form deinitialized',
+      'Payment method session card form deinitialized',
     ]);
     /* Each field is mounted once, though React moves it under the provider when the vault
        arrives. */
@@ -175,11 +175,16 @@ describe('a payment-method session', () => {
         .filter((log) => log.event_name === 'CARD_FORM_FLOW')
         .map((log) => log.value)
     ).toEqual([
-      'Card form created',
+      'cardNumber created',
+      'cardNumber mounted',
+      'cardExpiry created',
+      'cardExpiry mounted',
+      'cardCvc created',
+      'cardCvc mounted',
       'cardNumber unmounted',
       'cardExpiry unmounted',
       'cardCvc unmounted',
-      'Card form deinitialized',
+      'Payment method session card form deinitialized',
     ]);
 
     expect(new Set(urls)).toEqual(
@@ -200,7 +205,7 @@ describe('a payment-method session', () => {
     expect(sent).not.toMatch(/tok_mock|pro_flow|tnt_flow/);
   });
 
-  it('keeps the session and the form first when the instance arrives after the fields are ready', async () => {
+  it('keeps the session and the fields’ mounts first when the instance arrives after the fields are ready', async () => {
     installMock({ vaultType: 'vgs' });
     let resolveHyper: (instance: HyperswitchConfiguration) => void = () => {};
     const hyper = new Promise<HyperswitchConfiguration>((resolve) => {
@@ -227,10 +232,11 @@ describe('a payment-method session', () => {
     view.unmount();
     await Promise.resolve();
 
-    expect(events().slice(0, 4)).toEqual([
+    expect(events().slice(0, 5)).toEqual([
       'PAYMENT_METHOD_SESSION_INITIATED',
       'CARD_FORM_FLOW',
       'PAYMENT_METHOD_SESSION_FIELD_MOUNTED',
+      'CARD_FORM_FLOW',
       'PAYMENT_METHOD_SESSION_FIELD_RENDERED',
     ]);
     const rendered = logs().find(
