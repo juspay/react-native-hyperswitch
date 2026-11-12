@@ -10,7 +10,7 @@ object PaymentSheetCallbackManager {
 
     /* Message action of the Activity-fallback sheet, which has no fragment to hold one. */
     @Volatile
-    var messageAction: ((paymentMethod: String, paymentMethodType: String, index: Int, text: String) -> Unit)? = null
+    var messageAction: MessageActionHandler? = null
 
     fun setCallback(newCallback: Callback, newIsFragment: Boolean = true) {
         callback.set(newCallback)

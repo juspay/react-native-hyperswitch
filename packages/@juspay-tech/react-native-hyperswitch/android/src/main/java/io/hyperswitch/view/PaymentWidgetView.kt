@@ -17,6 +17,7 @@ import io.hyperswitch.PaymentEventListener
 import io.hyperswitch.model.ElementUpdateIntentResult
 import io.hyperswitch.model.HyperswitchBaseConfiguration
 import io.hyperswitch.paymentsession.LaunchOptions
+import io.hyperswitch.paymentsession.MessageActionHandler
 import io.hyperswitch.react.HyperFragment
 import io.hyperswitch.react.HyperFragmentManager
 import io.hyperswitch.react.ReactNativeController
@@ -173,10 +174,10 @@ open class PaymentWidgetView : FrameLayout {
     this.fragment?.setOnEventCallback(listener)
   }
 
-  private var messageAction: ((paymentMethod: String, paymentMethodType: String, index: Int, text: String) -> Unit)? = null
+  private var messageAction: MessageActionHandler? = null
 
   /** A tapped payment method message action; separate from payment events. */
-  fun onMessageAction(handler: (paymentMethod: String, paymentMethodType: String, index: Int, text: String) -> Unit) {
+  fun onMessageAction(handler: MessageActionHandler) {
     this.messageAction = handler
     this.fragment?.setOnMessageAction(handler)
   }
