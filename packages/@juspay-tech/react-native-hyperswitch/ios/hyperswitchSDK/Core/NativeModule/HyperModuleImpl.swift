@@ -240,6 +240,22 @@ public class HyperModuleImpl: NSObject {
         }
     }
 
+    /// A tapped payment method message action; separate from payment events.
+    @objc public func emitMessageAction(
+        _ rootTag: NSNumber, paymentMethod: String, paymentMethodType: String, index: NSNumber, text: String
+    ) {
+        let action: [String: Any] = [
+            "paymentMethod": paymentMethod, "paymentMethodType": paymentMethodType, "index": index.intValue, "text": text,
+        ]
+        resolveSubscribingTarget(rootTag) { target in
+            if let widget = target as? PaymentWidget {
+                widget.messageAction?(action)
+            } else if let sheet = target as? PaymentSheet {
+                sheet.messageAction?(action)
+            }
+        }
+    }
+
     @objc public func onPaymentConfirmButtonClick(_ rootTag: NSNumber, payload: String, callback: @escaping RCTResponseSenderBlock) {
         resolveSubscribingTarget(rootTag) { target in
             if let widget = target as? PaymentWidget {

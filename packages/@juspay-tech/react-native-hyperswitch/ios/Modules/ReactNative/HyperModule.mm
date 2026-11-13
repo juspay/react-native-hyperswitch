@@ -186,6 +186,19 @@ static BOOL HyperModuleDelegateAttachUnsupported(void)
     [self.impl emitPaymentEvent:@(rootTag) eventType:eventType payload:payload];
 }
 
+- (void)emitMessageAction:(double)rootTag
+              paymentMethod:(NSString *)paymentMethod
+          paymentMethodType:(NSString *)paymentMethodType
+                      index:(double)index
+                       text:(NSString *)text
+{
+    [self.impl emitMessageAction:@(rootTag)
+                   paymentMethod:paymentMethod
+               paymentMethodType:paymentMethodType
+                           index:@(index)
+                            text:text];
+}
+
 - (void)onUpdateIntentEvent:(double)rootTag type:(NSString *)type result:(NSString *)result
 {
     [self.impl onUpdateIntentEvent:@(rootTag) type:type result:result];

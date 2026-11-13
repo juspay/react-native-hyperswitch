@@ -1,7 +1,17 @@
 import type { TurboModule } from 'react-native';
 import { NativeModules, TurboModuleRegistry } from 'react-native';
+import type { EventEmitter } from 'react-native/Libraries/Types/CodegenTypes';
 
 export type CustomEndpoints = Object;
+/* A tap names its message: `paymentMethodType` is empty when the shown text is the payment
+   method's own message, `index` is the segment's position in that message's `value`, and
+   `text` is what it showed. */
+export type MessageActionEvent = {
+  paymentMethod: string;
+  paymentMethodType: string;
+  index: number;
+  text: string;
+};
 
 export interface Spec extends TurboModule {
   initialise(
@@ -13,6 +23,7 @@ export interface Spec extends TurboModule {
   ): Promise<string>;
 
   presentPaymentSheet(params: Object): Promise<string>;
+  readonly onPaymentSheetMessageAction: EventEmitter<MessageActionEvent>;
 
   getCustomerSavedPaymentMethods(params?: Object): Promise<string>;
 

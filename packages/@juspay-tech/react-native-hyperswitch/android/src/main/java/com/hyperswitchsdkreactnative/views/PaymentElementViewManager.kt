@@ -18,6 +18,7 @@ import com.facebook.react.viewmanagers.NativePaymentWidgetManagerInterface
 import com.facebook.react.viewmanagers.NativePaymentWidgetManagerDelegate
 import com.hyperswitchsdkreactnative.BuildConfig
 import com.hyperswitchsdkreactnative.model.PaymentWidgetEvent
+import com.hyperswitchsdkreactnative.model.MessageActionEvent
 import com.hyperswitchsdkreactnative.model.PaymentWidgetResult
 import io.hyperswitch.PaymentEvent
 import io.hyperswitch.PaymentEventListener
@@ -53,6 +54,7 @@ class PaymentElementViewManager : SimpleViewManager<PaymentWidgetView>(),
           emitOnPaymentEvent(this@apply, event)
         }
       })
+      onMessageAction { method, type, index, text -> emitOnMessageAction(this@apply, method, type, index, text) }
       onPaymentResult(object : PaymentResultListener {
         override fun onPaymentResult(result: String) {
           emitOnPaymentResult(this@apply, result)
@@ -114,6 +116,13 @@ class PaymentElementViewManager : SimpleViewManager<PaymentWidgetView>(),
     }
   }
 
+  private fun emitOnMessageAction(container: PaymentWidgetView, method: String, type: String, index: Int, text: String) {
+    reactContext?.let {
+      UIManagerHelper.getEventDispatcher(it, uiManagerType)
+        ?.dispatchEvent(MessageActionEvent(UIManagerHelper.getSurfaceId(container), container.id, method, type, index, text))
+    }
+  }
+
   override fun getExportedCustomDirectEventTypeConstants(): MutableMap<String, Any> {
     return mutableMapOf(
       EVENT_ON_PAYMENT to mutableMapOf<String, Any>(
@@ -121,6 +130,9 @@ class PaymentElementViewManager : SimpleViewManager<PaymentWidgetView>(),
       ),
       ON_PAYMENT_RESULT to mutableMapOf(
         "registrationName" to ON_PAYMENT_RESULT
+      ),
+      ON_MESSAGE_ACTION to mutableMapOf(
+        "registrationName" to ON_MESSAGE_ACTION
       )
     )
   }
@@ -144,5 +156,6 @@ class PaymentElementViewManager : SimpleViewManager<PaymentWidgetView>(),
     const val NAME = "RCTNativePaymentWidget"
     const val EVENT_ON_PAYMENT = "onPaymentEvent"
     const val ON_PAYMENT_RESULT = "onPaymentResult"
+    const val ON_MESSAGE_ACTION = "onMessageAction"
   }
 }

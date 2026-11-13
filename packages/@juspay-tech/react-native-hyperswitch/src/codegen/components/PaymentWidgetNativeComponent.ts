@@ -2,6 +2,7 @@ import codegenNativeComponent from 'react-native/Libraries/Utilities/codegenNati
 import type { ViewProps } from 'react-native';
 import type {
   DirectEventHandler,
+  Int32,
   UnsafeMixed,
 } from 'react-native/Libraries/Types/CodegenTypes';
 
@@ -20,6 +21,13 @@ export interface NativeProps extends ViewProps {
   onPaymentEvent?: DirectEventHandler<{
     eventName: string;
     payload: string;
+  }>;
+  // A tapped payment method message action; separate from payment events.
+  onMessageAction?: DirectEventHandler<{
+    paymentMethod: string;
+    paymentMethodType: string;
+    index: Int32;
+    text: string;
   }>;
 }
 
