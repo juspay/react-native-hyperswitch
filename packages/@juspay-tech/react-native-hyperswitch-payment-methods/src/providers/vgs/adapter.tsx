@@ -4,6 +4,7 @@ import { StyleSheet } from 'react-native';
 import { fieldChange } from '../../core/fieldChange';
 import type { ProviderAdapter } from '../../core/ProviderAdapter';
 import { errorResult, messageOf } from '../../core/results';
+import { logVgsSubmit } from '../../logging/formLog';
 import type { ElementType, TokenizeResult } from '../../core/types';
 import type { VgsTokenizeOptions, VgsVaultData } from './types';
 
@@ -184,6 +185,7 @@ const tokenize: ProviderAdapter['tokenize'] = async (
       options.method ?? 'POST',
       options.extraData
     );
+    logVgsSubmit(collector, status);
     const body = await readResponseBody(response);
 
     if (status >= 200 && status < 300) {
@@ -203,6 +205,7 @@ const tokenize: ProviderAdapter['tokenize'] = async (
       `VGS returned status ${status}.`
     );
   } catch (error) {
+    logVgsSubmit(collector);
     return errorResult(VAULT_TYPE, 'tokenization_failed', messageOf(error));
   }
 };

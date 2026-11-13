@@ -80,7 +80,10 @@ describe('sdkAuthorization', () => {
 describe('readVaultDetails', () => {
   it('maps the documented VGS shape onto VgsVaultData', () => {
     const result = readVaultDetails(
-      sessionBody({ vgs: { external_vault_id: 'tnt_abc', sdk_env: 'sandbox' } })
+      sessionBody({
+        vgs: { external_vault_id: 'tnt_abc', sdk_env: 'sandbox' },
+      }),
+      VALID_AUTH
     );
     expect(result).toEqual({
       ok: true,
@@ -92,16 +95,19 @@ describe('readVaultDetails', () => {
   });
 
   it('reads the Hyperswitch vault off vault_details, ahead of external', () => {
-    const result = readVaultDetails({
-      id: '0a_pms_0192',
-      vault_details: {
-        vault_type: 'hyperswitch',
-        vault_data: { sdk_authorization: 'auth_123' },
+    const result = readVaultDetails(
+      {
+        id: '0a_pms_0192',
+        vault_details: {
+          vault_type: 'hyperswitch',
+          vault_data: { sdk_authorization: 'auth_123' },
+        },
+        external_vault_details: {
+          vgs: { external_vault_id: 'tnt_abc', sdk_env: 'sandbox' },
+        },
       },
-      external_vault_details: {
-        vgs: { external_vault_id: 'tnt_abc', sdk_env: 'sandbox' },
-      },
-    });
+      VALID_AUTH
+    );
     expect(result).toEqual({
       ok: true,
       vaultDetails: {
@@ -112,12 +118,15 @@ describe('readVaultDetails', () => {
   });
 
   it('falls through to external_vault_details when vault_details names another vault', () => {
-    const result = readVaultDetails({
-      vault_details: { vault_type: 'something_else', vault_data: {} },
-      external_vault_details: {
-        vgs: { external_vault_id: 'tnt_abc', sdk_env: 'sandbox' },
+    const result = readVaultDetails(
+      {
+        vault_details: { vault_type: 'something_else', vault_data: {} },
+        external_vault_details: {
+          vgs: { external_vault_id: 'tnt_abc', sdk_env: 'sandbox' },
+        },
       },
-    });
+      VALID_AUTH
+    );
     expect(result.ok && result.vaultDetails.vaultType).toBe('vgs');
   });
 
@@ -125,7 +134,8 @@ describe('readVaultDetails', () => {
     const result = readVaultDetails(
       sessionBody({
         skyflow: { vault_id: 'v1', vault_url: 'https://x', table: 't' },
-      })
+      }),
+      VALID_AUTH
     );
     expect(result).toEqual({
       ok: true,
@@ -136,12 +146,21 @@ describe('readVaultDetails', () => {
     });
   });
 
-  it('says so when the session names no supported vault', () => {
-    const missing = readVaultDetails(sessionBody(undefined));
-    expect(missing.ok).toBe(false);
-    expect(!missing.ok && missing.message).toMatch(/names no vault/);
+  it('falls back to the Hyperswitch vault when the session names no external vault', () => {
+    expect(readVaultDetails(sessionBody(undefined), VALID_AUTH)).toEqual({
+      ok: true,
+      vaultDetails: {
+        vaultType: 'hyperswitch',
+        vaultData: { sdkAuthorization: VALID_AUTH },
+      },
+    });
+  });
 
-    const unknown = readVaultDetails(sessionBody({ some_other_vault: {} }));
+  it('says so when the session names no supported vault', () => {
+    const unknown = readVaultDetails(
+      sessionBody({ some_other_vault: {} }),
+      VALID_AUTH
+    );
     expect(unknown.ok).toBe(false);
     expect(!unknown.ok && unknown.message).toMatch(/some_other_vault/);
   });
