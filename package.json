@@ -1,6 +1,6 @@
 {
   "name": "react-native-hyperswitch-libraries",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "A monorepo for React Native Hyperswitch libraries",
   "main": "index.js",
