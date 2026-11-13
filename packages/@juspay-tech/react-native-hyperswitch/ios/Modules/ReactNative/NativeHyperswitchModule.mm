@@ -58,7 +58,14 @@ RCT_EXPORT_METHOD(presentPaymentSheet:(nonnull NSDictionary *)params
                   resolve:(nonnull RCTPromiseResolveBlock)resolve
                   reject:(nonnull RCTPromiseRejectBlock)reject)
 {
+    __weak NativeHyperswitchModule *weakSelf = self;
     [[self moduleImpl] presentPaymentSheet:params
+                           onMessageAction:^(NSDictionary *action) {
+        NativeHyperswitchModule *strongSelf = weakSelf;
+        if (strongSelf && strongSelf->_eventEmitterCallback) {
+            [strongSelf emitOnPaymentSheetMessageAction:action];
+        }
+    }
                                    resolve:resolve
                                     reject:reject];
 }

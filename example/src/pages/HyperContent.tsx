@@ -25,6 +25,7 @@ import {
 
 import { FormLayout } from "./FormLayout";
 import { initialBaseUrl } from "../utils";
+import { paymentMessages } from '../paymentMessages';
 
 export type {
   CustomerLastUsedPaymentMethod,
@@ -60,6 +61,7 @@ const CVC_APPEARANCE = {
 };
 
 const PAYMENT_ELEMENT_OPTIONS = {
+  paymentMethodsConfig: paymentMessages,
   merchantDisplayName: "Hyperswitch Example",
 
   displayDefaultSavedPaymentIcon: false,

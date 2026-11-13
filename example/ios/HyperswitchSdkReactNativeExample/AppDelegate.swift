@@ -32,9 +32,16 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     options connectionOptions: UIScene.ConnectionOptions
   ) {
     guard let windowScene = scene as? UIWindowScene,
-          let factory = (UIApplication.shared.delegate as? AppDelegate)?.reactNativeFactory else { return }
-    window = UIWindow(windowScene: windowScene)
-    factory.startReactNative(withModuleName: "HyperswitchSdkReactNativeExample", in: window, launchOptions: nil)
+          let factory = (UIApplication.shared.delegate as? AppDelegate)?.reactNativeFactory
+    else { return }
+
+    let window = UIWindow(windowScene: windowScene)
+    self.window = window
+    factory.startReactNative(
+      withModuleName: "HyperswitchSdkReactNativeExample",
+      in: window,
+      launchOptions: nil
+    )
   }
 }
 

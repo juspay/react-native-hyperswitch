@@ -1,4 +1,10 @@
 import NativeHyperswitchModule from '../codegen/modules/NativeHyperswitchModule';
+import type { MessageActionEvent } from '../codegen/modules/NativeHyperswitchModule';
+import type { PaymentSheetConfiguration } from '../types/PaymentSheetConfiguration';
+import {
+  dispatchMessageAction,
+  preparePaymentMessages,
+} from '../utils/PaymentMessages';
 import type { NativePaymentSheetPayload } from '../types/definitions';
 import type { PaymentResult } from '../types/paymentresult';
 import { mapNativeResponseToPaymentResult } from '../native/NativeResponseMapper';
@@ -46,14 +52,28 @@ export async function presentPaymentSheetWithPayload(
   }
   const callId = ++presentCallId;
   setSheetPresented(true);
+  let subscription: { remove(): void } | undefined;
   try {
+    const merchantConfiguration =
+      payload.configuration as PaymentSheetConfiguration;
+    const { configuration, hasActions } = preparePaymentMessages(
+      merchantConfiguration
+    );
+    if (hasActions) {
+      subscription = NativeHyperswitchModule.onPaymentSheetMessageAction(
+        (event: MessageActionEvent) => {
+          dispatchMessageAction(merchantConfiguration, event);
+        }
+      );
+    }
     const raw = await NativeHyperswitchModule.presentPaymentSheet({
       hyperswitchConfig: payload.hyperswitchConfig,
       paymentSessionConfig: payload.paymentSessionConfig,
-      configuration: payload.configuration,
+      configuration,
     });
     return mapNativeResponseToPaymentResult(raw);
   } finally {
+    subscription?.remove();
     if (callId === presentCallId) {
       setSheetPresented(false);
     }

@@ -11,6 +11,14 @@ export type * from './types/elements';
 export type * from './types/NativeEventTypes';
 export type * from './types/PaymentSheetConfiguration';
 export type * from './types/paymentresult';
+export { MessageElement, messageContent } from './messages/MessageContent';
+export type {
+  MessageContent,
+  MessageElementStyle,
+  MessageElementStyles,
+  MessageActionOptions,
+  PaymentMethodMessage,
+} from './messages/MessageContent';
 import NativeHyperswitchModule from './codegen/modules/NativeHyperswitchModule';
 import { createPaymentSession } from './session/PaymentSession';
 import { Elements } from './types/elements';

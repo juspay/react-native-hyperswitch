@@ -23,6 +23,7 @@ import io.hyperswitch.PaymentEvent
 import io.hyperswitch.PaymentEventListener
 import io.hyperswitch.model.ElementUpdateIntentResult
 import io.hyperswitch.paymentsession.ExitHeadlessCallBackManager
+import io.hyperswitch.paymentsession.MessageActionHandler
 import io.hyperswitch.paymentsheet.PaymentResult
 import io.hyperswitch.redirect.RedirectEvent
 import io.hyperswitch.utils.ConversionUtils
@@ -110,6 +111,17 @@ class HyperFragment : ReactFragment() {
 
   fun setOnEventCallback(listener: PaymentEventListener) {
     paymentEventListener = listener
+  }
+
+  /** A tapped payment method message action; its owner runs the merchant callback. */
+  private var messageAction: MessageActionHandler? = null
+
+  fun setOnMessageAction(handler: MessageActionHandler) {
+    messageAction = handler
+  }
+
+  internal fun onMessageAction(paymentMethod: String, paymentMethodType: String, index: Int, text: String) {
+    messageAction?.invoke(paymentMethod, paymentMethodType, index, text)
   }
 
   private fun emitDeviceEvent(
@@ -538,6 +550,7 @@ class HyperFragment : ReactFragment() {
       callbacks.clear()
       onExit = null
       paymentEventListener = null
+      messageAction = null
     } finally {
       super.onDestroyView()
     }
@@ -552,6 +565,7 @@ class HyperFragment : ReactFragment() {
       callbacks.clear()
       onExit = null
       paymentEventListener = null
+      messageAction = null
     } finally {
       super.onDestroy()
     }
