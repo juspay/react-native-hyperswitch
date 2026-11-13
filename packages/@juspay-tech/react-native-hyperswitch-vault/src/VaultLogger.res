@@ -221,27 +221,125 @@ let calculateLatencyHook = (logger: t, ~eventName: eventName) => {
   latency > 0. ? latency->Float.toString : ""
 }
 
-// What the vault sends from an error: the backend's error body, or what was thrown. The vault never
-// puts a field's value into either, and as a backstop any run of twelve or more digits, the shape
-// of a card number, is blanked out of every text in it, with any number of spaces, line breaks,
-// dots, slashes or dashes between the digits. Shorter numbers, such as a stack's line and column,
-// are kept. Separators and digits never overlap, so the match takes time in proportion to the text.
+// A run of twelve or more digits, the shape of a card number, with any number of spaces, line
+// breaks, dots, slashes or dashes between the digits. The form's settings log blanks it. Separators
+// and digits never overlap, so the match takes time in proportion to the text.
 let redactDigits = (text: string) =>
   text->String.replaceRegExp(%re("/\d(?:[\s./-]*\d){11,}/g"), "[redacted]")
 
-let rec redactCardNumbers = (value: JSON.t): JSON.t =>
-  switch value {
-  | String(text) => text->redactDigits->JSON.Encode.string
-  | Number(number) if Math.abs(number) >= 1e11 => "[redacted]"->JSON.Encode.string
-  | Array(items) => items->Array.map(redactCardNumbers)->JSON.Encode.array
-  | Object(fields) =>
-    fields
-    ->Dict.toArray
-    ->Array.map(((key, field)) => (key, field->redactCardNumbers))
+// An error's text as it is logged: a card-number shape is blanked as above, then every run of three
+// or more digits is sent as stars, one per digit. An error code's two digits are kept.
+let maskNumbers = (text: string) =>
+  text
+  ->redactDigits
+  ->String.unsafeReplaceRegExpBy0(%re("/\d{3,}/g"), (~match, ~offset as _, ~input as _) =>
+    "*"->String.repeat(match->String.length)
+  )
+
+// The fixed messages logged in place of what cannot be logged as it is.
+let notJson = "The response body is not JSON"
+let unrecognisedErrorBody = "The error response is not in the expected format"
+let notAnError = "A value that is not an Error was thrown"
+let noErrorMessage = "The error has no message"
+
+let fixedMessage = (message: string) =>
+  [("message", message->JSON.Encode.string)]->Dict.fromArray->JSON.Encode.object
+
+// The backend's typed error: {"error": {type, code, message, reason}}.
+let typedErrorFields = ["type", "code", "message", "reason"]
+// The fields an error body of another shape, such as a proxy's, commonly has at its top level.
+let topLevelErrorFields = [
+  "message",
+  "error",
+  "error_code",
+  "error_message",
+  "code",
+  "type",
+  "reason",
+]
+let maxKeys = 10
+
+// The named fields that are strings, each through maskNumbers.
+let maskedStrings = (source: Dict.t<JSON.t>, keys: array<string>) =>
+  keys->Array.filterMap(key =>
+    switch source->Dict.get(key) {
+    | Some(String(text)) => Some((key, text->maskNumbers->JSON.Encode.string))
+    | _ => None
+    }
+  )
+
+// What an API error body is logged as: the body with only known fields left, each only when it is a
+// string, and every one through maskNumbers. First the backend's typed error, in its shape; failing
+// that, the common top-level fields; failing that, a fixed message with the names of the body's
+// top-level keys (never their values). Anything else in the body (data, payment_id, connector ids) is
+// left out, and a body that is not an object is logged as the fixed message.
+let errorBodyValue = (body: JSON.t): JSON.t =>
+  switch body {
+  | Object(body) =>
+    let typed = switch body->Dict.get("error") {
+    | Some(Object(error)) => error->maskedStrings(typedErrorFields)
+    | _ => []
+    }
+    if typed->Array.length > 0 {
+      [("error", typed->Dict.fromArray->JSON.Encode.object)]->Dict.fromArray->JSON.Encode.object
+    } else {
+      let topLevel = body->maskedStrings(topLevelErrorFields)
+      if topLevel->Array.length > 0 {
+        topLevel->Dict.fromArray->JSON.Encode.object
+      } else {
+        let keys =
+          body
+          ->Dict.keysToArray
+          ->Array.slice(~start=0, ~end=maxKeys)
+          ->Array.map(key => key->maskNumbers->JSON.Encode.string)
+        keys->Array.length > 0
+          ? [
+              ("message", unrecognisedErrorBody->JSON.Encode.string),
+              ("keys", keys->JSON.Encode.array),
+            ]
+            ->Dict.fromArray
+            ->JSON.Encode.object
+          : fixedMessage(unrecognisedErrorBody)
+      }
+    }
+  | _ => fixedMessage(unrecognisedErrorBody)
+  }
+
+let isError: Exn.t => bool = %raw(`
+  function (thrown) { try { return thrown instanceof Error; } catch (_) { return false; } }
+`)
+
+// A property of what was thrown when it is a string. A getter that throws reads as absent.
+let stringProperty: (Exn.t, string) => option<string> = %raw(`
+  function (thrown, key) {
+    try { var value = thrown[key]; return typeof value === "string" ? value : undefined; }
+    catch (_) { return undefined; }
+  }
+`)
+
+// What an exception is logged as: its type and its message, both through maskNumbers; a missing or
+// empty message is logged as a fixed one. Never its stack, which in a debug build carries the
+// bundle's localhost or IP address URL that the log endpoint's WAF refuses. Any other value thrown
+// is logged as a fixed message, since it can carry anything.
+let exceptionValue = (thrown: Exn.t): JSON.t =>
+  if thrown->isError {
+    let type_ = switch thrown->stringProperty("name")->Option.map(String.trim) {
+    | Some(name) if name !== "" => name->maskNumbers
+    | _ => "Error"
+    }
+    let message = switch thrown->stringProperty("message")->Option.map(String.trim) {
+    | Some(text) if text !== "" => text->maskNumbers
+    | _ => noErrorMessage
+    }
+    [("type", type_->JSON.Encode.string), ("message", message->JSON.Encode.string)]
     ->Dict.fromArray
     ->JSON.Encode.object
-  | other => other
+  } else {
+    fixedMessage(notAnError)
   }
+
+let exceptionValueOf = (error: exn) =>
+  error->Exn.asJsExn->Option.mapOr(fixedMessage(notAnError), exceptionValue)
 
 let pushLog = (
   logger: t,
@@ -339,7 +437,7 @@ type apiCall = {
 // As LoggerUtils.logApi: what each kind of API log records.
 let logApi = (call: apiCall, ~eventName, ~apiLogType, ~statusCode=0, ~data=JSON.Encode.null) => {
   let url = ("url", call.url->JSON.Encode.string)
-  let response = ("response", data->redactCardNumbers)
+  let response = ("response", data)
   let (value, logType) = switch apiLogType {
   | Request => ([url], INFO)
   | Response => ([url, ("statusCode", statusCode->JSON.Encode.int)], INFO)
@@ -383,61 +481,32 @@ let callAnswered = (call: option<apiCall>, ~status: int, ~response: JSON.t) =>
         ~eventName=call.eventName,
         ~apiLogType=Err,
         ~statusCode=status,
-        ~data=response,
+        ~data=response->errorBodyValue,
       )
     }
   )
 
-// What was thrown, as web's Utils.formatException records an Error, or the value itself when it is
-// not one. Never throws: a value that cannot be written as JSON is recorded as null.
-let formatThrown = (thrown: Exn.t) =>
-  switch thrown->Nullable.make->Nullable.toOption {
-  | Some(jsExn) =>
-    let fields = [
-      ("message", jsExn->Exn.message, "Unknown Error"),
-      ("type", jsExn->Exn.name, "Unknown"),
-      ("stack", jsExn->Exn.stack, "Unknown"),
-      ("fileName", jsExn->Exn.fileName, "Unknown"),
-    ]
-    if fields->Array.some(((_, field, _)) => field->Option.isSome) {
-      fields
-      ->Array.map(((key, field, fallback)) => (key, field->Option.getOr(fallback)->JSON.Encode.string))
-      ->Dict.fromArray
-      ->JSON.Encode.object
-    } else {
-      try {
-        jsExn->JSON.stringifyAny->Option.mapOr(JSON.Encode.null, JSON.parseExn(_))
-      } catch {
-      | _ => JSON.Encode.null
-      }
-    }
-  | None => JSON.Encode.null
-  }
-
-let formatException = (error: exn) =>
-  error->Exn.asJsExn->Option.mapOr(JSON.Encode.null, formatThrown)
-
 let callUnanswered = (call: option<apiCall>, ~error: exn) =>
   call->Option.forEach(call =>
-    call->logApi(~eventName=call.eventName, ~apiLogType=NoResponse, ~data=error->formatException)
+    call->logApi(~eventName=call.eventName, ~apiLogType=NoResponse, ~data=error->exceptionValueOf)
   )
 
-// An answer whose body cannot be read: an error with its real status and the exception the read
-// raised.
-let callUnreadable = (call: option<apiCall>, ~status: int, ~error: exn) =>
+// An answer whose body cannot be read as JSON: an error with its real status and a fixed message,
+// never the body or what reading it raised.
+let callUnreadable = (call: option<apiCall>, ~status: int) =>
   call->Option.forEach(call =>
     call->logApi(
       ~eventName=call.eventName,
       ~apiLogType=Err,
       ~statusCode=status,
-      ~data=error->formatException,
+      ~data=fixedMessage(notJson),
     )
   )
 
 // What tells one crash from another: its type and message. Not its stack, which differs when React
 // renders the failing component again before the error leaves the form.
 let crashSignature = (thrown: Exn.t) =>
-  switch thrown->formatThrown {
+  switch thrown->exceptionValue {
   | Object(fields) =>
     [fields->Dict.get("type"), fields->Dict.get("message")]
     ->Array.map(field => field->Option.getOr(JSON.Encode.null))
@@ -447,9 +516,9 @@ let crashSignature = (thrown: Exn.t) =>
   }
 
 // As web's ErrorBoundary logs SDK_CRASH: an error in category USER_ERROR, so it goes out at once,
-// with the component that crashed. The exception is recorded as formatThrown records it.
+// with the component that crashed. The exception is recorded as exceptionValue records it.
 let logCrash = (logger: t, ~thrown: Exn.t, ~componentName, ~merchantId, ~paymentId) => {
-  let value = switch thrown->formatThrown->redactCardNumbers {
+  let value = switch thrown->exceptionValue {
   | Object(fields) => fields
   | other => Dict.fromArray([("thrown", other)])
   }

@@ -2,7 +2,7 @@ import { readAuthorizationClaims } from './sdkAuthorization';
 import type { VaultDetails, VaultType } from '../core/types';
 import { environmentOf } from './config';
 import { validateEndpoint } from './endpoint';
-import { formatThrown, MISSING_AUTHORIZATION } from '../logging/logger';
+import { MISSING_AUTHORIZATION } from '../logging/logger';
 import type { ApiCallLog, Logger } from '../logging/logger';
 
 export type HyperswitchEnvironment = 'PROD' | 'PROD_EU' | 'SANDBOX' | 'INTEG';
@@ -160,15 +160,15 @@ export function readVaultDetails(
 }
 
 /* The error body, read without holding up the result: the lookup answers as soon as it has the
-   status, as before. */
+   status, as before. A body that is not JSON is logged as such, never as its text. */
 function logErrorBody(call: ApiCallLog, response: Response): void {
   try {
     response.json().then(
       (body: unknown) => call.failed(response.status, body),
-      (error: unknown) => call.failed(response.status, formatThrown(error))
+      () => call.unreadable(response.status)
     );
-  } catch (error) {
-    call.failed(response.status, formatThrown(error));
+  } catch {
+    call.unreadable(response.status);
   }
 }
 
@@ -278,8 +278,8 @@ export async function fetchVaultDetails(
     let body: unknown;
     try {
       body = await response.json();
-    } catch (error) {
-      call?.failed(response.status, formatThrown(error));
+    } catch {
+      call?.unreadable(response.status);
       return {
         ok: false,
         message: 'The payment-method-session response was not readable JSON.',

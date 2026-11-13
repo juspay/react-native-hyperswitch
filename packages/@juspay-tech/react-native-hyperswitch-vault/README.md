@@ -301,7 +301,11 @@ credentials, query string or fragment. A base that fails returns `unsupported_co
 nothing sent.
 
 **Logs.** The form logs its two vault requests (confirm and saved-card update): the URL, the HTTP
-status and, on an error, the error response or the exception. It also logs when a card field gains
+status and, on an error, the backend's error `type`, `code`, `message` and `reason` (for a body of
+another shape, only its common top-level error fields, or else a fixed message with its key names),
+or the exception's type and message, never its stack. A body that is not JSON, or a thrown value
+that is not an Error, is logged as a fixed message, and every run of three or more digits in an
+error's text is sent as stars. It also logs when a card field gains
 or loses focus (the field's name and, on leaving it, a status such as `complete` or
 `invalid_card_number`, never what was typed), when each field first shows on screen, the network
 picker of a co-badged card, the form's settings (the environment, whether each custom endpoint is
@@ -309,10 +313,18 @@ set but not its URL, the card schemes, the fields mounted and whether the sessio
 a crash while a card field renders, which is then thrown on unchanged. It never logs a card
 value or a request body. As in the web SDK, logs are queued and sent in batches: 20 seconds after
 the last one, at once on an error, and when the form closes, its session is replaced or the app
-leaves the foreground. As in client-core, logs go to
-`overrideEndpoints.customLoggingEndpoint` when you pass `overrideEndpoints` (the environment's host
-when it has none), else to `<commonEndpoint>/logs/sdk`, else to the environment's host
-(`https://app.hyperswitch.io/api/logs/sdk` in `SANDBOX`). A blank `customLoggingEndpoint` sends none.
+leaves the foreground.
+
+Where the logs go:
+
+| You pass | Logs go to |
+|---|---|
+| nothing | the environment's host (`https://app.hyperswitch.io/api/logs/sdk` in `SANDBOX`) |
+| `overrideEndpoints.customLoggingEndpoint` | that URL |
+| `commonEndpoint` (no logging endpoint) | `<commonEndpoint>/logs/sdk` |
+| `overrideEndpoints.customBackendEndpoint` (no logging endpoint) | nowhere: no logs are sent |
+
+A blank (`""`) endpoint counts as not passed.
 
 ---
 

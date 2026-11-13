@@ -428,13 +428,19 @@ receives `elementType`, `styles`, `placeholder`, `savedCard`, `cvcIcon`, `cardBr
 Inside a payment-method session (`<HyperPaymentMethodSession>` or `initPaymentMethodSession`), the
 SDK sends logs in the web SDK's structure, as the Hyperswitch vault does. It logs:
 
-- the session starting, its lookup (the URL, the HTTP status and, on an error, the error body), and
-  a missing or malformed `sdkAuthorization` (named, never its value);
+- the session starting, its lookup (the URL, the HTTP status and, on an error, the backend's error
+  `type`, `code`, `message` and `reason`; for a body of another shape, only its common top-level
+  error fields, or else a fixed message with its key names; a body that is not JSON is logged as a
+  fixed message), and a missing or malformed `sdkAuthorization` (named, never its value);
 - the card form's lifecycle: each field created, mounted, rendered and unmounted, the fields
   complete, `clear()`, the form's close, and why a form never became usable;
 - each `tokenize()` and its outcome: the vault type and the error code;
 - a VGS submit's HTTP status, and a crash while a field renders, which is then thrown on unchanged
-  (for a provider other than the Hyperswitch vault, only the error's type, never its text).
+  (the error's type and message, never its stack; for a provider other than the Hyperswitch vault,
+  only the error's type, never its text).
+
+In an error's text, every run of three or more digits is sent as stars, so `IR_04` is kept and
+`status 500` is sent as `status ***`.
 
 Each log names the payment-method session from `sdkAuthorization`; with `vaultDetails` alone, from
 the Hyperswitch vault's `vaultData.sdkAuthorization`. Another vault's details carry no session id,
@@ -443,11 +449,20 @@ so pass `sdkAuthorization` as well if you want its logs tied to the session.
 It never logs a card value, a token, a request body or the `sdkAuthorization`. Logs are queued and
 sent in batches: 20 seconds after the last one, at once on an error, and when a `<CardForm>` or
 `<HyperPaymentMethodSession>` closes or the app leaves the foreground. A form made with
-`createCardForm` has no close of its own, so its logs go out on the timer or with the app. As in client-core, they go to
-`overrideEndpoints.customLoggingEndpoint` when you pass `overrideEndpoints` (the environment's host
-when it has none), else to `<commonEndpoint>/logs/sdk`, else to the environment's host
-(`https://app.hyperswitch.io/api/logs/sdk` in `SANDBOX`). A blank `customLoggingEndpoint` sends none.
-A `<CardForm>` used without a session sends none.
+`createCardForm` has no close of its own, so its logs go out on the timer or with the app.
+
+Where the logs go:
+
+| You pass | Logs go to |
+|---|---|
+| nothing | the environment's host (`https://app.hyperswitch.io/api/logs/sdk` in `SANDBOX`) |
+| `overrideEndpoints.customLoggingEndpoint` | that URL |
+| `commonEndpoint` (no logging endpoint) | `<commonEndpoint>/logs/sdk` |
+| `overrideEndpoints.customBackendEndpoint` (no logging endpoint) | nowhere: no logs are sent |
+
+A blank (`""`) endpoint counts as not passed.
+
+A `<CardForm>` used without a session sends no logs.
 
 ## Notes
 

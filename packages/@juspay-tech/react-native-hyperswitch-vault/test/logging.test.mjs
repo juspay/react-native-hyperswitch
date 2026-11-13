@@ -149,7 +149,7 @@ test('an HTTP error goes out at once, with the status and the error body as on w
   assert.deepEqual(JSON.parse(answered.value), { url: CONFIRM_URL, statusCode: 400, response: error });
 });
 
-test('a request that gets no answer logs status 504 and the exception as web formats it', async () => {
+test('a request that gets no answer logs status 504 and the exception\'s type and message', async () => {
   vaultAnswer = async () => {
     throw new TypeError('Network request failed');
   };
@@ -162,7 +162,7 @@ test('a request that gets no answer logs status 504 and the exception as web for
   assert.equal(value.statusCode, 504);
   assert.equal(value.response.message, 'Network request failed');
   assert.equal(value.response.type, 'TypeError');
-  assert.deepEqual(Object.keys(value.response).sort(), ['fileName', 'message', 'stack', 'type']);
+  assert.deepEqual(Object.keys(value.response).sort(), ['message', 'type'], 'never the stack');
 });
 
 test('a request that fails with no error object still returns unknown_outcome, and is logged', async () => {
@@ -173,15 +173,15 @@ test('a request that fails with no error object still returns unknown_outcome, a
   const value = JSON.parse(batches[0][1].value);
   assert.equal(batches[0][1].log_type, 'ERROR');
   assert.equal(value.statusCode, 504);
-  assert.equal(value.response, null);
+  assert.deepEqual(value.response, { message: VaultLogger.notAnError });
 });
 
-test('a request that fails with something other than an Error logs the value thrown, as web does', async () => {
+test('a request that fails with something other than an Error logs a fixed message, never the value', async () => {
   vaultAnswer = () => Promise.reject('Network request failed');
   const outcome = await confirm(VaultLogger.make(LOG_URL, 'android'));
 
   assert.equal(outcome.error.code, 'unknown_outcome');
-  assert.equal(JSON.parse(batches[0][1].value).response, 'Network request failed');
+  assert.deepEqual(JSON.parse(batches[0][1].value).response, { message: VaultLogger.notAnError });
 });
 
 test('a request cancelled before it is sent logs nothing', async () => {
@@ -229,7 +229,7 @@ test('a request stops listening to the caller signal once it settles', async () 
   assert.equal(listening.size, 0);
 });
 
-test('an answer whose body cannot be read is logged as an error with its real status', async () => {
+test('an answer whose body is not JSON is logged as an error with its real status and a fixed message', async () => {
   const unreadable = status => async () => ({
     ok: status >= 200 && status < 300,
     status,
@@ -249,10 +249,10 @@ test('an answer whose body cannot be read is logged as an error with its real st
   const [ok, bad] = batches.map(batch => batch[1]);
   assert.equal(ok.log_type, 'ERROR');
   assert.equal(JSON.parse(ok.value).statusCode, 200);
-  assert.equal(JSON.parse(ok.value).response.type, 'SyntaxError');
+  assert.deepEqual(JSON.parse(ok.value).response, { message: VaultLogger.notJson });
   assert.equal(bad.log_type, 'ERROR');
   assert.equal(JSON.parse(bad.value).statusCode, 502);
-  assert.equal(JSON.parse(bad.value).response.type, 'SyntaxError');
+  assert.deepEqual(JSON.parse(bad.value).response, { message: VaultLogger.notJson });
 });
 
 test('a new session sends what is queued, then starts a new session_id, first_event and counts', () => {
@@ -365,39 +365,74 @@ test('a batch that cannot be sent does not change the outcome', async () => {
   }
 });
 
-test('the log URL follows client-core’s getUrl(#logs) on the backend the vault calls', () => {
+test('the log URL is Hyperswitch for the environment when the merchant passes no endpoint', () => {
   const url = VaultEndpoint.loggingUrl;
   assert.equal(url(undefined, 'SANDBOX'), 'https://app.hyperswitch.io/api/logs/sdk');
   assert.equal(url(undefined, 'PROD'), 'https://live.hyperswitch.io/api/logs/sdk');
   assert.equal(url(undefined, 'PROD_EU'), 'https://eu.hyperswitch.io/api/logs/sdk');
   assert.equal(url(undefined, 'INTEG'), 'https://integ.hyperswitch.io/api/logs/sdk');
+  assert.equal(url({ overrideEndpoints: {} }, 'SANDBOX'), 'https://app.hyperswitch.io/api/logs/sdk');
+});
 
-  const logging = { overrideEndpoints: { customLoggingEndpoint: 'https://logs.example.com/collect' } };
-  assert.equal(url(logging, 'PROD'), 'https://logs.example.com/collect');
+test('the log URL is customLoggingEndpoint whenever it is passed, used as given', () => {
+  const url = VaultEndpoint.loggingUrl;
   assert.equal(
-    url({ commonEndpoint: 'https://pay.example.com/api/' }, 'PROD'),
-    'https://pay.example.com/api/logs/sdk',
+    url(
+      {
+        commonEndpoint: 'https://pay.example.com/api',
+        overrideEndpoints: {
+          customBackendEndpoint: 'https://backend.example.com/api',
+          customLoggingEndpoint: ' https://logs.example.com/collect ',
+        },
+      },
+      'PROD',
+    ),
+    'https://logs.example.com/collect',
   );
-  assert.equal(
-    url({ overrideEndpoints: { customBackendEndpoint: 'https://pay.example.com/api' } }, 'PROD'),
-    'https://live.hyperswitch.io/api/logs/sdk',
-    'overrideEndpoints without a logging endpoint uses the default, as client-core',
-  );
-  assert.equal(
-    url({ commonEndpoint: 'https://pay.example.com/api', overrideEndpoints: {} }, 'SANDBOX'),
-    'https://app.hyperswitch.io/api/logs/sdk',
-    'overrideEndpoints wins over commonEndpoint for logs, as client-core',
-  );
-  assert.equal(
-    url({ overrideEndpoints: { customLoggingEndpoint: 'http://logs.example.com' } }, 'PROD'),
-    'http://logs.example.com',
-    'the logging endpoint is used as given, as client-core',
-  );
-  assert.equal(url({ overrideEndpoints: { customLoggingEndpoint: '  ' } }, 'PROD'), undefined);
   assert.equal(
     url({ overrideEndpoints: { customLoggingEndpoint: 'http://localhost:8080/logs' } }, 'SANDBOX'),
     'http://localhost:8080/logs',
   );
+});
+
+test('the log URL is commonEndpoint\'s logs path when only commonEndpoint is passed', () => {
+  const url = VaultEndpoint.loggingUrl;
+  assert.equal(url({ commonEndpoint: 'https://pay.example.com/api/' }, 'PROD'), 'https://pay.example.com/api/logs/sdk');
+  assert.equal(
+    url({ commonEndpoint: 'https://pay.example.com/api', overrideEndpoints: {} }, 'SANDBOX'),
+    'https://pay.example.com/api/logs/sdk',
+  );
+  // commonEndpoint is the vault's API base even next to a backend override, so its logs path too.
+  assert.equal(
+    url(
+      {
+        commonEndpoint: 'https://pay.example.com/api',
+        overrideEndpoints: { customBackendEndpoint: 'https://backend.example.com/api' },
+      },
+      'PROD',
+    ),
+    'https://pay.example.com/api/logs/sdk',
+  );
+});
+
+test('no logs are sent when the merchant passes its own backend without a logging endpoint', () => {
+  const url = VaultEndpoint.loggingUrl;
+  assert.equal(url({ overrideEndpoints: { customBackendEndpoint: 'https://pay.example.com/api' } }, 'PROD'), undefined);
+  assert.equal(
+    url(
+      { overrideEndpoints: { customBackendEndpoint: 'https://pay.example.com/api', customLoggingEndpoint: '  ' } },
+      'PROD',
+    ),
+    undefined,
+  );
+});
+
+test('a blank endpoint counts as not passed for the log URL', () => {
+  const url = VaultEndpoint.loggingUrl;
+  const hyperswitch = 'https://app.hyperswitch.io/api/logs/sdk';
+  assert.equal(url({ overrideEndpoints: { customLoggingEndpoint: '' } }, 'SANDBOX'), hyperswitch);
+  assert.equal(url({ overrideEndpoints: { customBackendEndpoint: ' ' } }, 'SANDBOX'), hyperswitch);
+  assert.equal(url({ commonEndpoint: '' }, 'SANDBOX'), hyperswitch);
 });
 
 test('a field focus or blur is a USER_EVENT carrying the field name only', () => {
@@ -596,19 +631,12 @@ test('a card number or a name passed by mistake in the form settings is never lo
   }
 });
 
-test('no part of a crash record carries a run of digits shaped like a card number', () => {
+test('a crash record carries the message with its longer numbers masked, never the stack or a thrown value', () => {
   const logger = VaultLogger.make(LOG_URL, 'android');
-  const error = new Error('Unexpected value 4242 4242 4242 4242 at index 12');
-  // As Hermes writes a stack: the message first, then frames with their line and column.
-  error.stack = `Error: ${error.message}\n    at render (index.android.bundle:1:1234567)`;
+  const error = new Error('Unexpected value 4242 4242 4242 4242 at index 12 of 300');
+  error.stack = `Error: ${error.message}\n    at render (http://localhost:8081/index.bundle?platform=android:1:1234567)`;
   VaultLogger.logCrash(logger, error, 'cardNumber', PUBLISHABLE_KEY, SESSION_ID);
-  VaultLogger.logCrash(
-    logger,
-    'bad input 4242424242424242',
-    'cardNumber',
-    PUBLISHABLE_KEY,
-    SESSION_ID,
-  );
+  VaultLogger.logCrash(logger, 'bad input 4242424242424242', 'cardNumber', PUBLISHABLE_KEY, SESSION_ID);
   VaultLogger.logCrash(
     logger,
     { input: { pan: '4111-1111-1111-1111', digits: 4111111111111111 } },
@@ -616,23 +644,15 @@ test('no part of a crash record carries a run of digits shaped like a card numbe
     PUBLISHABLE_KEY,
     SESSION_ID,
   );
-  VaultLogger.logCrash(
-    logger,
-    'spaced 4242  4242  4242  4242, dotted 4242.4242.4242.4242, slashed 4242/4242/4242/4242',
-    'cardNumber',
-    PUBLISHABLE_KEY,
-    SESSION_ID,
-  );
-  const [crash, thrown, object, spaced] = logs().map(log => JSON.parse(log.value));
-  assert.equal(spaced.thrown, 'spaced [redacted], dotted [redacted], slashed [redacted]');
-  assert.equal(crash.message, 'Unexpected value [redacted] at index 12');
-  assert.equal(
-    crash.stack,
-    'Error: Unexpected value [redacted] at index 12\n    at render (index.android.bundle:1:1234567)',
-  );
-  assert.equal(thrown.thrown, 'bad input [redacted]');
-  assert.deepEqual(object.input, { pan: '[redacted]', digits: '[redacted]' });
-  assert.doesNotMatch(JSON.stringify(logs()), /4242|4111/);
+  const [crash, thrown, object] = logs().map(log => JSON.parse(log.value));
+  assert.deepEqual(crash, {
+    type: 'Error',
+    message: 'Unexpected value [redacted] at index 12 of ***',
+    componentName: 'cardNumber',
+  });
+  assert.deepEqual(thrown, { message: VaultLogger.notAnError, componentName: 'cardNumber' });
+  assert.deepEqual(object, { message: VaultLogger.notAnError, componentName: 'cardNumber' });
+  assert.doesNotMatch(JSON.stringify(logs()), /4242|4111|localhost|index\.bundle/);
 });
 
 test('a card number is blanked however many spaces, line breaks, dots, slashes or dashes it has', () => {
@@ -655,17 +675,112 @@ test('a card number is blanked however many spaces, line breaks, dots, slashes o
   assert.ok(performance.now() - startedAt < 1000);
 });
 
-test('an error body from the vault carries no run of digits shaped like a card number', async () => {
+test('an error body is logged as its typed error only, with longer numbers masked', async () => {
   vaultAnswer = async () =>
     okJson(422, {
-      error: { type: 'invalid_request', code: 'IR_16', message: 'Card 4242 4242 4242 4242 is invalid' },
+      error: {
+        type: 'invalid_request',
+        code: 'IR_16',
+        message: 'Card 4242 4242 4242 4242 is invalid, retry in 300 s',
+        reason: 'Attempt 1234 refused',
+        data: { echoed: 'http://localhost:8081/index.bundle' },
+        payment_id: 'pay_123456',
+        connector_transaction_id: 'txn_987654321',
+      },
+      trace: 'http://10.0.2.2:8081/index.bundle',
     });
   const logger = VaultLogger.make(LOG_URL, 'android');
   await confirm(logger);
   const answered = logs().find(log => log.event_name === 'PAYMENT_METHOD_SESSION_CONFIRM_CALL');
   assert.deepEqual(JSON.parse(answered.value).response, {
-    error: { type: 'invalid_request', code: 'IR_16', message: 'Card [redacted] is invalid' },
+    error: {
+      type: 'invalid_request',
+      code: 'IR_16',
+      message: 'Card [redacted] is invalid, retry in *** s',
+      reason: 'Attempt **** refused',
+    },
   });
+});
+
+test('an error body\'s type and code go through the same digit rule as its text', () => {
+  assert.deepEqual(VaultLogger.errorBodyValue({ error: { type: 'invalid_request', code: 'IR_04', message: 'x' } }), {
+    error: { type: 'invalid_request', code: 'IR_04', message: 'x' },
+  });
+  assert.deepEqual(VaultLogger.errorBodyValue({ error: { code: 'UE_9000', message: 7, reason: null } }), {
+    error: { code: 'UE_****' },
+  });
+});
+
+test('an error body of another shape keeps only the common top-level fields', () => {
+  assert.deepEqual(VaultLogger.errorBodyValue({ message: 'Forbidden' }), { message: 'Forbidden' });
+  assert.deepEqual(VaultLogger.errorBodyValue({ error: 'Unauthorized', status: 401 }), { error: 'Unauthorized' });
+  assert.deepEqual(
+    VaultLogger.errorBodyValue({
+      error_code: 'E1',
+      error_message: 'Card 4242424242424242 declined, 300 left',
+      data: { echoed: 'http://localhost:8081/index.bundle' },
+    }),
+    { error_code: 'E1', error_message: 'Card [redacted] declined, *** left' },
+  );
+  // A typed error with no string field falls back to the top level.
+  assert.deepEqual(VaultLogger.errorBodyValue({ error: { message: 42 }, message: 'Forbidden' }), {
+    message: 'Forbidden',
+  });
+});
+
+test('an error body with none of those fields is logged as a fixed message and its key names', () => {
+  const unrecognised = VaultLogger.unrecognisedErrorBody;
+  assert.deepEqual(
+    VaultLogger.errorBodyValue({ detail: 'secret 4242', status: 403, 'bad key!': 1, field1234: 2 }),
+    { message: unrecognised, keys: ['detail', 'status', 'bad key!', 'field****'] },
+  );
+  assert.deepEqual(VaultLogger.errorBodyValue({ error: { message: 42, code: null } }), {
+    message: unrecognised,
+    keys: ['error'],
+  });
+  const many = Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`k${String.fromCharCode(97 + i)}`, 1]));
+  assert.equal(VaultLogger.errorBodyValue(many).keys.length, 10);
+  for (const body of [null, 'Bad Gateway', 502, [{ error: { message: 'x' } }], {}]) {
+    assert.deepEqual(VaultLogger.errorBodyValue(body), { message: unrecognised }, JSON.stringify(body));
+  }
+});
+
+test('an exception is logged with a fixed message when its message is missing, empty or not a string', () => {
+  const noMessage = { type: 'Error', message: VaultLogger.noErrorMessage };
+  assert.deepEqual(VaultLogger.exceptionValue(new Error()), noMessage);
+  assert.deepEqual(VaultLogger.exceptionValue(new Error('   ')), noMessage);
+  const numeric = new Error('x');
+  numeric.message = 404;
+  assert.deepEqual(VaultLogger.exceptionValue(numeric), noMessage);
+  const hostile = new Error('x');
+  Object.defineProperty(hostile, 'message', {
+    get() {
+      throw new Error('getter');
+    },
+  });
+  assert.deepEqual(VaultLogger.exceptionValue(hostile), noMessage);
+});
+
+test('an exception\'s type goes through the same digit rule as its message', () => {
+  assert.equal(VaultLogger.exceptionValue(new TypeError('x')).type, 'TypeError');
+  const abort = new Error('Aborted');
+  abort.name = 'AbortError';
+  assert.equal(VaultLogger.exceptionValue(abort).type, 'AbortError');
+  const odd = new Error('x');
+  odd.name = 'Card 4242424242424242';
+  assert.equal(VaultLogger.exceptionValue(odd).type, 'Card [redacted]');
+  const numbered = new Error('x');
+  numbered.name = 'Error12345';
+  assert.equal(VaultLogger.exceptionValue(numbered).type, 'Error*****');
+  const blank = new Error('x');
+  blank.name = '  ';
+  assert.equal(VaultLogger.exceptionValue(blank).type, 'Error');
+});
+
+test('an error-like object that is not an Error is logged as a fixed message', () => {
+  for (const thrown of [{ message: 'looks like an error', name: 'TypeError' }, undefined, null, 0, 'text']) {
+    assert.deepEqual(VaultLogger.exceptionValue(thrown), { message: VaultLogger.notAnError });
+  }
 });
 
 test('an answer that arrives after the session changed stays with the session that sent it', async () => {
@@ -743,18 +858,18 @@ test('a crash is a USER_ERROR sent at once, with the component and the exception
   assert.equal(value.componentName, 'cardNumber');
   assert.equal(value.message, 'Cannot read properties of undefined');
   assert.equal(value.type, 'TypeError');
-  assert.equal(typeof value.stack, 'string');
+  assert.equal('stack' in value, false);
 });
 
-test('a crash that throws something other than an Error logs the value itself', () => {
+test('a crash that throws something other than an Error logs a fixed message, never the value', () => {
   const logger = VaultLogger.make(LOG_URL, 'android');
   VaultLogger.logCrash(logger, 'boom', 'cardCvc', PUBLISHABLE_KEY, SESSION_ID);
   VaultLogger.logCrash(logger, null, 'cardExpiry', PUBLISHABLE_KEY, SESSION_ID);
   assert.deepEqual(
     logs().map(log => JSON.parse(log.value)),
     [
-      { thrown: 'boom', componentName: 'cardCvc' },
-      { thrown: null, componentName: 'cardExpiry' },
+      { message: VaultLogger.notAnError, componentName: 'cardCvc' },
+      { message: VaultLogger.notAnError, componentName: 'cardExpiry' },
     ],
   );
 });
@@ -769,7 +884,8 @@ test('a crash rendered again with another stack has the same signature, so it is
     VaultLogger.crashSignature(first),
     VaultLogger.crashSignature(new TypeError('render failed')),
   );
-  assert.notEqual(VaultLogger.crashSignature('boom'), VaultLogger.crashSignature('bang'));
+  // Values other than an Error log the same fixed record, so they share one signature.
+  assert.equal(VaultLogger.crashSignature('boom'), VaultLogger.crashSignature('bang'));
 });
 
 test('the crash boundary logs a crash, then throws the very same value on', () => {

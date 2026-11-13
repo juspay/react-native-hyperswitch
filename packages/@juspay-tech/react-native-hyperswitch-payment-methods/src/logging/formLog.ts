@@ -7,7 +7,7 @@ import type {
   VaultType,
 } from '../core/types';
 import { DEFAULT_READY_TIMEOUT_MS } from '../core/formSession';
-import { formatThrown, redactCardNumbers, redactDigits } from './logger';
+import { exceptionValue, maskNumbers } from './logger';
 import type { Identity, Logger } from './logger';
 
 /* Why a card form never became usable. Web does not log this; it answers "was the card form
@@ -101,20 +101,20 @@ function loggedMessage(
   const { code, message } = result.error;
   const authored =
     isHyperswitchVault(vaultType, adapter) && code !== 'tokenization_failed';
-  return authored && typeof message === 'string' ? redactDigits(message) : '';
+  return authored && typeof message === 'string' ? maskNumbers(message) : '';
 }
 
-/* What a crash recorded. The field is the provider's code, so an Error's message, type and stack
-   are kept only for the Hyperswitch vault, by the same rule as a tokenize message; for any other
-   provider, only the error's type and the provider. Any other value thrown is recorded only as
-   its kind, since it can carry what the customer typed. */
+/* What a crash recorded. The field is the provider's code, so an Error's message is kept only for
+   the Hyperswitch vault, by the same rule as a tokenize message, with its type as exceptionValue
+   records them; for any other provider, only the error's type and the provider. Any other value
+   thrown is recorded only as its kind, since it can carry what the customer typed. */
 function recordCrash(
   thrown: unknown,
   adapter: ProviderAdapter | null
 ): Record<string, unknown> {
   if (thrown instanceof Error) {
     if (isHyperswitchVault(adapter?.vaultType, adapter)) {
-      return redactCardNumbers(formatThrown(thrown)) as Record<string, unknown>;
+      return exceptionValue(thrown);
     }
     return {
       type: /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(thrown.name)
