@@ -16,6 +16,7 @@ import {
   intentData,
   profileId,
   publishableKey,
+  sdkLogging,
   secretKey,
   serverURL,
 } from "./utils";
@@ -31,6 +32,7 @@ function getHyperSingleton(): Promise<HyperswitchSession> {
     hyperSingleton = Hyperswitch.init({
       publishableKey,
       profileId,
+      ...sdkLogging,
     }) as Promise<HyperswitchSession>;
   }
   return hyperSingleton;

@@ -41,9 +41,12 @@ type cardFieldId =
   | CvcField
   | CardholderNameField
 
+type cardNetworkMenu = Opened | Closed
+
 type analyticsEvent =
   | FieldFocused(cardFieldId)
   | FieldBlurred(cardFieldId)
+  | CardNetworkMenu(cardNetworkMenu)
 
 type cardFieldValues = {
   cardNumber: string,

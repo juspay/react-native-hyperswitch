@@ -17,11 +17,12 @@ import {
   type CardFormHandle,
 } from "@juspay-tech/react-native-hyperswitch-payment-methods";
 
-import { initialBaseUrl, intentData, publishableKey } from "../utils";
+import { customerId, initialBaseUrl, intentData, publishableKey, sdkLogging } from "../utils";
 
 const hyper = HyperswitchPaymentMethods.init({
   publishableKey,
   environment: "SANDBOX",
+  ...sdkLogging,
 });
 
 const appearance = {
@@ -37,12 +38,53 @@ const appearance = {
   input: { color: "#111827", fontSize: 16 },
 };
 
+interface SavedCard {
+  token: string;
+  network?: string;
+  last4: string;
+  expiry: string;
+  requiresCvv: boolean;
+}
+
+const toSavedCard = (method: any): SavedCard => {
+  const card = method.payment_method_data?.card ?? {};
+  return {
+    token: method.payment_method_token,
+    network: card.card_network ?? undefined,
+    last4: card.last4_digits ?? "",
+    expiry: `${card.expiry_month ?? ""}/${String(card.expiry_year ?? "").slice(-2)}`,
+    requiresCvv: method.requires_cvv !== false,
+  };
+};
+
+const fetchSavedCards = async (sessionId: string): Promise<SavedCard[]> => {
+  const response = await fetch(
+    `${initialBaseUrl}/payment-method-session/${encodeURIComponent(sessionId)}/saved-payment-methods`
+  );
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.error ?? `Server returned ${response.status}`);
+  }
+  return (data?.customer_payment_methods ?? [])
+    .filter((method: any) => method.payment_method_type === "card")
+    .map(toSavedCard);
+};
+
 export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
   const vaultRef = useRef<CardFormHandle>(null);
   const [sdkAuthorization, setSdkAuthorization] = useState<string | null>(null);
   const [status, setStatus] = useState("Not started");
   const [canPay, setCanPay] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
+  const [selectedCard, setSelectedCard] = useState<SavedCard | null>(null);
+
+  const selectCard = (card: SavedCard | null) => {
+    // Tapping the row already selected keeps its form and validity, so canPay stays as it is.
+    if (card?.token === selectedCard?.token) return;
+    setCanPay(false);
+    setSelectedCard(card);
+  };
 
   const start = useCallback(async () => {
     setBusy(true);
@@ -53,7 +95,7 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ customer_id: '12345_cus_019d109101b07911be86fc8bab029d45' }),
+          body: JSON.stringify({ customer_id: customerId }),
         }
       );
       const data = await response.json();
@@ -65,8 +107,19 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
         throw new Error("Server returned no sdk_authorization");
       }
       const vaults = Object.keys(data.external_vault_details ?? {});
+      setSelectedCard(null);
       setSdkAuthorization(authorization);
       setStatus(`Session created - vault: ${vaults.join(", ") || "none"}`);
+      try {
+        setSavedCards(await fetchSavedCards(data.id));
+      } catch (error) {
+        setSavedCards([]);
+        setStatus(
+          `Session created; saved cards not listed: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
     } catch (error) {
       console.log(error)
       setStatus(error instanceof Error ? error.message : String(error));
@@ -81,6 +134,10 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
       const result = await vaultRef.current?.tokenize();
       if (result?.status === "success") {
         setStatus(`Tokenized: ${JSON.stringify(result.data?.tokens)}`);
+        setSdkAuthorization(null);
+        setSavedCards([]);
+        setSelectedCard(null);
+        setCanPay(false);
       } else if (result?.error) {
         setStatus(`${result.error.code}: ${result.error.message}`);
       }
@@ -101,28 +158,81 @@ export default function PaymentMethodFlow({ onBack }: { onBack: () => void }) {
           options={{ sdkAuthorization, appearance }}
           onError={(error) => setStatus(error.message)}
         >
-          <CardForm
-            ref={vaultRef}
-            onChange={(event) => setCanPay(event.complete && event.valid)}
-            onError={(error) => setStatus(String(error))}
-          >
-            {/* Field options use the web SDK's nesting. */}
-            <CardNumberField
-              options={{
-                placeholder: "1234 5678 9012 3456",
-                cardBrandIcon: "hidden",
-              }}
-            />
-            <View style={styles.row}>
-              <View style={styles.half}>
-                <CardExpiryField options={{ placeholder: "MM / YY" }} />
-              </View>
-              <View style={styles.half}>
-                <CardCVCField options={{ placeholder: "CVC"}} />
-              </View>
+          {savedCards.length > 0 && (
+            <View style={styles.savedCards}>
+              <Text style={styles.sectionTitle}>Saved cards</Text>
+              {savedCards.map((card) => (
+                <TouchableOpacity
+                  key={card.token}
+                  style={[
+                    styles.option,
+                    selectedCard?.token === card.token && styles.optionSelected,
+                  ]}
+                  onPress={() => selectCard(card)}
+                >
+                  <Text style={styles.optionText}>
+                    {card.network ?? "Card"} •••• {card.last4}
+                  </Text>
+                  <Text style={styles.optionHint}>{card.expiry}</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={[styles.option, !selectedCard && styles.optionSelected]}
+                onPress={() => selectCard(null)}
+              >
+                <Text style={styles.optionText}>New card</Text>
+              </TouchableOpacity>
             </View>
-            <CardholderNameField options={{ placeholder: "Name on card" }} />
-          </CardForm>
+          )}
+
+          {selectedCard ? (
+            selectedCard.requiresCvv ? (
+              <CardForm
+                key={selectedCard.token}
+                ref={vaultRef}
+                onChange={(event) => setCanPay(event.complete && event.valid)}
+                onError={(error) => setStatus(String(error))}
+              >
+                <CardCVCField
+                  options={{
+                    placeholder: "CVC",
+                    savedCard: {
+                      paymentMethodToken: selectedCard.token,
+                      paymentMethodData: { card: { cardNetwork: selectedCard.network } },
+                    },
+                  }}
+                />
+              </CardForm>
+            ) : (
+              <Text style={styles.optionHint}>
+                This card needs no CVC: use its token as listed.
+              </Text>
+            )
+          ) : (
+            <CardForm
+              key="new"
+              ref={vaultRef}
+              onChange={(event) => setCanPay(event.complete && event.valid)}
+              onError={(error) => setStatus(String(error))}
+            >
+              {/* Field options use the web SDK's nesting. */}
+              <CardNumberField
+                options={{
+                  placeholder: "1234 5678 9012 3456",
+                  cardBrandIcon: "hidden",
+                }}
+              />
+              <View style={styles.row}>
+                <View style={styles.half}>
+                  <CardExpiryField options={{ placeholder: "MM / YY" }} />
+                </View>
+                <View style={styles.half}>
+                  <CardCVCField options={{ placeholder: "CVC"}} />
+                </View>
+              </View>
+              <CardholderNameField options={{ placeholder: "Name on card" }} />
+            </CardForm>
+          )}
 
           <TouchableOpacity
             style={[styles.button, { marginTop: 20 }]}
@@ -171,4 +281,19 @@ const styles = StyleSheet.create({
   },
   secondary: { backgroundColor: "#e5e7eb" },
   buttonText: { color: "#fff", fontSize: 14, fontWeight: "500" },
+  savedCards: { marginBottom: 16, gap: 8 },
+  sectionTitle: { fontSize: 13, fontWeight: "600", color: "#111827" },
+  option: {
+    height: 44,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  optionSelected: { borderColor: "#111827", backgroundColor: "#f3f4f6" },
+  optionText: { fontSize: 14, color: "#111827" },
+  optionHint: { fontSize: 12, color: "#6b7280" },
 });
