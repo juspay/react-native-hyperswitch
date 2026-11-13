@@ -7,13 +7,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "lerna": "lerna",
-    "example": "yarn workspace react-native-hyperswitch-example",
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\""
   },
   "workspaces": [
-    "packages/@juspay-tech/*",
-    "example"
+    "packages/@juspay-tech/*"
   ],
   "devDependencies": {
     "@commitlint/config-conventional": "^17.0.2",
