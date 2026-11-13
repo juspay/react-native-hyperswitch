@@ -50,8 +50,8 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@commitlint/config-conventional": "^17.0.2",
-    "@react-native/babel-preset": "0.81.1",
-    "@release-it/conventional-changelog": "^10.0.1",
+    "@react-native/babel-preset": "0.88.1",
+    "@react-native/jest-preset": "0.88.1",
     "@types/jest": "^29.5.14",
     "@types/react": "^19.1.0",
     "commitlint": "^17.0.2",
@@ -62,10 +62,9 @@
     "metro-react-native-babel-preset": "^0.77.0",
     "pod-install": "^0.1.0",
     "prettier": "^2.0.5",
-    "react": "19.1.0",
-    "react-native": "0.81.1",
+    "react": "19.3.1",
+    "react-native": "0.88.1",
     "react-native-builder-bob": "^0.40.13",
-    "release-it": "^19.0.5",
     "typescript": "^5.9.2"
   },
   "resolutions": {
@@ -76,7 +75,7 @@
     "react-native": ">=0.76.0"
   },
   "jest": {
-    "preset": "react-native",
+    "preset": "@react-native/jest-preset",
     "modulePathIgnorePatterns": [
       "<rootDir>/example/node_modules",
       "<rootDir>/lib/"

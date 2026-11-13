@@ -100,12 +100,12 @@ Our pre-commit hooks verify that your commit message matches this format when co
 
 ### Publishing to npm
 
-We use [release-it](https://github.com/release-it/release-it) to make it easier to publish new versions. It handles common tasks like bumping version based on semver, creating tags and releases etc.
+Releases are published manually with [lerna](https://lerna.js.org/) from the repository root. It bumps versions based on conventional commits, writes changelogs, and publishes the changed packages.
 
-To publish new versions, run the following:
+To publish new versions, run the following from the repository root:
 
 ```sh
-yarn release
+yarn lerna publish
 ```
 
 
