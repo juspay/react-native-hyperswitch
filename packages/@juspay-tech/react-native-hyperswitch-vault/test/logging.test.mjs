@@ -1,0 +1,924 @@
+// The vault's logs: hyperswitch-web's log structure, for the vault's own two API calls, the card
+// fields' user events and the form's debugging logs. Runs on the ReScript output (`rescript` first),
+// with `fetch` stubbed.
+import { test, beforeEach, afterEach } from 'node:test';
+import assert from 'node:assert/strict';
+
+import * as VaultLogger from '../src/VaultLogger.bs.js';
+import * as VaultConfirm from '../src/VaultConfirm.bs.js';
+import * as VaultSavedCard from '../src/VaultSavedCard.bs.js';
+import * as VaultEndpoint from '../src/VaultEndpoint.bs.js';
+import * as VaultLogValues from '../src/VaultLogValues.bs.js';
+import * as CardNetworkNames from '../src/CardNetworkNames.bs.js';
+import { VaultCrashBoundary } from '../src/VaultCrashBoundary.mjs';
+
+const LOG_URL = 'https://app.hyperswitch.io/api/logs/sdk';
+const BASE_URL = 'https://app.hyperswitch.io/api';
+const SESSION_ID = '12345_pms_test';
+const PUBLISHABLE_KEY = 'pk_snd_test';
+const SDK_AUTHORIZATION = Buffer.from(
+  `publishable_key=${PUBLISHABLE_KEY},payment_method_session_id=${SESSION_ID},client_secret=cs_secret_1`,
+).toString('base64');
+const CARD = { cardNumber: '4242424242424242', expiryMonth: '12', expiryYear: '2030', cvc: '123' };
+const CONFIRM_URL = `${BASE_URL}/v1/payment-method-sessions/${SESSION_ID}/confirm`;
+
+const okJson = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
+const tokenBody = {
+  associated_payment_methods: [{ payment_method_token: { data: 'tok_123' } }],
+  payment_method_data: { card: { last4_digits: '4242', expiry_month: '12', expiry_year: '2030' } },
+};
+
+let realFetch;
+let batches;
+let vaultAnswer;
+const logs = () => batches.flat();
+
+beforeEach(() => {
+  realFetch = globalThis.fetch;
+  batches = [];
+  vaultAnswer = async () => okJson(200, tokenBody);
+  globalThis.fetch = async (url, options) => {
+    if (url === LOG_URL) {
+      batches.push(JSON.parse(options.body));
+      return okJson(200, {});
+    }
+    await new Promise(resolve => setTimeout(resolve, 5));
+    return vaultAnswer(url, options);
+  };
+});
+
+afterEach(() => {
+  globalThis.fetch = realFetch;
+});
+
+const confirm = (logger, extra = {}) =>
+  VaultConfirm.confirmPaymentMethodSession({
+    sdkAuthorization: SDK_AUTHORIZATION,
+    vaultBaseUrl: BASE_URL,
+    card: CARD,
+    logger,
+    ...extra,
+  });
+
+// A vault that never answers: its request ends only when it is cancelled.
+const hangUntilCancelled = (url, options) =>
+  new Promise((_, reject) => {
+    const cancelled = () => reject(new DOMException('This operation was aborted', 'AbortError'));
+    if (options.signal.aborted) cancelled();
+    else options.signal.addEventListener('abort', cancelled);
+  });
+
+const confirmCall = logger => ({
+  logger,
+  eventName: 'PAYMENT_METHOD_SESSION_CONFIRM_CALL',
+  url: CONFIRM_URL,
+  merchantId: PUBLISHABLE_KEY,
+  paymentId: SESSION_ID,
+  logSession: VaultLogger.currentSession(logger),
+  startedAt: undefined,
+});
+
+test('a confirm queues its _INIT and answer, and they go out together as one batch', async () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  const outcome = await confirm(logger);
+
+  assert.equal(outcome.status, 'success');
+  assert.equal(batches.length, 0, 'INFO logs wait for the 20 s flush, as on web');
+
+  VaultLogger.sendLogs(logger);
+  assert.equal(batches.length, 1);
+  assert.deepEqual(batches[0].map(log => log.event_name), [
+    'PAYMENT_METHOD_SESSION_CONFIRM_CALL_INIT',
+    'PAYMENT_METHOD_SESSION_CONFIRM_CALL',
+  ]);
+
+  const [started, answered] = batches[0];
+  assert.deepEqual(Object.keys(started).sort(), [
+    'app_id', 'category', 'component', 'event_name', 'first_event', 'latency', 'log_type',
+    'merchant_id', 'payment_id', 'payment_method', 'platform', 'session_id', 'source',
+    'timestamp', 'user_agent', 'value', 'version',
+  ]);
+  assert.equal(started.log_type, 'INFO');
+  assert.equal(started.category, 'API');
+  assert.equal(started.source, 'HYPERSWITCH_VAULT');
+  assert.equal(started.component, 'MOBILE');
+  assert.equal(started.platform, 'ANDROID');
+  assert.equal(started.merchant_id, PUBLISHABLE_KEY);
+  assert.equal(started.payment_id, SESSION_ID);
+  assert.equal(started.session_id, logger.sessionId);
+  assert.equal(started.first_event, 'true');
+  assert.equal(started.latency, '');
+  assert.deepEqual(JSON.parse(started.value), { url: CONFIRM_URL });
+
+  assert.equal(answered.log_type, 'INFO');
+  assert.deepEqual(JSON.parse(answered.value), { url: CONFIRM_URL, statusCode: 200 });
+  assert.ok(Number(answered.latency) > 0, 'the answer carries its latency from its _INIT');
+
+  VaultLogger.sendLogs(logger);
+  assert.equal(batches.length, 1, 'an empty queue sends nothing');
+});
+
+test('queued logs go out on their own 20 s after the last one', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  VaultLogger.callStarted(confirmCall(VaultLogger.make(LOG_URL, 'ios')));
+
+  t.mock.timers.tick(19999);
+  assert.equal(batches.length, 0);
+  t.mock.timers.tick(1);
+  assert.equal(batches.length, 1);
+  assert.equal(batches[0][0].event_name, 'PAYMENT_METHOD_SESSION_CONFIRM_CALL_INIT');
+});
+
+test('more than 8 queued logs go out at once', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  for (let i = 0; i < 9; i++) VaultLogger.callStarted(confirmCall(logger));
+  assert.equal(batches.length, 1);
+  assert.equal(batches[0].length, 9);
+});
+
+test('an HTTP error goes out at once, with the status and the error body as on web', async () => {
+  const error = { error: { type: 'invalid_request', code: 'IR_16', message: 'Session already used' } };
+  vaultAnswer = async () => okJson(400, error);
+  const outcome = await confirm(VaultLogger.make(LOG_URL, 'android'));
+
+  assert.equal(outcome.status, 'failure');
+  assert.equal(batches.length, 1, 'an ERROR sends the queue immediately');
+  const answered = batches[0][1];
+  assert.equal(answered.event_name, 'PAYMENT_METHOD_SESSION_CONFIRM_CALL');
+  assert.equal(answered.log_type, 'ERROR');
+  assert.deepEqual(JSON.parse(answered.value), { url: CONFIRM_URL, statusCode: 400, response: error });
+});
+
+test('a request that gets no answer logs status 504 and the exception\'s type and message', async () => {
+  vaultAnswer = async () => {
+    throw new TypeError('Network request failed');
+  };
+  const outcome = await confirm(VaultLogger.make(LOG_URL, 'android'));
+
+  assert.equal(outcome.error.code, 'unknown_outcome');
+  const answered = batches[0][1];
+  const value = JSON.parse(answered.value);
+  assert.equal(answered.log_type, 'ERROR');
+  assert.equal(value.statusCode, 504);
+  assert.equal(value.response.message, 'Network request failed');
+  assert.equal(value.response.type, 'TypeError');
+  assert.deepEqual(Object.keys(value.response).sort(), ['message', 'type'], 'never the stack');
+});
+
+test('a request that fails with no error object still returns unknown_outcome, and is logged', async () => {
+  vaultAnswer = () => Promise.reject(undefined);
+  const outcome = await confirm(VaultLogger.make(LOG_URL, 'android'));
+
+  assert.equal(outcome.error.code, 'unknown_outcome');
+  const value = JSON.parse(batches[0][1].value);
+  assert.equal(batches[0][1].log_type, 'ERROR');
+  assert.equal(value.statusCode, 504);
+  assert.deepEqual(value.response, { message: VaultLogger.notAnError });
+});
+
+test('a request that fails with something other than an Error logs a fixed message, never the value', async () => {
+  vaultAnswer = () => Promise.reject('Network request failed');
+  const outcome = await confirm(VaultLogger.make(LOG_URL, 'android'));
+
+  assert.equal(outcome.error.code, 'unknown_outcome');
+  assert.deepEqual(JSON.parse(batches[0][1].value).response, { message: VaultLogger.notAnError });
+});
+
+test('a request cancelled before it is sent logs nothing', async () => {
+  vaultAnswer = hangUntilCancelled;
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  const outcome = await confirm(logger, { signal: AbortSignal.abort() });
+  VaultLogger.sendLogs(logger);
+
+  assert.equal(outcome.error.code, 'unknown_outcome');
+  assert.deepEqual(logs(), []);
+});
+
+test('a request cancelled in flight, or timed out, is logged with its AbortError as web logs it', async () => {
+  vaultAnswer = hangUntilCancelled;
+  const caller = new AbortController();
+  setTimeout(() => caller.abort(), 1);
+  const cancelled = await confirm(VaultLogger.make(LOG_URL, 'android'), { signal: caller.signal });
+
+  assert.equal(cancelled.error.code, 'unknown_outcome');
+  assert.equal(batches.length, 1, 'an ERROR sends the queue immediately');
+  const [started, answered] = batches[0];
+  assert.equal(started.event_name, 'PAYMENT_METHOD_SESSION_CONFIRM_CALL_INIT');
+  assert.equal(answered.log_type, 'ERROR');
+  assert.equal(JSON.parse(answered.value).statusCode, 504);
+  assert.equal(JSON.parse(answered.value).response.type, 'AbortError');
+
+  batches = [];
+  const timedOut = await confirm(VaultLogger.make(LOG_URL, 'android'), { timeoutMs: 1 });
+  assert.equal(timedOut.error.code, 'unknown_outcome');
+  assert.equal(JSON.parse(batches[0][1].value).response.type, 'AbortError');
+});
+
+test('a request stops listening to the caller signal once it settles', async () => {
+  const caller = new AbortController();
+  const listening = new Set();
+  const add = caller.signal.addEventListener.bind(caller.signal);
+  const remove = caller.signal.removeEventListener.bind(caller.signal);
+  caller.signal.addEventListener = (type, listener) => (listening.add(listener), add(type, listener));
+  caller.signal.removeEventListener = (type, listener) => (listening.delete(listener), remove(type, listener));
+
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  const outcome = await confirm(logger, { signal: caller.signal });
+  VaultLogger.sendLogs(logger);
+  assert.equal(outcome.status, 'success');
+  assert.equal(listening.size, 0);
+});
+
+test('an answer whose body is not JSON is logged as an error with its real status and a fixed message', async () => {
+  const unreadable = status => async () => ({
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => {
+      throw new SyntaxError('Unexpected token <');
+    },
+  });
+
+  vaultAnswer = unreadable(200);
+  const success = await confirm(VaultLogger.make(LOG_URL, 'android'));
+  vaultAnswer = unreadable(502);
+  const gateway = await confirm(VaultLogger.make(LOG_URL, 'android'));
+
+  assert.equal(success.error.code, 'malformed_response');
+  assert.equal(gateway.status, 'failure');
+  assert.equal(batches.length, 2, 'each ERROR sends its queue immediately');
+  const [ok, bad] = batches.map(batch => batch[1]);
+  assert.equal(ok.log_type, 'ERROR');
+  assert.equal(JSON.parse(ok.value).statusCode, 200);
+  assert.deepEqual(JSON.parse(ok.value).response, { message: VaultLogger.notJson });
+  assert.equal(bad.log_type, 'ERROR');
+  assert.equal(JSON.parse(bad.value).statusCode, 502);
+  assert.deepEqual(JSON.parse(bad.value).response, { message: VaultLogger.notJson });
+});
+
+test('a new session sends what is queued, then starts a new session_id, first_event and counts', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  for (let i = 0; i < 100; i++) VaultLogger.setLogInfo(logger, 'cardNumber', 'FOCUS', PUBLISHABLE_KEY, SESSION_ID);
+  const before = logger.sessionId;
+  VaultLogger.startNewSession(logger);
+  const sentBefore = logs().length;
+  VaultLogger.setLogInfo(logger, 'cardNumber', 'FOCUS', PUBLISHABLE_KEY, 'next_pms');
+  VaultLogger.sendLogs(logger);
+
+  assert.equal(sentBefore, 100, 'the old session\'s logs went out first');
+  const next = logs().at(-1);
+  assert.notEqual(next.session_id, before);
+  assert.equal(next.first_event, 'true');
+  assert.equal(next.payment_id, 'next_pms');
+});
+
+test('no log carries a card value, the request body, a token or the client secret', async () => {
+  const logger = VaultLogger.make(LOG_URL, 'ios');
+  await confirm(logger);
+  VaultLogger.sendLogs(logger);
+  vaultAnswer = async () =>
+    okJson(422, { error: { type: 'invalid_request', code: 'IR_05', message: 'Invalid card' } });
+  await confirm(VaultLogger.make(LOG_URL, 'ios'));
+
+  const sent = JSON.stringify(batches);
+  for (const secret of [
+    CARD.cardNumber,
+    '424242',
+    'card_cvc',
+    'card_number',
+    'tok_123',
+    'cs_secret_1',
+    SDK_AUTHORIZATION,
+  ]) {
+    assert.ok(!sent.includes(secret), `logs must not contain ${secret}`);
+  }
+});
+
+test('first_event turns false on the second call of the same form', async () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  await confirm(logger);
+  await confirm(logger);
+  VaultLogger.sendLogs(logger);
+  assert.deepEqual(logs().map(log => log.first_event), ['true', 'true', 'false', 'false']);
+});
+
+test('a saved-card CVC update logs PAYMENT_METHOD_SESSION_UPDATE_CALL_INIT then _CALL', async () => {
+  const logger = VaultLogger.make(LOG_URL, 'ios');
+  const outcome = await VaultSavedCard.updateSavedPaymentMethod({
+    vaultBaseUrl: BASE_URL,
+    sdkAuthorization: SDK_AUTHORIZATION,
+    paymentMethodToken: 'tok_saved',
+    cvc: '123',
+    logger,
+  });
+  VaultLogger.sendLogs(logger);
+
+  assert.equal(outcome.status, 'success');
+  assert.deepEqual(logs().map(log => log.event_name), [
+    'PAYMENT_METHOD_SESSION_UPDATE_CALL_INIT',
+    'PAYMENT_METHOD_SESSION_UPDATE_CALL',
+  ]);
+  const url = `${BASE_URL}/v1/payment-method-sessions/${SESSION_ID}/update-saved-payment-method`;
+  assert.deepEqual(JSON.parse(logs()[1].value), { url, statusCode: 200 });
+  assert.ok(Number(logs()[1].latency) > 0);
+  assert.ok(!JSON.stringify(batches).includes('tok_saved'));
+});
+
+test('each event sends at most 100 logs per form, as on web', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  for (let i = 0; i < 120; i++) VaultLogger.callStarted(confirmCall(logger));
+  VaultLogger.sendLogs(logger);
+  assert.equal(logs().length, 100);
+});
+
+test('a call without a logger, or a logger without a URL, sends no logs', async () => {
+  assert.equal((await confirm(undefined)).status, 'success', 'the vault request is made without a logger');
+  const silent = VaultLogger.make(undefined, 'android');
+  assert.equal((await confirm(silent)).status, 'success');
+  VaultLogger.sendLogs(silent);
+  assert.equal(batches.length, 0);
+});
+
+test('a batch that cannot be sent does not change the outcome', async () => {
+  const vaultFetch = globalThis.fetch;
+  let attempts = 0;
+  globalThis.fetch = async (url, options) => {
+    if (url === LOG_URL) {
+      attempts += 1;
+      throw new Error('log collector down');
+    }
+    return vaultFetch(url, options);
+  };
+  const unhandled = [];
+  const onUnhandled = reason => unhandled.push(reason);
+  process.on('unhandledRejection', onUnhandled);
+  try {
+    const logger = VaultLogger.make(LOG_URL, 'android');
+    const outcome = await confirm(logger);
+    VaultLogger.sendLogs(logger);
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    assert.equal(outcome.status, 'success');
+    assert.equal(attempts, 1, 'the batch was sent');
+    assert.deepEqual(unhandled, [], 'its failure was handled');
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+  }
+});
+
+test('the log URL is Hyperswitch for the environment when the merchant passes no endpoint', () => {
+  const url = VaultEndpoint.loggingUrl;
+  assert.equal(url(undefined, 'SANDBOX'), 'https://app.hyperswitch.io/api/logs/sdk');
+  assert.equal(url(undefined, 'PROD'), 'https://live.hyperswitch.io/api/logs/sdk');
+  assert.equal(url(undefined, 'PROD_EU'), 'https://eu.hyperswitch.io/api/logs/sdk');
+  assert.equal(url(undefined, 'INTEG'), 'https://integ.hyperswitch.io/api/logs/sdk');
+  assert.equal(url({ overrideEndpoints: {} }, 'SANDBOX'), 'https://app.hyperswitch.io/api/logs/sdk');
+});
+
+test('the log URL is customLoggingEndpoint whenever it is passed, used as given', () => {
+  const url = VaultEndpoint.loggingUrl;
+  assert.equal(
+    url(
+      {
+        commonEndpoint: 'https://pay.example.com/api',
+        overrideEndpoints: {
+          customBackendEndpoint: 'https://backend.example.com/api',
+          customLoggingEndpoint: ' https://logs.example.com/collect ',
+        },
+      },
+      'PROD',
+    ),
+    'https://logs.example.com/collect',
+  );
+  assert.equal(
+    url({ overrideEndpoints: { customLoggingEndpoint: 'http://localhost:8080/logs' } }, 'SANDBOX'),
+    'http://localhost:8080/logs',
+  );
+});
+
+test('the log URL is commonEndpoint\'s logs path when only commonEndpoint is passed', () => {
+  const url = VaultEndpoint.loggingUrl;
+  assert.equal(url({ commonEndpoint: 'https://pay.example.com/api/' }, 'PROD'), 'https://pay.example.com/api/logs/sdk');
+  assert.equal(
+    url({ commonEndpoint: 'https://pay.example.com/api', overrideEndpoints: {} }, 'SANDBOX'),
+    'https://pay.example.com/api/logs/sdk',
+  );
+  // commonEndpoint is the vault's API base even next to a backend override, so its logs path too.
+  assert.equal(
+    url(
+      {
+        commonEndpoint: 'https://pay.example.com/api',
+        overrideEndpoints: { customBackendEndpoint: 'https://backend.example.com/api' },
+      },
+      'PROD',
+    ),
+    'https://pay.example.com/api/logs/sdk',
+  );
+});
+
+test('no logs are sent when the merchant passes its own backend without a logging endpoint', () => {
+  const url = VaultEndpoint.loggingUrl;
+  assert.equal(url({ overrideEndpoints: { customBackendEndpoint: 'https://pay.example.com/api' } }, 'PROD'), undefined);
+  assert.equal(
+    url(
+      { overrideEndpoints: { customBackendEndpoint: 'https://pay.example.com/api', customLoggingEndpoint: '  ' } },
+      'PROD',
+    ),
+    undefined,
+  );
+});
+
+test('a blank endpoint counts as not passed for the log URL', () => {
+  const url = VaultEndpoint.loggingUrl;
+  const hyperswitch = 'https://app.hyperswitch.io/api/logs/sdk';
+  assert.equal(url({ overrideEndpoints: { customLoggingEndpoint: '' } }, 'SANDBOX'), hyperswitch);
+  assert.equal(url({ overrideEndpoints: { customBackendEndpoint: ' ' } }, 'SANDBOX'), hyperswitch);
+  assert.equal(url({ commonEndpoint: '' }, 'SANDBOX'), hyperswitch);
+});
+
+test('a field focus or blur is a USER_EVENT carrying the field name only', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  VaultLogger.setLogInfo(logger, 'cardNumber', 'FOCUS', PUBLISHABLE_KEY, SESSION_ID);
+  VaultLogger.setLogInfo(logger, 'cardNumber', 'BLUR', PUBLISHABLE_KEY, SESSION_ID);
+  VaultLogger.setLogInfo(logger, 'CardSchemeMenu expanded', 'CARD_SCHEME_SELECTION', PUBLISHABLE_KEY, SESSION_ID);
+  VaultLogger.setLogInfo(logger, 'cardExpiry', 'FOCUS', PUBLISHABLE_KEY, SESSION_ID);
+  VaultLogger.sendLogs(logger);
+
+  const [focused, blurred, menu, next] = logs();
+  assert.equal(focused.event_name, 'FOCUS');
+  assert.equal(focused.category, 'USER_EVENT');
+  assert.equal(focused.log_type, 'INFO');
+  assert.equal(focused.value, 'cardNumber');
+  assert.equal(focused.latency, '');
+  assert.equal(focused.payment_id, SESSION_ID);
+  assert.equal(blurred.event_name, 'BLUR');
+  assert.equal(blurred.value, 'cardNumber');
+  assert.equal(menu.event_name, 'CARD_SCHEME_SELECTION');
+  assert.equal(menu.value, 'CardSchemeMenu expanded');
+  assert.equal(next.event_name, 'FOCUS');
+  assert.equal(next.value, 'cardExpiry');
+  assert.equal(next.first_event, 'false');
+});
+
+test('field events go out in batches, at most 100 per event name as on web', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  const focus = field => VaultLogger.setLogInfo(logger, field, 'FOCUS', PUBLISHABLE_KEY, SESSION_ID);
+  for (let i = 0; i < 9; i++) focus('cardNumber');
+  assert.equal(batches.length, 1, 'the 9th queued log sends a batch, as on web');
+  for (let i = 0; i < 110; i++) focus('cardCvc');
+  VaultLogger.sendLogs(logger);
+
+  assert.equal(logs().filter(log => log.event_name === 'FOCUS').length, 100);
+});
+
+// The debugging logs: what a field held when the customer left it, each field first showing, the
+// form's settings, and a crash inside the form.
+
+test('BLUR names what the customer left in the field, in the public field error codes', () => {
+  const status = (empty, complete, invalidCode, unsupportedNetwork = false) =>
+    VaultLogValues.fieldStatus(empty, complete, invalidCode, unsupportedNetwork);
+  assert.equal(status(true, false, 'invalid_card_number'), 'empty');
+  assert.equal(status(true, false, 'invalid_card_number', true), 'empty');
+  assert.equal(status(false, true, 'invalid_card_number'), 'complete');
+  assert.equal(status(false, false, 'invalid_card_number'), 'invalid_card_number');
+  assert.equal(status(false, true, 'invalid_card_number', true), 'unsupported_network');
+  // As in the form's public state, a network fault counts only once the number is complete.
+  assert.equal(status(false, false, 'invalid_card_number', true), 'invalid_card_number');
+  assert.equal(status(false, false, 'invalid_expiry'), 'invalid_expiry');
+  assert.equal(
+    VaultLogValues.blurValue('cardNumber', 'invalid_card_number'),
+    'cardNumber invalid_card_number',
+  );
+});
+
+test('APP_RENDERED is a DEBUG USER_EVENT carrying the field name and the time it took to show', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  VaultLogger.setLogInfo(logger, 'cardNumber', 'APP_RENDERED', PUBLISHABLE_KEY, SESSION_ID, 42, 'DEBUG');
+  // A DEBUG log waits for the batch.
+  assert.equal(batches.length, 0);
+  VaultLogger.sendLogs(logger);
+  const [rendered] = logs();
+  assert.equal(rendered.event_name, 'APP_RENDERED');
+  assert.equal(rendered.value, 'cardNumber');
+  assert.equal(rendered.latency, '42');
+  assert.equal(rendered.log_type, 'DEBUG');
+  assert.equal(rendered.category, 'USER_EVENT');
+});
+
+test('the form settings record each custom endpoint as set or not, never its URL', () => {
+  const value = VaultLogValues.optionsValue({
+    environment: 'SANDBOX',
+    sessionStatus: 'valid',
+    sessionProblem: '',
+    customEndpoints: {
+      commonEndpoint: 'https://proxy.merchant.example/api',
+      overrideEndpoints: { customLoggingEndpoint: 'https://logs.merchant.example/sdk' },
+    },
+    enabledCardSchemes: ['Visa'],
+    unknownCardSchemes: ['Mastercad'],
+    cardholderNameMode: 'collect',
+    locale: 'en',
+    fields: ['cardNumber', 'cardExpiry', 'cardCvc'],
+    savedCard: false,
+  });
+  assert.deepEqual(JSON.parse(value), {
+    environment: 'SANDBOX',
+    sessionStatus: 'valid',
+    sessionProblem: '',
+    customEndpoints: {
+      commonEndpoint: true,
+      customBackendEndpoint: false,
+      customLoggingEndpoint: true,
+    },
+    enabledCardSchemes: ['Visa'],
+    unknownCardSchemes: ['Mastercad'],
+    cardholderNameMode: 'collect',
+    locale: 'en',
+    fields: ['cardNumber', 'cardExpiry', 'cardCvc'],
+    savedCard: false,
+  });
+  assert.doesNotMatch(value, /https?:|merchant\.example/);
+});
+
+test('endpoints a JavaScript caller passes as null, a number or {} read as not set', () => {
+  const flags = customEndpoints =>
+    JSON.parse(
+      VaultLogValues.optionsValue({
+        environment: 'PROD',
+        sessionStatus: 'valid',
+        sessionProblem: '',
+        customEndpoints,
+        enabledCardSchemes: [],
+        unknownCardSchemes: [],
+        cardholderNameMode: 'collect',
+        locale: '',
+        fields: [],
+        savedCard: false,
+      }),
+    ).customEndpoints;
+  const none = { commonEndpoint: false, customBackendEndpoint: false, customLoggingEndpoint: false };
+  assert.deepEqual(flags(undefined), none);
+  assert.deepEqual(flags(null), none);
+  assert.deepEqual(flags({ commonEndpoint: 5, overrideEndpoints: null }), none);
+  assert.deepEqual(flags({ commonEndpoint: '', overrideEndpoints: {} }), none);
+});
+
+test('the merchant’s own text is logged only when it looks like a locale or a scheme name', () => {
+  const settings = (locale, unknownCardSchemes) =>
+    JSON.parse(
+      VaultLogValues.optionsValue({
+        environment: 'PROD',
+        sessionStatus: 'valid',
+        sessionProblem: '',
+        customEndpoints: undefined,
+        enabledCardSchemes: [],
+        unknownCardSchemes,
+        cardholderNameMode: 'collect',
+        locale,
+        fields: [],
+        savedCard: false,
+      }),
+    );
+  for (const locale of ['', 'en', 'fr-FR', 'zh_Hant_TW', 'de-CH']) {
+    assert.equal(settings(locale, []).locale, locale);
+  }
+  for (const locale of ['not a locale', 'https://merchant.example', 'en-GB; 4242']) {
+    assert.equal(settings(locale, []).locale, 'unrecognised', locale);
+  }
+  assert.deepEqual(
+    settings('', [
+      'Mastercad',
+      'american express',
+      'key=value; not a scheme',
+      '4242;x',
+    ]).unknownCardSchemes,
+    ['Mastercad', 'american express', 'unrecognised', 'unrecognised'],
+  );
+  const many = Array.from({ length: 25 }, (_, i) => `scheme${i}`);
+  assert.equal(settings('', many).unknownCardSchemes.length, 10);
+  const named = settings('', []);
+  assert.equal(named.cardholderNameMode, 'collect');
+  assert.equal('cardholderName' in named, false);
+});
+
+test('a card number or a name passed by mistake in the form settings is never logged', () => {
+  const settings = (unknownCardSchemes, cardholderNameMode) =>
+    VaultLogValues.optionsValue({
+      environment: 'PROD',
+      sessionStatus: 'valid',
+      sessionProblem: '',
+      customEndpoints: undefined,
+      enabledCardSchemes: [],
+      unknownCardSchemes,
+      cardholderNameMode,
+      locale: '',
+      fields: [],
+      savedCard: false,
+    });
+  const value = settings(
+    ['4242424242424242', '4242 4242 4242 4242', 'Visa 4242424242424242', 'Mastercad'],
+    'Jane Q. Customer',
+  );
+  assert.deepEqual(JSON.parse(value).unknownCardSchemes, [
+    'unrecognised',
+    'unrecognised',
+    'Visa [redacted]',
+    'Mastercad',
+  ]);
+  assert.equal(JSON.parse(value).cardholderNameMode, 'unrecognised');
+  assert.doesNotMatch(value, /4242|Jane/);
+  for (const mode of ['collect', 'external', 'omit']) {
+    assert.equal(JSON.parse(settings([], mode)).cardholderNameMode, mode);
+  }
+});
+
+test('a crash record carries the message with its longer numbers masked, never the stack or a thrown value', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  const error = new Error('Unexpected value 4242 4242 4242 4242 at index 12 of 300');
+  error.stack = `Error: ${error.message}\n    at render (http://localhost:8081/index.bundle?platform=android:1:1234567)`;
+  VaultLogger.logCrash(logger, error, 'cardNumber', PUBLISHABLE_KEY, SESSION_ID);
+  VaultLogger.logCrash(logger, 'bad input 4242424242424242', 'cardNumber', PUBLISHABLE_KEY, SESSION_ID);
+  VaultLogger.logCrash(
+    logger,
+    { input: { pan: '4111-1111-1111-1111', digits: 4111111111111111 } },
+    'cardNumber',
+    PUBLISHABLE_KEY,
+    SESSION_ID,
+  );
+  const [crash, thrown, object] = logs().map(log => JSON.parse(log.value));
+  assert.deepEqual(crash, {
+    type: 'Error',
+    message: 'Unexpected value [redacted] at index 12 of ***',
+    componentName: 'cardNumber',
+  });
+  assert.deepEqual(thrown, { message: VaultLogger.notAnError, componentName: 'cardNumber' });
+  assert.deepEqual(object, { message: VaultLogger.notAnError, componentName: 'cardNumber' });
+  assert.doesNotMatch(JSON.stringify(logs()), /4242|4111|localhost|index\.bundle/);
+});
+
+test('a card number is blanked however many spaces, line breaks, dots, slashes or dashes it has', () => {
+  for (const text of [
+    '4242   4242   4242   4242',
+    '4242 - 4242 - 4242 - 4242',
+    '4242\n4242\n4242\n4242',
+    '4242\t\t\t4242\t\t\t4242\t\t\t4242',
+    '4242 . 4242 / 4242 -- 4242',
+  ]) {
+    assert.equal(VaultLogger.redactDigits(`card ${text} end`), 'card [redacted] end', text);
+  }
+  for (const kept of ['at render (index.android.bundle:12:3456)', 'order 1234 5678', 'IR_16']) {
+    assert.equal(VaultLogger.redactDigits(kept), kept);
+  }
+  // Separators and digits never overlap, so a long text takes no time.
+  const long = `1${' '.repeat(1_000_000)}x`;
+  const startedAt = performance.now();
+  assert.equal(VaultLogger.redactDigits(long), long);
+  assert.ok(performance.now() - startedAt < 1000);
+});
+
+test('an error body is logged as its typed error only, with longer numbers masked', async () => {
+  vaultAnswer = async () =>
+    okJson(422, {
+      error: {
+        type: 'invalid_request',
+        code: 'IR_16',
+        message: 'Card 4242 4242 4242 4242 is invalid, retry in 300 s',
+        reason: 'Attempt 1234 refused',
+        data: { echoed: 'http://localhost:8081/index.bundle' },
+        payment_id: 'pay_123456',
+        connector_transaction_id: 'txn_987654321',
+      },
+      trace: 'http://10.0.2.2:8081/index.bundle',
+    });
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  await confirm(logger);
+  const answered = logs().find(log => log.event_name === 'PAYMENT_METHOD_SESSION_CONFIRM_CALL');
+  assert.deepEqual(JSON.parse(answered.value).response, {
+    error: {
+      type: 'invalid_request',
+      code: 'IR_16',
+      message: 'Card [redacted] is invalid, retry in *** s',
+      reason: 'Attempt **** refused',
+    },
+  });
+});
+
+test('an error body\'s type and code go through the same digit rule as its text', () => {
+  assert.deepEqual(VaultLogger.errorBodyValue({ error: { type: 'invalid_request', code: 'IR_04', message: 'x' } }), {
+    error: { type: 'invalid_request', code: 'IR_04', message: 'x' },
+  });
+  assert.deepEqual(VaultLogger.errorBodyValue({ error: { code: 'UE_9000', message: 7, reason: null } }), {
+    error: { code: 'UE_****' },
+  });
+});
+
+test('an error body of another shape keeps only the common top-level fields', () => {
+  assert.deepEqual(VaultLogger.errorBodyValue({ message: 'Forbidden' }), { message: 'Forbidden' });
+  assert.deepEqual(VaultLogger.errorBodyValue({ error: 'Unauthorized', status: 401 }), { error: 'Unauthorized' });
+  assert.deepEqual(
+    VaultLogger.errorBodyValue({
+      error_code: 'E1',
+      error_message: 'Card 4242424242424242 declined, 300 left',
+      data: { echoed: 'http://localhost:8081/index.bundle' },
+    }),
+    { error_code: 'E1', error_message: 'Card [redacted] declined, *** left' },
+  );
+  // A typed error with no string field falls back to the top level.
+  assert.deepEqual(VaultLogger.errorBodyValue({ error: { message: 42 }, message: 'Forbidden' }), {
+    message: 'Forbidden',
+  });
+});
+
+test('an error body with none of those fields is logged as a fixed message and its key names', () => {
+  const unrecognised = VaultLogger.unrecognisedErrorBody;
+  assert.deepEqual(
+    VaultLogger.errorBodyValue({ detail: 'secret 4242', status: 403, 'bad key!': 1, field1234: 2 }),
+    { message: unrecognised, keys: ['detail', 'status', 'bad key!', 'field****'] },
+  );
+  assert.deepEqual(VaultLogger.errorBodyValue({ error: { message: 42, code: null } }), {
+    message: unrecognised,
+    keys: ['error'],
+  });
+  const many = Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`k${String.fromCharCode(97 + i)}`, 1]));
+  assert.equal(VaultLogger.errorBodyValue(many).keys.length, 10);
+  for (const body of [null, 'Bad Gateway', 502, [{ error: { message: 'x' } }], {}]) {
+    assert.deepEqual(VaultLogger.errorBodyValue(body), { message: unrecognised }, JSON.stringify(body));
+  }
+});
+
+test('an exception is logged with a fixed message when its message is missing, empty or not a string', () => {
+  const noMessage = { type: 'Error', message: VaultLogger.noErrorMessage };
+  assert.deepEqual(VaultLogger.exceptionValue(new Error()), noMessage);
+  assert.deepEqual(VaultLogger.exceptionValue(new Error('   ')), noMessage);
+  const numeric = new Error('x');
+  numeric.message = 404;
+  assert.deepEqual(VaultLogger.exceptionValue(numeric), noMessage);
+  const hostile = new Error('x');
+  Object.defineProperty(hostile, 'message', {
+    get() {
+      throw new Error('getter');
+    },
+  });
+  assert.deepEqual(VaultLogger.exceptionValue(hostile), noMessage);
+});
+
+test('an exception\'s type goes through the same digit rule as its message', () => {
+  assert.equal(VaultLogger.exceptionValue(new TypeError('x')).type, 'TypeError');
+  const abort = new Error('Aborted');
+  abort.name = 'AbortError';
+  assert.equal(VaultLogger.exceptionValue(abort).type, 'AbortError');
+  const odd = new Error('x');
+  odd.name = 'Card 4242424242424242';
+  assert.equal(VaultLogger.exceptionValue(odd).type, 'Card [redacted]');
+  const numbered = new Error('x');
+  numbered.name = 'Error12345';
+  assert.equal(VaultLogger.exceptionValue(numbered).type, 'Error*****');
+  const blank = new Error('x');
+  blank.name = '  ';
+  assert.equal(VaultLogger.exceptionValue(blank).type, 'Error');
+});
+
+test('an error-like object that is not an Error is logged as a fixed message', () => {
+  for (const thrown of [{ message: 'looks like an error', name: 'TypeError' }, undefined, null, 0, 'text']) {
+    assert.deepEqual(VaultLogger.exceptionValue(thrown), { message: VaultLogger.notAnError });
+  }
+});
+
+test('an answer that arrives after the session changed stays with the session that sent it', async () => {
+  let answer;
+  vaultAnswer = () => new Promise(resolve => (answer = resolve));
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  const firstSession = logger.sessionId;
+  const pending = confirm(logger);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  VaultLogger.startNewSession(logger);
+  const secondSession = logger.sessionId;
+  answer(okJson(200, tokenBody));
+  await pending;
+  vaultAnswer = async () => okJson(200, tokenBody);
+  await confirm(logger);
+  VaultLogger.sendLogs(logger);
+  const calls = logs().filter(log => log.event_name.startsWith('PAYMENT_METHOD_SESSION_CONFIRM'));
+  assert.deepEqual(
+    calls.map(log => [log.event_name, log.session_id === firstSession ? 'first' : 'second', log.first_event]),
+    [
+      ['PAYMENT_METHOD_SESSION_CONFIRM_CALL_INIT', 'first', 'true'],
+      ['PAYMENT_METHOD_SESSION_CONFIRM_CALL', 'first', 'true'],
+      ['PAYMENT_METHOD_SESSION_CONFIRM_CALL_INIT', 'second', 'true'],
+      ['PAYMENT_METHOD_SESSION_CONFIRM_CALL', 'second', 'true'],
+    ],
+  );
+  // The late answer counted in its own session, not in the one that replaced it.
+  assert.equal(logger.counts.PAYMENT_METHOD_SESSION_CONFIRM_CALL, 1);
+  assert.notEqual(firstSession, secondSession);
+  assert.ok(Number(calls[1].latency) >= 20, `late answer latency ${calls[1].latency}`);
+});
+
+test('unknown card schemes are the entries the form ignores', () => {
+  assert.deepEqual(
+    CardNetworkNames.unknownOf(['visa', 'Mastercad', 'MASTERCARD', 'american_express', 'Diners']),
+    ['Mastercad'],
+  );
+});
+
+test('a session the form cannot use makes the settings log an error, which goes out at once', () => {
+  for (const status of ['invalid', 'expired']) {
+    assert.equal(VaultLogValues.isUnusableSession(status), true, status);
+  }
+  // No session yet is not an error: a form can mount before its session arrives.
+  for (const status of ['valid', 'consumed', 'absent']) {
+    assert.equal(VaultLogValues.isUnusableSession(status), false, status);
+  }
+  const logger = VaultLogger.make(LOG_URL, 'ios');
+  VaultLogger.setLogInfo(logger, '{}', 'PAYMENT_ELEMENT_OPTIONS', '', '', undefined, 'ERROR');
+  assert.equal(batches.length, 1);
+  const [options] = batches[0];
+  assert.equal(options.event_name, 'PAYMENT_ELEMENT_OPTIONS');
+  assert.equal(options.log_type, 'ERROR');
+  assert.equal(options.category, 'USER_EVENT');
+  assert.equal(options.latency, '');
+});
+
+test('a crash is a USER_ERROR sent at once, with the component and the exception', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  VaultLogger.logCrash(
+    logger,
+    new TypeError('Cannot read properties of undefined'),
+    'cardNumber',
+    PUBLISHABLE_KEY,
+    SESSION_ID,
+  );
+  assert.equal(batches.length, 1);
+  const [crash] = batches[0];
+  assert.equal(crash.event_name, 'SDK_CRASH');
+  assert.equal(crash.log_type, 'ERROR');
+  assert.equal(crash.category, 'USER_ERROR');
+  assert.equal(crash.merchant_id, PUBLISHABLE_KEY);
+  assert.equal(crash.payment_id, SESSION_ID);
+  const value = JSON.parse(crash.value);
+  assert.equal(value.componentName, 'cardNumber');
+  assert.equal(value.message, 'Cannot read properties of undefined');
+  assert.equal(value.type, 'TypeError');
+  assert.equal('stack' in value, false);
+});
+
+test('a crash that throws something other than an Error logs a fixed message, never the value', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  VaultLogger.logCrash(logger, 'boom', 'cardCvc', PUBLISHABLE_KEY, SESSION_ID);
+  VaultLogger.logCrash(logger, null, 'cardExpiry', PUBLISHABLE_KEY, SESSION_ID);
+  assert.deepEqual(
+    logs().map(log => JSON.parse(log.value)),
+    [
+      { message: VaultLogger.notAnError, componentName: 'cardCvc' },
+      { message: VaultLogger.notAnError, componentName: 'cardExpiry' },
+    ],
+  );
+});
+
+test('a crash rendered again with another stack has the same signature, so it is logged once', () => {
+  const first = new Error('render failed');
+  const retried = new Error('render failed');
+  retried.stack = `${retried.stack}\n    at a React retry frame`;
+  assert.notEqual(first.stack, retried.stack);
+  assert.equal(VaultLogger.crashSignature(first), VaultLogger.crashSignature(retried));
+  assert.notEqual(
+    VaultLogger.crashSignature(first),
+    VaultLogger.crashSignature(new TypeError('render failed')),
+  );
+  // Values other than an Error log the same fixed record, so they share one signature.
+  assert.equal(VaultLogger.crashSignature('boom'), VaultLogger.crashSignature('bang'));
+});
+
+test('the crash boundary logs a crash, then throws the very same value on', () => {
+  const thrownBy = render => {
+    try {
+      render();
+    } catch (thrown) {
+      return { thrown };
+    }
+    return undefined;
+  };
+  for (const thrown of [new Error('render failed'), 'boom', undefined]) {
+    const reported = [];
+    const boundary = new VaultCrashBoundary({
+      onCrash: value => reported.push(value),
+      children: 'fields',
+    });
+    assert.equal(boundary.render(), 'fields');
+    boundary.state = VaultCrashBoundary.getDerivedStateFromError(thrown);
+    assert.deepEqual(thrownBy(() => boundary.render()), { thrown });
+    assert.equal(reported.length, 1);
+    assert.equal(reported[0], thrown);
+  }
+});
+
+test('a crash log that fails does not change what the boundary throws', () => {
+  const thrown = new Error('render failed');
+  const boundary = new VaultCrashBoundary({
+    onCrash: () => {
+      throw new Error('logging failed');
+    },
+    children: null,
+  });
+  boundary.state = VaultCrashBoundary.getDerivedStateFromError(thrown);
+  assert.throws(() => boundary.render(), error => error === thrown);
+});

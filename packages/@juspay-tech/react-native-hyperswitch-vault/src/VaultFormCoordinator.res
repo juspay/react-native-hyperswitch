@@ -177,10 +177,13 @@ let useMachinery = (
   ~clearLocal: unit => unit,
 
   ~savedCardKey: string,
+  ~logger: VaultLogger.t,
 ): machinery => {
 
   let latestRef = React.useRef((sessionState, environment, cardholderNameMode, vaultEndpoint))
   latestRef.current = (sessionState, environment, cardholderNameMode, vaultEndpoint)
+  let loggerRef = React.useRef(logger)
+  loggerRef.current = logger
   let currentCardholderNameMode = () => {
     let (_, _, mode, _) = latestRef.current
     mode
@@ -267,6 +270,7 @@ let useMachinery = (
     ~nickName: option<string>,
     ~cardholderName: option<string>,
     ~signal: VaultConfirm.abortSignal,
+    ~logger: option<VaultLogger.t>,
   ): result<(string, VaultConfirm.vaultCardMetadata), mintFailure> => {
     let vaultAuthorization = session.authorization
     let currentVersion = cardVersion()
@@ -292,6 +296,7 @@ let useMachinery = (
         cardNetwork: ?VaultConfirmBody.cardNetworkToWire(cardNetwork()),
         nickName: ?nickName,
         signal,
+        logger: ?logger,
       })
       switch outcome {
       | VaultConfirm.Success({result}) =>
@@ -364,6 +369,7 @@ let useMachinery = (
                   paymentMethodToken: saved.token,
                   cvc: cardDetails().cvc,
                   signal,
+                  logger: loggerRef.current,
                 })
                 closeRequest(controller)
                 if result.status === #success {
@@ -388,6 +394,7 @@ let useMachinery = (
                   | #"external" | #omit => None
                   },
                   ~signal,
+                  ~logger=Some(loggerRef.current),
                 )
                 closeRequest(controller)
                 switch minted {
@@ -549,6 +556,11 @@ let useMachinery = (
                             ~nickName=VaultPaymentMethodData.nickNameOf(args.paymentMethodData),
                             ~cardholderName=resolvedCardholderName,
                             ~signal,
+                            // Logs go where the form's customEndpoints send them, so a vault
+                            // backend chosen for this call alone is not logged.
+                            ~logger=args.vaultEndpoint->Option.isSome
+                              ? None
+                              : Some(loggerRef.current),
                           )
 
                           switch minted {

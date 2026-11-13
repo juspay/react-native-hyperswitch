@@ -109,7 +109,7 @@ let make = React.forwardRef((
     ~accessible=props["accessible"],
     ~enabledCardSchemes=props["enabledCardSchemes"]->Option.getOr([]),
     ~eligibility=props["eligibility"],
-    ~vaultEndpoint=VaultEndpoint.configOf(props["customEndpoints"]),
+    ~customEndpoints=props["customEndpoints"],
     ~cardholderNameMode=props["cardholderName"]->Option.getOr(#collect),
     ~onReady=props["onReady"],
     ~onChange=props["onChange"],
@@ -127,12 +127,14 @@ let make = React.forwardRef((
   })
 
   <VaultWidgetContext.ContextProvider value={Some(host.contextValue)}>
-    <CardFormView
-      cardholderName=?{props["cardholderName"]}
-      layout=?{props["layout"]}
-      fieldArrangement=?{props["fieldArrangement"]}
-      fieldStyles=?{props["fieldStyles"]}
-      fieldOptions=?{props["fieldOptions"]}
-    />
+    <VaultWidgetContext.Guarded ctx=host.contextValue componentName=#cardForm>
+      <CardFormView
+        cardholderName=?{props["cardholderName"]}
+        layout=?{props["layout"]}
+        fieldArrangement=?{props["fieldArrangement"]}
+        fieldStyles=?{props["fieldStyles"]}
+        fieldOptions=?{props["fieldOptions"]}
+      />
+    </VaultWidgetContext.Guarded>
   </VaultWidgetContext.ContextProvider>
 })

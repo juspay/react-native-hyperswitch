@@ -166,6 +166,9 @@
   },
   "jest": {
     "preset": "@react-native/jest-preset",
+    "setupFilesAfterEnv": [
+      "<rootDir>/src/__fixtures__/jestSetup.ts"
+    ],
     "testEnvironmentOptions": {
       "customExportConditions": [
         "require",

@@ -2,6 +2,8 @@ import { readAuthorizationClaims } from './sdkAuthorization';
 import type { VaultDetails, VaultType } from '../core/types';
 import { environmentOf } from './config';
 import { validateEndpoint } from './endpoint';
+import { MISSING_AUTHORIZATION } from '../logging/logger';
+import type { ApiCallLog, Logger } from '../logging/logger';
 
 export type HyperswitchEnvironment = 'PROD' | 'PROD_EU' | 'SANDBOX' | 'INTEG';
 
@@ -21,7 +23,7 @@ export interface OverrideEndpoints {
   overrideEndpoints: OverrideEndpointConfiguration;
 }
 
-const DEFAULT_BASE_URL: Record<HyperswitchEnvironment, string> = {
+export const DEFAULT_BASE_URL: Record<HyperswitchEnvironment, string> = {
   PROD: 'https://live.hyperswitch.io/api',
   PROD_EU: 'https://eu.hyperswitch.io/api',
   SANDBOX: 'https://app.hyperswitch.io/api',
@@ -38,6 +40,8 @@ export interface FetchVaultDetailsOptions {
   customEndpoints?: CommonEndpoint | OverrideEndpoints;
   timeoutMs?: number;
   signal?: AbortSignal;
+  /* Logs the lookup, and a refusal before it, in web's events. */
+  log?: Logger;
 }
 
 export type FetchVaultDetailsResult =
@@ -155,6 +159,19 @@ export function readVaultDetails(
   };
 }
 
+/* The error body, read without holding up the result: the lookup answers as soon as it has the
+   status, as before. A body that is not JSON is logged as such, never as its text. */
+function logErrorBody(call: ApiCallLog, response: Response): void {
+  try {
+    response.json().then(
+      (body: unknown) => call.failed(response.status, body),
+      () => call.unreadable(response.status)
+    );
+  } catch {
+    call.unreadable(response.status);
+  }
+}
+
 function resolveBaseUrl(
   options: FetchVaultDetailsOptions
 ): { ok: true; baseUrl: string } | { ok: false; message: string } {
@@ -184,24 +201,52 @@ function resolveBaseUrl(
       };
 }
 
+/* As web's manageErrorWarning: a parameter the lookup refused, named but never its value. The
+   messages logged are this file's own. */
+function logRefusal(
+  log: Logger | undefined,
+  sdkAuthorization: string,
+  message: string
+): void {
+  if (!log) return;
+  const missing = sdkAuthorization.trim().length === 0;
+  log.log({
+    eventName: missing ? 'REQUIRED_PARAMETER' : 'INVALID_FORMAT',
+    value: missing ? MISSING_AUTHORIZATION : message,
+    logType: 'ERROR',
+    category: 'USER_ERROR',
+  });
+}
+
 export async function fetchVaultDetails(
   options: FetchVaultDetailsOptions
 ): Promise<FetchVaultDetailsResult> {
+  const { log } = options;
   const claims = readAuthorizationClaims(options.sdkAuthorization);
-  if (!claims.ok) return claims;
+  if (!claims.ok) {
+    logRefusal(log, options.sdkAuthorization, claims.message);
+    return claims;
+  }
 
   const resolved = resolveBaseUrl(options);
-  if (!resolved.ok) return resolved;
+  if (!resolved.ok) {
+    logRefusal(log, options.sdkAuthorization, resolved.message);
+    return resolved;
+  }
 
-  const url = `${resolved.baseUrl}/v1/payment-method-sessions/${encodeURIComponent(
+  const url = `${
+    resolved.baseUrl
+  }/v1/payment-method-sessions/${encodeURIComponent(
     claims.claims.paymentMethodSessionId
   )}`;
+  const call = log?.apiCall('PAYMENT_METHOD_SESSION_RETRIEVE_CALL', url);
 
   const controller = new AbortController();
   const caller = options.signal;
+  const onCallerAbort = () => controller.abort();
   if (caller) {
     if (caller.aborted) controller.abort();
-    else caller.addEventListener('abort', () => controller.abort());
+    else caller.addEventListener('abort', onCallerAbort);
   }
 
   let timedOut = false;
@@ -210,6 +255,8 @@ export async function fetchVaultDetails(
     controller.abort();
   }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
+  /* A lookup cancelled before it is sent logs nothing. */
+  if (!controller.signal.aborted) call?.started();
   try {
     const response = await fetch(url, {
       method: 'GET',
@@ -221,6 +268,7 @@ export async function fetchVaultDetails(
     });
 
     if (!response.ok) {
+      if (call) logErrorBody(call, response);
       return {
         ok: false,
         message: `The payment-method-session lookup returned status ${response.status}.`,
@@ -231,24 +279,40 @@ export async function fetchVaultDetails(
     try {
       body = await response.json();
     } catch {
+      call?.unreadable(response.status);
       return {
         ok: false,
         message: 'The payment-method-session response was not readable JSON.',
       };
     }
 
-    return readVaultDetails(body, options.sdkAuthorization);
+    call?.answered(response.status);
+    const result = readVaultDetails(body, options.sdkAuthorization);
+    if (!result.ok) {
+      log?.log({
+        eventName: 'INVALID_FORMAT',
+        value: isRecord(body)
+          ? 'The payment-method-session response names no vault this SDK supports.'
+          : 'The payment-method-session response was not an object.',
+        logType: 'ERROR',
+        category: 'USER_ERROR',
+      });
+    }
+    return result;
   } catch (error) {
+    /* A lookup the caller gave up on (the session unmounted or its inputs changed) has no answer
+       to log. */
+    if (!timedOut && controller.signal.aborted) {
+      return {
+        ok: false,
+        message: 'The payment-method-session lookup was aborted.',
+      };
+    }
+    call?.unanswered(error);
     if (timedOut) {
       return {
         ok: false,
         message: 'The payment-method-session lookup timed out.',
-      };
-    }
-    if (controller.signal.aborted) {
-      return {
-        ok: false,
-        message: 'The payment-method-session lookup was aborted.',
       };
     }
     return {
@@ -257,5 +321,8 @@ export async function fetchVaultDetails(
     };
   } finally {
     clearTimeout(timer);
+    /* Settled: a later cancel by the caller has nothing left to stop (the error body is still
+       being read for the log). */
+    caller?.removeEventListener('abort', onCallerAbort);
   }
 }

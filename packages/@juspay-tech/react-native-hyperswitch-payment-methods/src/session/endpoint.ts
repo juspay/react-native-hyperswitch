@@ -13,7 +13,7 @@ const LOOPBACK_HOSTS: ReadonlySet<string> = new Set([
 ]);
 
 /* A loop rather than /\/+$/, which backtracks quadratically on a URL with many slashes. */
-function trimTrailingSlashes(text: string): string {
+export function trimTrailingSlashes(text: string): string {
   let end = text.length;
   while (end > 0 && text[end - 1] === '/') end -= 1;
   return text.slice(0, end);

@@ -37,7 +37,7 @@ let useHost = (
   ~enabledCardSchemes: array<string>,
   ~eligibility: option<VaultFormOptions.eligibilityConfig>,
 
-  ~vaultEndpoint: option<VaultEndpoint.vaultEndpointConfig>,
+  ~customEndpoints: option<VaultEndpoint.customEndpoints>,
 
   ~cardholderNameMode: CardFieldOptions.cardholderNameMode,
 
@@ -49,6 +49,8 @@ let useHost = (
   ~defaultErrorDisplay: CardFieldOptions.errorDisplay,
 ): host => {
   let environment = environment->VaultConfirm.normalizeEnvironment
+  let vaultEndpoint = VaultEndpoint.configOf(customEndpoints)
+  let loggingUrl = customEndpoints->VaultEndpoint.loggingUrl(~environment)
 
   let sessionState = React.useMemo3(
     () =>
@@ -56,12 +58,68 @@ let useHost = (
       | (Some(session), _, _) => session->VaultFormCoordinator.readSession
       | (None, Some(details), _) =>
         VaultFormCoordinator.sessionFromVaultDetails(~details, ~sdkAuthorization)
-      | (None, None, Some(authorization)) =>
-        VaultFormCoordinator.sessionFromAuthorization(authorization)
+      | (None, None, Some(sdkAuthorization)) =>
+        VaultFormCoordinator.sessionFromAuthorization(sdkAuthorization)
       | (None, None, None) => VaultFormCoordinator.Unusable("No card-vault session was supplied.")
       },
     (session, vaultDetails, sdkAuthorization),
   )
+  // The authorization of the session the form uses, as web's resolveSdkAuthorization: the
+  // sdkAuthorization the merchant passed, the Hyperswitch vaultDetails' one, or the session's own.
+  // Empty when that session cannot be used.
+  let resolvedSdkAuthorization = switch sessionState {
+  | Ready({authorization}) => authorization
+  | Unusable(_) => ""
+  }
+  let logger = React.useMemo1(
+    () => VaultLogger.make(~url=loggingUrl, ~platform=(ReactNative.Platform.os :> string)),
+    [loggingUrl],
+  )
+  // A session that replaces another starts the logger afresh, as web loads its frames afresh for
+  // each. The first session to arrive does not: what the customer did before it keeps its session_id.
+  let lastResolvedSdkAuthorizationRef = React.useRef("")
+  React.useEffect2(() => {
+    if resolvedSdkAuthorization !== "" {
+      let previous = lastResolvedSdkAuthorizationRef.current
+      if previous !== "" && previous !== resolvedSdkAuthorization {
+        logger->VaultLogger.startNewSession
+      }
+      lastResolvedSdkAuthorizationRef.current = resolvedSdkAuthorization
+    }
+    None
+  }, (logger, resolvedSdkAuthorization))
+  // What every log's merchant_id and payment_id are read from: the resolved authorization, or, for
+  // a session the form cannot use, the sdkAuthorization the merchant passed, so the logs that
+  // explain why that session was rejected still carry its payment_id.
+  let logSdkAuthorization = switch sessionState {
+  | Ready(_) => resolvedSdkAuthorization
+  | Unusable(_) => sdkAuthorization->Option.getOr("")
+  }
+  let (merchantId, paymentId) = React.useMemo1(
+    () => (
+      logSdkAuthorization->VaultConfirm.publishableKeyOf,
+      logSdkAuthorization->VaultConfirm.resolveSessionId->Result.getOr(""),
+    ),
+    [logSdkAuthorization],
+  )
+  // Queued logs go out when the form closes or the app leaves the foreground, as web sends them when
+  // the page unloads.
+  React.useEffect1(() => {
+    let subscription = ReactNative.AppState.addEventListener(
+      #change(
+        state =>
+          if state !== #active {
+            logger->VaultLogger.sendLogs
+          },
+      ),
+    )
+    Some(
+      () => {
+        subscription->ReactNative.EventSubscription.remove
+        logger->VaultLogger.sendLogs
+      },
+    )
+  }, [logger])
   let theme = React.useMemo1(() => appearance->VaultFormOptions.buildTheme, [appearance])
   let bundle = React.useMemo1(() => LocaleBundles.resolve(locale), [locale])
   let labels = React.useMemo2(
@@ -200,6 +258,7 @@ let useHost = (
     ~presenceGate,
     ~clearLocal=controller.reset,
     ~savedCardKey=controller.values.savedCard->Option.mapOr("", saved => saved.token),
+    ~logger,
   )
 
   let sessionStatus: VaultPublicState.vaultSessionStatus = switch sessionState {
@@ -218,6 +277,155 @@ let useHost = (
   }
 
   let isSubmitting = machinery.isSubmitting
+
+  // How the merchant set the form up: once per logger session, and again when a setting or the
+  // session's status changes (not when a save uses the session up). A session the form was given
+  // but cannot save a card with makes it an error, so it goes out at once; a blank sdkAuthorization
+  // is no session yet, as when the merchant is still fetching one. It waits for the fields, which
+  // register in their own effects and which the payment-methods SDK mounts only once the form is
+  // ready; a form that gets none within a second is logged without them.
+  let noSessionYet =
+    session->Option.isNone &&
+    vaultDetails->Option.isNone &&
+    sdkAuthorization->Option.mapOr(true, authorization => authorization->String.trim === "")
+  let loggedSessionStatus = switch sessionStatus {
+  | #invalid if noSessionYet => "absent"
+  | status => (status :> string)
+  }
+  let sessionProblem = switch sessionState {
+  | Unusable(problem) => problem
+  | Ready(_) => ""
+  }
+  let mountedFields = [
+    (VaultCardController.CardNumberKind, "cardNumber"),
+    (VaultCardController.ExpiryKind, "cardExpiry"),
+    (VaultCardController.CvcKind, "cardCvc"),
+    (VaultCardController.CardholderNameKind, "cardholderName"),
+  ]->Array.filterMap(((kind, name)) => countOf(kind) > 0 ? Some(name) : None)
+  let settings = VaultLogValues.optionsValue({
+    environment: (environment :> string),
+    sessionStatus: loggedSessionStatus,
+    sessionProblem,
+    customEndpoints,
+    enabledCardSchemes: acceptedSchemes,
+    unknownCardSchemes: enabledCardSchemes->CardNetworkNames.unknownOf,
+    cardholderNameMode: (cardholderNameMode :> string),
+    locale: locale->Option.getOr(""),
+    fields: mountedFields,
+    savedCard: switch presenceGate() {
+    | Ok(VaultFormCoordinator.SavedCardCvc(_)) => true
+    | Ok(NewCard) | Error(_) => false
+    },
+  })
+  let hasFields = mountedFields->Array.length > 0
+  let loggedSettingsRef = React.useRef("")
+  React.useEffect4(() => {
+    let key = `${logger.sessionId}|${settings}`
+    let logSettings = () =>
+      if loggedSettingsRef.current !== key {
+        loggedSettingsRef.current = key
+        logger->VaultLogger.setLogInfo(
+          ~eventName=PAYMENT_ELEMENT_OPTIONS,
+          ~value=settings,
+          ~logType=loggedSessionStatus->VaultLogValues.isUnusableSession ? ERROR : DEBUG,
+          ~merchantId,
+          ~paymentId,
+        )
+      }
+    if loggedSessionStatus === "consumed" || loggedSettingsRef.current === key {
+      None
+    } else if hasFields {
+      logSettings()
+      None
+    } else {
+      let timer = setTimeout(logSettings, 1000)
+      Some(() => clearTimeout(timer))
+    }
+  }, (settings, resolvedSdkAuthorization, logger, hasFields))
+
+  // The card fields' user events. The co-badged network picker is logged as web's
+  // CardSchemeComponent logs it. FOCUS and BLUR record the customer moving between fields, by field
+  // name only; web logs those two names only when the merchant calls focus() or blur(). BLUR adds
+  // what the customer left in the field, and APP_RENDERED is each field first showing, as each of
+  // web's field frames logs its own.
+  let logUserEvent = (~eventName, ~value) =>
+    logger->VaultLogger.setLogInfo(~eventName, ~value, ~merchantId, ~paymentId)
+  // The field's public name: VaultPublicState's elementType, as in focus() and state.field.
+  let fieldName = (field: CardFormTypes.cardFieldId) =>
+    switch field {
+    | CardNumberField => (#cardNumber: VaultPublicState.elementType :> string)
+    | ExpiryField => (#cardExpiry: VaultPublicState.elementType :> string)
+    | CvcField => (#cardCvc: VaultPublicState.elementType :> string)
+    | CardholderNameField => (#cardholderName: VaultPublicState.elementType :> string)
+    }
+  let fieldStatus = (field: CardFormTypes.cardFieldId) => {
+    let snapshot = controller.publicSnapshot()
+    let statusOf = (
+      change: VaultPublicState.fieldChange,
+      ~invalidCode,
+      ~unsupportedNetwork=false,
+    ) =>
+      VaultLogValues.fieldStatus(
+        ~empty=change.empty,
+        ~complete=change.complete,
+        ~invalidCode,
+        ~unsupportedNetwork,
+      )
+    switch field {
+    | CardNumberField =>
+      snapshot.cardNumber->statusOf(
+        ~invalidCode="invalid_card_number",
+        ~unsupportedNetwork=snapshot.networkError->Option.isSome,
+      )
+    | ExpiryField => snapshot.cardExpiry->statusOf(~invalidCode="invalid_expiry")
+    | CvcField => snapshot.cardCvc->statusOf(~invalidCode="invalid_cvc")
+    | CardholderNameField => snapshot.cardholderName->statusOf(~invalidCode="")
+    }
+  }
+  let onAnalytics = (event: CardFormTypes.analyticsEvent) =>
+    switch event {
+    | FieldFocused(field) => logUserEvent(~eventName=FOCUS, ~value=field->fieldName)
+    | FieldBlurred(field) =>
+      logUserEvent(
+        ~eventName=BLUR,
+        ~value=VaultLogValues.blurValue(~field=field->fieldName, ~status=field->fieldStatus),
+      )
+    | FieldRendered(field, latency) =>
+      logger->VaultLogger.setLogInfo(
+        ~eventName=APP_RENDERED,
+        ~value=field->fieldName,
+        ~latency,
+        ~logType=DEBUG,
+        ~merchantId,
+        ~paymentId,
+      )
+    | CardNetworkMenu(Opened) =>
+      logUserEvent(~eventName=CARD_SCHEME_SELECTION, ~value="CardSchemeMenu expanded")
+    | CardNetworkMenu(Closed) =>
+      logUserEvent(~eventName=CARD_SCHEME_SELECTION, ~value="CardSchemeMenu closed")
+    }
+
+  // A crash inside a field, once per logger session for each distinct error: React can render a
+  // failing component more than once before the error leaves the form.
+  let crashesLoggedRef = React.useRef(Dict.make())
+  let onCrash = (componentName: VaultWidgetContext.componentName, thrown) => {
+    let componentName = (componentName :> string)
+    let key = `${logger.sessionId}|${componentName}|${thrown->VaultLogger.crashSignature}`
+    if crashesLoggedRef.current->Dict.get(key)->Option.isNone {
+      crashesLoggedRef.current->Dict.set(key, true)
+      logger->VaultLogger.logCrash(~thrown, ~componentName, ~merchantId, ~paymentId)
+    }
+  }
+
+  // Once per logger session, as web logs it once per frame.
+  let coBadgedLoggedInRef = React.useRef("")
+  React.useEffect3(() => {
+    if controller.values.isCoBadged && coBadgedLoggedInRef.current !== logger.sessionId {
+      coBadgedLoggedInRef.current = logger.sessionId
+      logUserEvent(~eventName=CARD_SCHEME_SELECTION, ~value="Card detected as co-badged")
+    }
+    None
+  }, (controller.values.isCoBadged, resolvedSdkAuthorization, logger))
 
   let buildFormChange = () => {
     let snapshot = controller.publicSnapshot()
@@ -274,7 +482,8 @@ let useHost = (
       accessible,
       editable: !machinery.isSubmitting && !disabled,
       isProcessing: machinery.isSubmitting || disabled,
-      onAnalytics: _ => (),
+      onAnalytics,
+      onCrash,
       unstyled,
       defaultErrorDisplay,
       defaultLabelBehavior,

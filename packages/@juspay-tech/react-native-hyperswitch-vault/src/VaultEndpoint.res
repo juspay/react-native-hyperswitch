@@ -114,3 +114,32 @@ let resolveBaseUrl = (endpoint, ~environment: VaultConfirm.vaultEnvironment): re
   | Ok(None) => Ok(environment->VaultConfirm.vaultBaseUrl)
   | Ok(Some(base)) => Ok(base)
   }
+
+let logsPath = "/logs/sdk"
+
+// A string field that holds something: a missing or blank value is not passed.
+let passed = (value: option<string>) =>
+  value->Option.map(String.trim)->Option.flatMap(text => text === "" ? None : Some(text))
+
+// Where the logs go:
+// 1. customLoggingEndpoint, when passed: that URL;
+// 2. else commonEndpoint, when passed: its logs path. commonEndpoint is the vault's API base (as in
+//    configOf), which already holds client-core's /api;
+// 3. else customBackendEndpoint, when passed: no logs, as client-core's GlobalHooks.getLoggingUrl,
+//    so a merchant with its own backend never sends logs to Hyperswitch;
+// 4. else Hyperswitch for the environment.
+// A blank value counts as not passed.
+let loggingUrl = (custom: option<customEndpoints>, ~environment: VaultConfirm.vaultEnvironment) => {
+  let entry = custom->normalize
+  let over = entry->Option.flatMap(entry => entry.overrideEndpoints)
+  switch (
+    over->Option.flatMap(over => over.customLoggingEndpoint)->passed,
+    entry->Option.flatMap(entry => entry.commonEndpoint)->passed,
+    over->Option.flatMap(over => over.customBackendEndpoint)->passed,
+  ) {
+  | (Some(logging), _, _) => Some(logging)
+  | (None, Some(common), _) => Some(common->trimTrailingSlashes ++ logsPath)
+  | (None, None, Some(_)) => None
+  | (None, None, None) => Some(environment->VaultConfirm.vaultBaseUrl ++ logsPath)
+  }
+}

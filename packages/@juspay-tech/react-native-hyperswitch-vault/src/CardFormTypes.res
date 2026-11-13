@@ -41,9 +41,14 @@ type cardFieldId =
   | CvcField
   | CardholderNameField
 
+type cardNetworkMenu = Opened | Closed
+
 type analyticsEvent =
   | FieldFocused(cardFieldId)
   | FieldBlurred(cardFieldId)
+  | CardNetworkMenu(cardNetworkMenu)
+  // The field first has a size on screen, this many milliseconds after it mounted.
+  | FieldRendered(cardFieldId, float)
 
 type cardFieldValues = {
   cardNumber: string,

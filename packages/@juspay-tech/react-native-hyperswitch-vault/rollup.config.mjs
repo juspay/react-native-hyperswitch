@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 
 /*
@@ -42,7 +43,18 @@ const hostRuntime = ['react', 'react/jsx-runtime', 'react-native', 'react-native
 
 
 
-const plugins = [nodeResolve({ extensions: ['.js', '.mjs'] })];
+/* The version the logs report: package.json's, stamped over src/VaultVersion.res's placeholder. */
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+const versionPlaceholder = '"__VAULT_SDK_VERSION__"';
+const stampVersion = {
+  name: 'stamp-version',
+  transform: (code) =>
+    code.includes(versionPlaceholder)
+      ? { code: code.replaceAll(versionPlaceholder, JSON.stringify(version)), map: null }
+      : null,
+};
+
+const plugins = [nodeResolve({ extensions: ['.js', '.mjs'] }), stampVersion];
 
 /*
  * Packaged image assets are NOT bundled. Rollup leaves the specifier verbatim so React Native's

@@ -231,6 +231,10 @@ app.post('/create-payment-intent', async (req, res) => {
 });
 
 
+// sdk_authorization of each payment-method session this server created, by session id. Listing a
+// session's saved payment methods authorises with it; the secret key is refused there.
+const paymentMethodSessions = new Map();
+
 app.post('/create-payment-method-session', async (req, res) => {
   try {
     if (!PROFILE_ID) {
@@ -261,6 +265,7 @@ app.post('/create-payment-method-session', async (req, res) => {
       id: response.data.id,
       vaults: Object.keys(response.data.external_vault_details || {}),
     });
+    paymentMethodSessions.set(response.data.id, response.data.sdk_authorization);
 
     res.json({
       ...response.data,
@@ -275,6 +280,44 @@ app.post('/create-payment-method-session', async (req, res) => {
 
     res.status(error.response?.status || 500).json({
       error: 'Failed to create payment method session',
+      details: error.response?.data || error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// The session customer's saved payment methods, listed by the merchant backend as the vault SDK
+// expects (GET /v1/payment-method-sessions/{id}/list-payment-methods on the same session).
+// Demo only: a real backend lists them only for the signed-in customer who owns the session.
+app.get('/payment-method-session/:id/saved-payment-methods', async (req, res) => {
+  const sdkAuthorization = paymentMethodSessions.get(req.params.id);
+  if (!sdkAuthorization) {
+    return res.status(404).json({
+      error: 'Unknown payment-method session: create it through this server first',
+    });
+  }
+
+  try {
+    const response = await makeHyperswitchRequest(
+      `/v1/payment-method-sessions/${encodeURIComponent(req.params.id)}/list-payment-methods`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': sdkAuthorization,
+        },
+      }
+    );
+
+    res.json(response.data);
+  } catch (error) {
+    logger.error(
+      'Error listing saved payment methods',
+      error.response?.data || error.message
+    );
+
+    res.status(error.response?.status || 500).json({
+      error: 'Failed to list saved payment methods',
       details: error.response?.data || error.message,
       timestamp: new Date().toISOString(),
     });
