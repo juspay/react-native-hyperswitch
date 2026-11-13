@@ -10,10 +10,15 @@ import { AppState } from 'react-native';
 
 import {
   createLogger,
-  formatThrown,
-  redactCardNumbers,
+  errorBodyValue,
+  exceptionValue,
+  maskNumbers,
+  NO_ERROR_MESSAGE,
+  NOT_AN_ERROR,
+  NOT_JSON,
   redactDigits,
   setLogTransport,
+  UNRECOGNISED_ERROR_BODY,
 } from '../logger';
 import { loggingUrl } from '../loggingUrl';
 import { SDK_VERSION } from '../version';
@@ -311,10 +316,7 @@ describe('sessions', () => {
         {
           url,
           statusCode: 504,
-          response: expect.objectContaining({
-            message: 'Network request failed',
-            type: 'TypeError',
-          }),
+          response: { type: 'TypeError', message: 'Network request failed' },
         },
       ],
     ]);
@@ -340,22 +342,138 @@ describe('sessions', () => {
 });
 
 describe('what a log may carry', () => {
-  it('blanks runs of digits shaped like a card number, however they are spaced', () => {
+  it('logs an error body as its typed error only, with longer numbers masked', () => {
     expect(
-      redactCardNumbers({
-        message: 'Card 4242 4242 4242 4242 at line 12:345',
-        pan: '4111-1111-1111-1111',
-        dotted: '4242.4242.4242.4242',
-        digits: 4111111111111111,
-        nested: ['5555555555554444'],
+      errorBodyValue({
+        error: {
+          type: 'invalid_request',
+          code: 'IR_16',
+          message: 'Card 4242 4242 4242 4242 is invalid, retry in 300 s',
+          reason: 'Attempt 1234 refused',
+          data: { echoed: 'http://localhost:8081/index.bundle' },
+          payment_id: 'pay_123456',
+          connector_transaction_id: 'txn_987654321',
+        },
+        trace: 'http://10.0.2.2:8081/index.bundle',
       })
     ).toEqual({
-      message: 'Card [redacted] at line 12:345',
-      pan: '[redacted]',
-      dotted: '[redacted]',
-      digits: '[redacted]',
-      nested: ['[redacted]'],
+      error: {
+        type: 'invalid_request',
+        code: 'IR_16',
+        message: 'Card [redacted] is invalid, retry in *** s',
+        reason: 'Attempt **** refused',
+      },
     });
+  });
+
+  it('puts an error body’s type and code through the same digit rule as its text', () => {
+    expect(
+      errorBodyValue({
+        error: { type: 'invalid_request', code: 'IR_04', message: 'x' },
+      })
+    ).toEqual({
+      error: { type: 'invalid_request', code: 'IR_04', message: 'x' },
+    });
+    expect(
+      errorBodyValue({ error: { code: 'UE_9000', message: 7, reason: null } })
+    ).toEqual({ error: { code: 'UE_****' } });
+  });
+
+  it('keeps only the common top-level fields of an error body of another shape', () => {
+    expect(errorBodyValue({ message: 'Forbidden' })).toEqual({
+      message: 'Forbidden',
+    });
+    expect(errorBodyValue({ error: 'Unauthorized', status: 401 })).toEqual({
+      error: 'Unauthorized',
+    });
+    expect(
+      errorBodyValue({
+        error_code: 'E1',
+        error_message: 'Card 4242424242424242 declined, 300 left',
+        data: { echoed: 'http://localhost:8081/index.bundle' },
+      })
+    ).toEqual({
+      error_code: 'E1',
+      error_message: 'Card [redacted] declined, *** left',
+    });
+    /* A typed error with no string field falls back to the top level. */
+    expect(
+      errorBodyValue({ error: { message: 42 }, message: 'Forbidden' })
+    ).toEqual({ message: 'Forbidden' });
+  });
+
+  it('logs an error body with none of those fields as a fixed message and its key names', () => {
+    expect(
+      errorBodyValue({
+        'detail': 'secret 4242',
+        'status': 403,
+        'bad key!': 1,
+        'field1234': 2,
+      })
+    ).toEqual({
+      message: UNRECOGNISED_ERROR_BODY,
+      keys: ['detail', 'status', 'bad key!', 'field****'],
+    });
+    expect(errorBodyValue({ error: { message: 42, code: null } })).toEqual({
+      message: UNRECOGNISED_ERROR_BODY,
+      keys: ['error'],
+    });
+    const many = Object.fromEntries(
+      Array.from({ length: 15 }, (_, i) => [
+        `k${String.fromCharCode(97 + i)}`,
+        1,
+      ])
+    );
+    expect(errorBodyValue(many).keys).toHaveLength(10);
+    for (const body of [
+      null,
+      undefined,
+      'Bad Gateway',
+      502,
+      [{ error: { message: 'x' } }],
+      {},
+    ]) {
+      expect(errorBodyValue(body)).toEqual({
+        message: UNRECOGNISED_ERROR_BODY,
+      });
+    }
+    const hostile = new Proxy(
+      {},
+      {
+        get() {
+          throw new Error('getter');
+        },
+      }
+    );
+    expect(errorBodyValue(hostile)).toEqual({
+      message: UNRECOGNISED_ERROR_BODY,
+    });
+  });
+
+  it('logs a body that is not JSON as a fixed message with its real status', () => {
+    const logger = createLogger(LOG_URL);
+    logger.identify(AUTH, undefined);
+    const call = logger.apiCall('PAYMENT_METHOD_SESSION_RETRIEVE_CALL', 'u');
+    call.started();
+    call.unreadable(502);
+    logger.sendLogs();
+    const answer = logs().find(
+      (log) => log.event_name === 'PAYMENT_METHOD_SESSION_RETRIEVE_CALL'
+    )!;
+    expect(answer.log_type).toBe('ERROR');
+    expect(JSON.parse(answer.value!)).toEqual({
+      url: 'u',
+      statusCode: 502,
+      response: { message: NOT_JSON },
+    });
+  });
+
+  it('sends every run of three or more digits as stars, one per digit', () => {
+    expect(maskNumbers('IR_04, status 500, order 12345678')).toBe(
+      'IR_04, status ***, order ********'
+    );
+    expect(maskNumbers('4242 4242 4242 4242')).toBe('[redacted]');
+    expect(maskNumbers('42-42-42-42-42-42-42')).toBe('[redacted]');
   });
 
   it('blanks a card number however many spaces, line breaks, dots, slashes or dashes it has', () => {
@@ -382,20 +500,62 @@ describe('what a log may carry', () => {
     expect(performance.now() - startedAt).toBeLessThan(1000);
   });
 
-  it('records an Error as web’s formatException, and anything else as itself', () => {
-    expect(formatThrown(new TypeError('bad'))).toEqual(
-      expect.objectContaining({ message: 'bad', type: 'TypeError' })
-    );
-    expect(formatThrown('boom')).toBe('boom');
-    expect(formatThrown(null)).toBeNull();
-    const cyclic: Record<string, unknown> = {};
-    cyclic.self = cyclic;
-    expect(formatThrown(cyclic)).toBeNull();
+  it('logs an exception as its type and message, never its stack', () => {
+    const error = new TypeError('bad value 4242424242424242 at 300');
+    error.stack =
+      'TypeError: bad\n    at render (http://localhost:8081/index.bundle:1:2)';
+    expect(exceptionValue(error)).toEqual({
+      type: 'TypeError',
+      message: 'bad value [redacted] at ***',
+    });
+    const abort = new Error('Aborted');
+    abort.name = 'AbortError';
+    expect(exceptionValue(abort)).toEqual({
+      type: 'AbortError',
+      message: 'Aborted',
+    });
+    const odd = new Error('x');
+    odd.name = 'Card 4242424242424242';
+    expect(exceptionValue(odd).type).toBe('Card [redacted]');
+    const numbered = new Error('x');
+    numbered.name = 'Error12345';
+    expect(exceptionValue(numbered).type).toBe('Error*****');
+    const blank = new Error('x');
+    blank.name = '  ';
+    expect(exceptionValue(blank).type).toBe('Error');
+  });
+
+  it('logs a fixed message when an exception’s message is missing, empty or not a string', () => {
+    const noMessage = { type: 'Error', message: NO_ERROR_MESSAGE };
+    expect(exceptionValue(new Error())).toEqual(noMessage);
+    expect(exceptionValue(new Error('   '))).toEqual(noMessage);
+    const numeric = new Error('x');
+    (numeric as { message: unknown }).message = 404;
+    expect(exceptionValue(numeric)).toEqual(noMessage);
+    const hostile = new Error('x');
+    Object.defineProperty(hostile, 'message', {
+      get() {
+        throw new Error('getter');
+      },
+    });
+    expect(exceptionValue(hostile)).toEqual(noMessage);
+  });
+
+  it('logs anything thrown that is not an Error as a fixed message', () => {
+    for (const thrown of [
+      { message: 'looks like an error', name: 'TypeError' },
+      'boom',
+      undefined,
+      null,
+      0,
+    ]) {
+      expect(exceptionValue(thrown)).toEqual({ message: NOT_AN_ERROR });
+    }
   });
 });
 
-describe('the log URL, as client-core’s getUrl(#logs)', () => {
-  it('follows overrideEndpoints, then commonEndpoint, then the environment', () => {
+describe('the log URL', () => {
+  it('is Hyperswitch for the environment when the merchant passes no endpoint', () => {
     expect(loggingUrl('SANDBOX', undefined)).toBe(
       'https://app.hyperswitch.io/api/logs/sdk'
     );
@@ -408,26 +568,21 @@ describe('the log URL, as client-core’s getUrl(#logs)', () => {
     expect(loggingUrl('INTEG', 5)).toBe(
       'https://integ.hyperswitch.io/api/logs/sdk'
     );
-    expect(
-      loggingUrl('PROD', { commonEndpoint: ' https://proxy.example/api// ' })
-    ).toBe('https://proxy.example/api/logs/sdk');
+    expect(loggingUrl('SANDBOX', { overrideEndpoints: {} })).toBe(
+      'https://app.hyperswitch.io/api/logs/sdk'
+    );
+  });
+
+  it('is customLoggingEndpoint whenever it is passed, used as given', () => {
     expect(
       loggingUrl('PROD', {
+        commonEndpoint: 'https://proxy.example/api',
         overrideEndpoints: {
           customBackendEndpoint: 'https://backend.example/api',
           customLoggingEndpoint: ' https://logs.example/sdk ',
         },
       })
     ).toBe('https://logs.example/sdk');
-    /* overrideEndpoints without a logging endpoint: the environment's. */
-    expect(
-      loggingUrl('SANDBOX', {
-        overrideEndpoints: {
-          customBackendEndpoint: 'https://backend.example/api',
-        },
-      })
-    ).toBe('https://app.hyperswitch.io/api/logs/sdk');
-    /* As client-core, the URL is used as given. */
     expect(
       loggingUrl('PROD', {
         overrideEndpoints: {
@@ -437,9 +592,51 @@ describe('the log URL, as client-core’s getUrl(#logs)', () => {
     ).toBe('http://10.0.2.2:5299/logs');
   });
 
-  it('sends no logs for a blank logging endpoint', () => {
+  it('is commonEndpoint’s logs path when only commonEndpoint is passed', () => {
     expect(
-      loggingUrl('PROD', { overrideEndpoints: { customLoggingEndpoint: '  ' } })
+      loggingUrl('PROD', { commonEndpoint: ' https://proxy.example/api// ' })
+    ).toBe('https://proxy.example/api/logs/sdk');
+    /* commonEndpoint is the API base even next to a backend override, so its logs path too. */
+    expect(
+      loggingUrl('PROD', {
+        commonEndpoint: 'https://proxy.example/api',
+        overrideEndpoints: {
+          customBackendEndpoint: 'https://backend.example/api',
+        },
+      })
+    ).toBe('https://proxy.example/api/logs/sdk');
+  });
+
+  it('sends no logs when the merchant passes its own backend without a logging endpoint', () => {
+    expect(
+      loggingUrl('SANDBOX', {
+        overrideEndpoints: {
+          customBackendEndpoint: 'https://backend.example/api',
+        },
+      })
     ).toBeUndefined();
+    expect(
+      loggingUrl('SANDBOX', {
+        overrideEndpoints: {
+          customBackendEndpoint: 'https://backend.example/api',
+          customLoggingEndpoint: '  ',
+        },
+      })
+    ).toBeUndefined();
+  });
+
+  it('treats a blank endpoint as not passed', () => {
+    const hyperswitch = 'https://app.hyperswitch.io/api/logs/sdk';
+    expect(
+      loggingUrl('SANDBOX', {
+        overrideEndpoints: { customLoggingEndpoint: '' },
+      })
+    ).toBe(hyperswitch);
+    expect(
+      loggingUrl('SANDBOX', {
+        overrideEndpoints: { customBackendEndpoint: ' ' },
+      })
+    ).toBe(hyperswitch);
+    expect(loggingUrl('SANDBOX', { commonEndpoint: '' })).toBe(hyperswitch);
   });
 });

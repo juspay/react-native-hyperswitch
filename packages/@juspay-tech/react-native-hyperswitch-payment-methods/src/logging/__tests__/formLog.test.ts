@@ -450,8 +450,9 @@ describe('crashes and VGS', () => {
       { type: 'Error', vaultType: '', componentName: 'cardExpiry' },
     ]);
     expect(JSON.stringify(crashes.slice(0, 3))).not.toMatch(/973|tok_review/);
-    expect(crashes[3]).toMatchObject({
-      message: 'Invalid CVC: 973; token: tok_review_secret',
+    expect(crashes[3]).toEqual({
+      type: 'Error',
+      message: 'Invalid CVC: ***; token: tok_review_secret',
       componentName: 'cardholderName',
     });
   });

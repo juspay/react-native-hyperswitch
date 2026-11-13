@@ -351,14 +351,50 @@ describe('a payment-method session', () => {
     });
   });
 
-  it('sends nothing when the logging endpoint is blank', async () => {
+  it('logs a failed lookup whose body is not JSON as a fixed message, never the body', async () => {
+    installMock();
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => {
+        throw new SyntaxError('Unexpected token < in JSON at position 0');
+      },
+    });
+
+    const { view } = renderSession({ sdkAuthorization: AUTH });
+    await waitFor(() =>
+      expect(
+        logs().some(
+          (log) =>
+            log.event_name === 'PAYMENT_METHOD_SESSION_RETRIEVE_CALL' &&
+            log.log_type === 'ERROR'
+        )
+      ).toBe(true)
+    );
+    view.unmount();
+
+    const failed = logs().find(
+      (log) => log.event_name === 'PAYMENT_METHOD_SESSION_RETRIEVE_CALL'
+    )!;
+    expect(JSON.parse(failed.value!)).toEqual({
+      url: LOOKUP_URL,
+      statusCode: 502,
+      response: { message: 'The response body is not JSON' },
+    });
+  });
+
+  it('sends nothing when the merchant has its own backend and no logging endpoint', async () => {
     installMock({ fieldState: { empty: false, valid: true } });
     answer(200, vgsSession);
     const { view, ref } = renderSession(
       { sdkAuthorization: AUTH },
       {
         ...SANDBOX,
-        customEndpoints: { overrideEndpoints: { customLoggingEndpoint: '' } },
+        customEndpoints: {
+          overrideEndpoints: {
+            customBackendEndpoint: 'https://backend.acme.test/api',
+          },
+        },
       }
     );
     await waitFor(() =>

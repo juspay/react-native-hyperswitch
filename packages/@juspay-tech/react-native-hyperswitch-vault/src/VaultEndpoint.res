@@ -117,21 +117,29 @@ let resolveBaseUrl = (endpoint, ~environment: VaultConfirm.vaultEnvironment): re
 
 let logsPath = "/logs/sdk"
 
-// Where the logs go, as hyperswitch-client-core's GlobalHooks.getUrl(~urlType=#logs): with
-// overrideEndpoints, its customLoggingEndpoint; without, commonEndpoint's logs path; else the
-// environment's. commonEndpoint is the vault's API base (as in configOf), which already holds
-// client-core's /api. A blank logging endpoint sends no logs.
+// A string field that holds something: a missing or blank value is not passed.
+let passed = (value: option<string>) =>
+  value->Option.map(String.trim)->Option.flatMap(text => text === "" ? None : Some(text))
+
+// Where the logs go:
+// 1. customLoggingEndpoint, when passed: that URL;
+// 2. else commonEndpoint, when passed: its logs path. commonEndpoint is the vault's API base (as in
+//    configOf), which already holds client-core's /api;
+// 3. else customBackendEndpoint, when passed: no logs, as client-core's GlobalHooks.getLoggingUrl,
+//    so a merchant with its own backend never sends logs to Hyperswitch;
+// 4. else Hyperswitch for the environment.
+// A blank value counts as not passed.
 let loggingUrl = (custom: option<customEndpoints>, ~environment: VaultConfirm.vaultEnvironment) => {
   let entry = custom->normalize
-  let custom = switch entry->Option.flatMap(entry => entry.overrideEndpoints) {
-  | Some(over) => over.customLoggingEndpoint
-  | None =>
-    entry
-    ->Option.flatMap(entry => entry.commonEndpoint)
-    ->Option.map(common => common->String.trim->trimTrailingSlashes ++ logsPath)
-  }
-  switch custom {
-  | Some(url) => url->String.trim === "" ? None : Some(url->String.trim)
-  | None => Some(environment->VaultConfirm.vaultBaseUrl ++ logsPath)
+  let over = entry->Option.flatMap(entry => entry.overrideEndpoints)
+  switch (
+    over->Option.flatMap(over => over.customLoggingEndpoint)->passed,
+    entry->Option.flatMap(entry => entry.commonEndpoint)->passed,
+    over->Option.flatMap(over => over.customBackendEndpoint)->passed,
+  ) {
+  | (Some(logging), _, _) => Some(logging)
+  | (None, Some(common), _) => Some(common->trimTrailingSlashes ++ logsPath)
+  | (None, None, Some(_)) => None
+  | (None, None, None) => Some(environment->VaultConfirm.vaultBaseUrl ++ logsPath)
   }
 }

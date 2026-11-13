@@ -454,8 +454,8 @@ let sendVaultRequest = async (
     | json =>
       call->VaultLogger.callAnswered(~status, ~response=json)
       Some(json)
-    | exception error =>
-      call->VaultLogger.callUnreadable(~status, ~error)
+    | exception _ =>
+      call->VaultLogger.callUnreadable(~status)
       None
     }
     Answered({status, ok: response->responseOk, body})

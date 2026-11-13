@@ -115,53 +115,111 @@ export function setLogTransport(next?: LogTransport): void {
 }
 
 /* Any run of twelve or more digits, the shape of a card number, with any number of spaces, line
-   breaks, dots, slashes or dashes between the digits. Shorter numbers, such as a stack's line and
-   column, are kept. Separators and digits never overlap, so the match takes time in proportion to
-   the text. */
+   breaks, dots, slashes or dashes between the digits. Separators and digits never overlap, so the
+   match takes time in proportion to the text. */
 export function redactDigits(text: string): string {
   return text.replace(/\d(?:[\s./-]*\d){11,}/g, '[redacted]');
 }
 
-export function redactCardNumbers(value: unknown): unknown {
-  if (typeof value === 'string') return redactDigits(value);
-  if (typeof value === 'number') {
-    return Math.abs(value) >= 1e11 ? '[redacted]' : value;
-  }
-  if (Array.isArray(value)) return value.map(redactCardNumbers);
-  if (typeof value === 'object' && value !== null) {
-    const out: Record<string, unknown> = {};
-    for (const [key, field] of Object.entries(value)) {
-      out[key] = redactCardNumbers(field);
-    }
-    return out;
-  }
-  return value;
+/* An error's text as it is logged: a card-number shape is blanked as above, then every run of
+   three or more digits is sent as stars, one per digit. An error code's two digits are kept. */
+export function maskNumbers(text: string): string {
+  return redactDigits(text).replace(/\d{3,}/g, (digits) =>
+    '*'.repeat(digits.length)
+  );
 }
 
-/* What was thrown, as web's Utils.formatException records an Error, or the value itself when it
-   is not one. A value that cannot be written as JSON is recorded as null. */
-export function formatThrown(thrown: unknown): unknown {
-  if (thrown === null || thrown === undefined) return null;
-  const error = thrown as Partial<Record<string, unknown>>;
-  const fields: Array<[string, unknown, string]> = [
-    ['message', error.message, 'Unknown Error'],
-    ['type', error.name, 'Unknown'],
-    ['stack', error.stack, 'Unknown'],
-    ['fileName', error.fileName, 'Unknown'],
-  ];
-  if (fields.some(([, field]) => typeof field === 'string')) {
-    const out: Record<string, string> = {};
-    for (const [key, field, fallback] of fields) {
-      out[key] = typeof field === 'string' ? field : fallback;
-    }
-    return out;
+/* The fixed messages logged in place of what cannot be logged as it is. */
+export const NOT_JSON = 'The response body is not JSON';
+export const UNRECOGNISED_ERROR_BODY =
+  'The error response is not in the expected format';
+export const NOT_AN_ERROR = 'A value that is not an Error was thrown';
+export const NO_ERROR_MESSAGE = 'The error has no message';
+
+/* The backend's typed error: {"error": {type, code, message, reason}}. */
+const TYPED_ERROR_FIELDS = ['type', 'code', 'message', 'reason'] as const;
+/* The fields an error body of another shape, such as a proxy's, commonly has at its top level. */
+const TOP_LEVEL_ERROR_FIELDS = [
+  'message',
+  'error',
+  'error_code',
+  'error_message',
+  'code',
+  'type',
+  'reason',
+] as const;
+const MAX_KEYS = 10;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/* The named fields that are strings, each through maskNumbers; undefined when there are none. */
+function maskedStrings(
+  source: Record<string, unknown>,
+  keys: readonly string[]
+): Record<string, string> | undefined {
+  const out: Record<string, string> = {};
+  for (const key of keys) {
+    const field = source[key];
+    if (typeof field === 'string') out[key] = maskNumbers(field);
   }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/* What an API error body is logged as: the body with only known fields left, each only when it is
+   a string, and every one through maskNumbers. First the backend's typed error, in its shape;
+   failing that, the common top-level fields; failing that, a fixed message with the names of the
+   body's top-level keys (never their values). Anything else in the body (data, payment_id,
+   connector ids) is left out, and a body that is not an object is logged as the fixed message. */
+export function errorBodyValue(body: unknown): Record<string, unknown> {
   try {
-    const text = JSON.stringify(thrown);
-    return text === undefined ? null : JSON.parse(text);
+    if (isRecord(body)) {
+      const typed = isRecord(body.error)
+        ? maskedStrings(body.error, TYPED_ERROR_FIELDS)
+        : undefined;
+      if (typed) return { error: typed };
+      const topLevel = maskedStrings(body, TOP_LEVEL_ERROR_FIELDS);
+      if (topLevel) return topLevel;
+      const keys = Object.keys(body).slice(0, MAX_KEYS).map(maskNumbers);
+      if (keys.length > 0) return { message: UNRECOGNISED_ERROR_BODY, keys };
+    }
   } catch {
-    return null;
+    /* A body whose fields cannot be read is one of another shape. */
   }
+  return { message: UNRECOGNISED_ERROR_BODY };
+}
+
+/* A property of what was thrown when it is a string. A getter that throws reads as absent. */
+function stringProperty(thrown: object, key: string): string | undefined {
+  try {
+    const value = (thrown as Record<string, unknown>)[key];
+    return typeof value === 'string' ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function isError(thrown: unknown): thrown is Error {
+  try {
+    return thrown instanceof Error;
+  } catch {
+    return false;
+  }
+}
+
+/* What an exception is logged as: its type and its message, both through maskNumbers; a missing
+   or empty message is logged as a fixed one. Never its stack, which in a debug build carries the
+   bundle's localhost or IP address URL that the log endpoint's WAF refuses. Any other value thrown
+   is logged as a fixed message, since it can carry anything. */
+export function exceptionValue(thrown: unknown): Record<string, string> {
+  if (!isError(thrown)) return { message: NOT_AN_ERROR };
+  const name = stringProperty(thrown, 'name')?.trim();
+  const message = stringProperty(thrown, 'message')?.trim();
+  return {
+    type: name ? maskNumbers(name) : 'Error',
+    message: message ? maskNumbers(message) : NO_ERROR_MESSAGE,
+  };
 }
 
 function newSessionId(): string {
@@ -177,6 +235,7 @@ export interface ApiCallLog {
   started(): void;
   answered(status: number): void;
   failed(status: number, response: unknown): void;
+  unreadable(status: number): void;
   unanswered(error: unknown): void;
 }
 
@@ -433,14 +492,17 @@ export function createLogger(url: string | undefined): Logger {
         failed(status, response) {
           answer('ERROR', {
             statusCode: status,
-            response: redactCardNumbers(response),
+            response: errorBodyValue(response),
+          });
+        },
+        unreadable(status) {
+          answer('ERROR', {
+            statusCode: status,
+            response: { message: NOT_JSON },
           });
         },
         unanswered(error) {
-          answer('ERROR', {
-            statusCode: 504,
-            response: redactCardNumbers(formatThrown(error)),
-          });
+          answer('ERROR', { statusCode: 504, response: exceptionValue(error) });
         },
       };
     },
