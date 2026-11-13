@@ -127,12 +127,14 @@ let make = React.forwardRef((
   })
 
   <VaultWidgetContext.ContextProvider value={Some(host.contextValue)}>
-    <CardFormView
-      cardholderName=?{props["cardholderName"]}
-      layout=?{props["layout"]}
-      fieldArrangement=?{props["fieldArrangement"]}
-      fieldStyles=?{props["fieldStyles"]}
-      fieldOptions=?{props["fieldOptions"]}
-    />
+    <VaultWidgetContext.Guarded ctx=host.contextValue componentName=#cardForm>
+      <CardFormView
+        cardholderName=?{props["cardholderName"]}
+        layout=?{props["layout"]}
+        fieldArrangement=?{props["fieldArrangement"]}
+        fieldStyles=?{props["fieldStyles"]}
+        fieldOptions=?{props["fieldOptions"]}
+      />
+    </VaultWidgetContext.Guarded>
   </VaultWidgetContext.ContextProvider>
 })

@@ -104,9 +104,22 @@ let make = (
     None
   }, (showFloating, lifted))
 
+  // The first layout with a size tells the form this field is on screen, and how long after it
+  // mounted. The input's own layout is used, so no view is added around it.
+  let mountedAtRef = React.useRef(Date.now())
+  let renderedRef = React.useRef(false)
+  let onLayout = (event: Event.layoutEvent) => {
+    let {width, height} = event.nativeEvent.layout
+    if !renderedRef.current && width > 0. && height > 0. {
+      renderedRef.current = true
+      onAnalytics(FieldRendered(fieldId, Date.now() -. mountedAtRef.current))
+    }
+  }
+
   let inputElement = (~unstyled: bool) =>
         <TextInput
           ref=?{reference->Option.map(ref => ref->ReactNative.Ref.value)}
+          onLayout
           style={array([
             s({
               fontStyle: #normal,

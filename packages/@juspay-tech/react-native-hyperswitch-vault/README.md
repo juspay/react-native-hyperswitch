@@ -302,10 +302,14 @@ nothing sent.
 
 **Logs.** The form logs its two vault requests (confirm and saved-card update): the URL, the HTTP
 status and, on an error, the error response or the exception. It also logs when a card field gains
-or loses focus (the field's name only, never what was typed) and the network picker of a co-badged
-card. It never logs a card value or a request body. As in the web SDK, logs are queued and sent in
-batches: 20 seconds after the last one, at once on an error, and when the form closes, its session
-is replaced or the app leaves the foreground. As in client-core, logs go to
+or loses focus (the field's name and, on leaving it, a status such as `complete` or
+`invalid_card_number`, never what was typed), when each field first shows on screen, the network
+picker of a co-badged card, the form's settings (the environment, whether each custom endpoint is
+set but not its URL, the card schemes, the fields mounted and whether the session can be used), and
+a crash while a card field renders, which is then thrown on unchanged. It never logs a card
+value or a request body. As in the web SDK, logs are queued and sent in batches: 20 seconds after
+the last one, at once on an error, and when the form closes, its session is replaced or the app
+leaves the foreground. As in client-core, logs go to
 `overrideEndpoints.customLoggingEndpoint` when you pass `overrideEndpoints` (the environment's host
 when it has none), else to `<commonEndpoint>/logs/sdk`, else to the environment's host
 (`https://app.hyperswitch.io/api/logs/sdk` in `SANDBOX`). A blank `customLoggingEndpoint` sends none.

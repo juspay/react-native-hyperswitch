@@ -1,5 +1,8 @@
 open ReactNative
 
+// What a crash is logged under: a card field, by its public name, or the whole form.
+type componentName = [VaultPublicState.elementType | #cardForm]
+
 type contextValue = {
   controller: VaultCardController.controller,
   theme: CardFormTypes.cardTheme,
@@ -12,6 +15,8 @@ type contextValue = {
   editable: bool,
   isProcessing: bool,
   onAnalytics: CardFormTypes.analyticsEvent => unit,
+  // Logs a crash inside the named field (SDK_CRASH).
+  onCrash: (componentName, Exn.t) => unit,
 
   unstyled: bool,
 
@@ -55,6 +60,20 @@ module ErrorText = {
       })->CardFieldStyles.withText(errorStyle)}>
       {React.string(message)}
     </Text>
+}
+
+module CrashBoundary = {
+  @module("./VaultCrashBoundary.mjs") @react.component
+  external make: (~onCrash: Exn.t => unit, ~children: React.element) => React.element =
+    "VaultCrashBoundary"
+}
+
+// A field's own components, under a boundary that logs a crash in them as SDK_CRASH and throws it on
+// unchanged. Only the vault's components are inside it, never the merchant's.
+module Guarded = {
+  @react.component
+  let make = (~ctx: contextValue, ~componentName: componentName, ~children: React.element) =>
+    <CrashBoundary onCrash={thrown => ctx.onCrash(componentName, thrown)}> children </CrashBoundary>
 }
 
 let useRegistration = (ctx: contextValue, kind: VaultCardController.widgetKind) => {

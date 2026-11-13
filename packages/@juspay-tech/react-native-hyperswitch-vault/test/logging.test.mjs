@@ -1,5 +1,6 @@
-// The vault's logs: hyperswitch-web's log structure, for the vault's own two API calls and the card
-// fields' user events. Runs on the ReScript output (`rescript` first), with `fetch` stubbed.
+// The vault's logs: hyperswitch-web's log structure, for the vault's own two API calls, the card
+// fields' user events and the form's debugging logs. Runs on the ReScript output (`rescript` first),
+// with `fetch` stubbed.
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -7,6 +8,9 @@ import * as VaultLogger from '../src/VaultLogger.bs.js';
 import * as VaultConfirm from '../src/VaultConfirm.bs.js';
 import * as VaultSavedCard from '../src/VaultSavedCard.bs.js';
 import * as VaultEndpoint from '../src/VaultEndpoint.bs.js';
+import * as VaultLogValues from '../src/VaultLogValues.bs.js';
+import * as CardNetworkNames from '../src/CardNetworkNames.bs.js';
+import { VaultCrashBoundary } from '../src/VaultCrashBoundary.mjs';
 
 const LOG_URL = 'https://app.hyperswitch.io/api/logs/sdk';
 const BASE_URL = 'https://app.hyperswitch.io/api';
@@ -431,6 +435,239 @@ test('field events go out in batches, at most 100 per event name as on web', () 
   assert.equal(logs().filter(log => log.event_name === 'FOCUS').length, 100);
 });
 
+// The debugging logs: what a field held when the customer left it, each field first showing, the
+// form's settings, and a crash inside the form.
+
+test('BLUR names what the customer left in the field, in the public field error codes', () => {
+  const status = (empty, complete, invalidCode, unsupportedNetwork = false) =>
+    VaultLogValues.fieldStatus(empty, complete, invalidCode, unsupportedNetwork);
+  assert.equal(status(true, false, 'invalid_card_number'), 'empty');
+  assert.equal(status(true, false, 'invalid_card_number', true), 'empty');
+  assert.equal(status(false, true, 'invalid_card_number'), 'complete');
+  assert.equal(status(false, false, 'invalid_card_number'), 'invalid_card_number');
+  assert.equal(status(false, true, 'invalid_card_number', true), 'unsupported_network');
+  // As in the form's public state, a network fault counts only once the number is complete.
+  assert.equal(status(false, false, 'invalid_card_number', true), 'invalid_card_number');
+  assert.equal(status(false, false, 'invalid_expiry'), 'invalid_expiry');
+  assert.equal(
+    VaultLogValues.blurValue('cardNumber', 'invalid_card_number'),
+    'cardNumber invalid_card_number',
+  );
+});
+
+test('APP_RENDERED is a DEBUG USER_EVENT carrying the field name and the time it took to show', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  VaultLogger.setLogInfo(logger, 'cardNumber', 'APP_RENDERED', PUBLISHABLE_KEY, SESSION_ID, 42, 'DEBUG');
+  // A DEBUG log waits for the batch.
+  assert.equal(batches.length, 0);
+  VaultLogger.sendLogs(logger);
+  const [rendered] = logs();
+  assert.equal(rendered.event_name, 'APP_RENDERED');
+  assert.equal(rendered.value, 'cardNumber');
+  assert.equal(rendered.latency, '42');
+  assert.equal(rendered.log_type, 'DEBUG');
+  assert.equal(rendered.category, 'USER_EVENT');
+});
+
+test('the form settings record each custom endpoint as set or not, never its URL', () => {
+  const value = VaultLogValues.optionsValue({
+    environment: 'SANDBOX',
+    sessionStatus: 'valid',
+    sessionProblem: '',
+    customEndpoints: {
+      commonEndpoint: 'https://proxy.merchant.example/api',
+      overrideEndpoints: { customLoggingEndpoint: 'https://logs.merchant.example/sdk' },
+    },
+    enabledCardSchemes: ['Visa'],
+    unknownCardSchemes: ['Mastercad'],
+    cardholderNameMode: 'collect',
+    locale: 'en',
+    fields: ['cardNumber', 'cardExpiry', 'cardCvc'],
+    savedCard: false,
+  });
+  assert.deepEqual(JSON.parse(value), {
+    environment: 'SANDBOX',
+    sessionStatus: 'valid',
+    sessionProblem: '',
+    customEndpoints: {
+      commonEndpoint: true,
+      customBackendEndpoint: false,
+      customLoggingEndpoint: true,
+    },
+    enabledCardSchemes: ['Visa'],
+    unknownCardSchemes: ['Mastercad'],
+    cardholderNameMode: 'collect',
+    locale: 'en',
+    fields: ['cardNumber', 'cardExpiry', 'cardCvc'],
+    savedCard: false,
+  });
+  assert.doesNotMatch(value, /https?:|merchant\.example/);
+});
+
+test('endpoints a JavaScript caller passes as null, a number or {} read as not set', () => {
+  const flags = customEndpoints =>
+    JSON.parse(
+      VaultLogValues.optionsValue({
+        environment: 'PROD',
+        sessionStatus: 'valid',
+        sessionProblem: '',
+        customEndpoints,
+        enabledCardSchemes: [],
+        unknownCardSchemes: [],
+        cardholderNameMode: 'collect',
+        locale: '',
+        fields: [],
+        savedCard: false,
+      }),
+    ).customEndpoints;
+  const none = { commonEndpoint: false, customBackendEndpoint: false, customLoggingEndpoint: false };
+  assert.deepEqual(flags(undefined), none);
+  assert.deepEqual(flags(null), none);
+  assert.deepEqual(flags({ commonEndpoint: 5, overrideEndpoints: null }), none);
+  assert.deepEqual(flags({ commonEndpoint: '', overrideEndpoints: {} }), none);
+});
+
+test('the merchant’s own text is logged only when it looks like a locale or a scheme name', () => {
+  const settings = (locale, unknownCardSchemes) =>
+    JSON.parse(
+      VaultLogValues.optionsValue({
+        environment: 'PROD',
+        sessionStatus: 'valid',
+        sessionProblem: '',
+        customEndpoints: undefined,
+        enabledCardSchemes: [],
+        unknownCardSchemes,
+        cardholderNameMode: 'collect',
+        locale,
+        fields: [],
+        savedCard: false,
+      }),
+    );
+  for (const locale of ['', 'en', 'fr-FR', 'zh_Hant_TW', 'de-CH']) {
+    assert.equal(settings(locale, []).locale, locale);
+  }
+  for (const locale of ['not a locale', 'https://merchant.example', 'en-GB; 4242']) {
+    assert.equal(settings(locale, []).locale, 'unrecognised', locale);
+  }
+  assert.deepEqual(
+    settings('', [
+      'Mastercad',
+      'american express',
+      'key=value; not a scheme',
+      '4242;x',
+    ]).unknownCardSchemes,
+    ['Mastercad', 'american express', 'unrecognised', 'unrecognised'],
+  );
+  const many = Array.from({ length: 25 }, (_, i) => `scheme${i}`);
+  assert.equal(settings('', many).unknownCardSchemes.length, 10);
+  const named = settings('', []);
+  assert.equal(named.cardholderNameMode, 'collect');
+  assert.equal('cardholderName' in named, false);
+});
+
+test('a card number or a name passed by mistake in the form settings is never logged', () => {
+  const settings = (unknownCardSchemes, cardholderNameMode) =>
+    VaultLogValues.optionsValue({
+      environment: 'PROD',
+      sessionStatus: 'valid',
+      sessionProblem: '',
+      customEndpoints: undefined,
+      enabledCardSchemes: [],
+      unknownCardSchemes,
+      cardholderNameMode,
+      locale: '',
+      fields: [],
+      savedCard: false,
+    });
+  const value = settings(
+    ['4242424242424242', '4242 4242 4242 4242', 'Visa 4242424242424242', 'Mastercad'],
+    'Jane Q. Customer',
+  );
+  assert.deepEqual(JSON.parse(value).unknownCardSchemes, [
+    'unrecognised',
+    'unrecognised',
+    'Visa [redacted]',
+    'Mastercad',
+  ]);
+  assert.equal(JSON.parse(value).cardholderNameMode, 'unrecognised');
+  assert.doesNotMatch(value, /4242|Jane/);
+  for (const mode of ['collect', 'external', 'omit']) {
+    assert.equal(JSON.parse(settings([], mode)).cardholderNameMode, mode);
+  }
+});
+
+test('no part of a crash record carries a run of digits shaped like a card number', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  const error = new Error('Unexpected value 4242 4242 4242 4242 at index 12');
+  // As Hermes writes a stack: the message first, then frames with their line and column.
+  error.stack = `Error: ${error.message}\n    at render (index.android.bundle:1:1234567)`;
+  VaultLogger.logCrash(logger, error, 'cardNumber', PUBLISHABLE_KEY, SESSION_ID);
+  VaultLogger.logCrash(
+    logger,
+    'bad input 4242424242424242',
+    'cardNumber',
+    PUBLISHABLE_KEY,
+    SESSION_ID,
+  );
+  VaultLogger.logCrash(
+    logger,
+    { input: { pan: '4111-1111-1111-1111', digits: 4111111111111111 } },
+    'cardNumber',
+    PUBLISHABLE_KEY,
+    SESSION_ID,
+  );
+  VaultLogger.logCrash(
+    logger,
+    'spaced 4242  4242  4242  4242, dotted 4242.4242.4242.4242, slashed 4242/4242/4242/4242',
+    'cardNumber',
+    PUBLISHABLE_KEY,
+    SESSION_ID,
+  );
+  const [crash, thrown, object, spaced] = logs().map(log => JSON.parse(log.value));
+  assert.equal(spaced.thrown, 'spaced [redacted], dotted [redacted], slashed [redacted]');
+  assert.equal(crash.message, 'Unexpected value [redacted] at index 12');
+  assert.equal(
+    crash.stack,
+    'Error: Unexpected value [redacted] at index 12\n    at render (index.android.bundle:1:1234567)',
+  );
+  assert.equal(thrown.thrown, 'bad input [redacted]');
+  assert.deepEqual(object.input, { pan: '[redacted]', digits: '[redacted]' });
+  assert.doesNotMatch(JSON.stringify(logs()), /4242|4111/);
+});
+
+test('a card number is blanked however many spaces, line breaks, dots, slashes or dashes it has', () => {
+  for (const text of [
+    '4242   4242   4242   4242',
+    '4242 - 4242 - 4242 - 4242',
+    '4242\n4242\n4242\n4242',
+    '4242\t\t\t4242\t\t\t4242\t\t\t4242',
+    '4242 . 4242 / 4242 -- 4242',
+  ]) {
+    assert.equal(VaultLogger.redactDigits(`card ${text} end`), 'card [redacted] end', text);
+  }
+  for (const kept of ['at render (index.android.bundle:12:3456)', 'order 1234 5678', 'IR_16']) {
+    assert.equal(VaultLogger.redactDigits(kept), kept);
+  }
+  // Separators and digits never overlap, so a long text takes no time.
+  const long = `1${' '.repeat(1_000_000)}x`;
+  const startedAt = performance.now();
+  assert.equal(VaultLogger.redactDigits(long), long);
+  assert.ok(performance.now() - startedAt < 1000);
+});
+
+test('an error body from the vault carries no run of digits shaped like a card number', async () => {
+  vaultAnswer = async () =>
+    okJson(422, {
+      error: { type: 'invalid_request', code: 'IR_16', message: 'Card 4242 4242 4242 4242 is invalid' },
+    });
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  await confirm(logger);
+  const answered = logs().find(log => log.event_name === 'PAYMENT_METHOD_SESSION_CONFIRM_CALL');
+  assert.deepEqual(JSON.parse(answered.value).response, {
+    error: { type: 'invalid_request', code: 'IR_16', message: 'Card [redacted] is invalid' },
+  });
+});
+
 test('an answer that arrives after the session changed stays with the session that sent it', async () => {
   let answer;
   vaultAnswer = () => new Promise(resolve => (answer = resolve));
@@ -459,4 +696,113 @@ test('an answer that arrives after the session changed stays with the session th
   assert.equal(logger.counts.PAYMENT_METHOD_SESSION_CONFIRM_CALL, 1);
   assert.notEqual(firstSession, secondSession);
   assert.ok(Number(calls[1].latency) >= 20, `late answer latency ${calls[1].latency}`);
+});
+
+test('unknown card schemes are the entries the form ignores', () => {
+  assert.deepEqual(
+    CardNetworkNames.unknownOf(['visa', 'Mastercad', 'MASTERCARD', 'american_express', 'Diners']),
+    ['Mastercad'],
+  );
+});
+
+test('a session the form cannot use makes the settings log an error, which goes out at once', () => {
+  for (const status of ['invalid', 'expired']) {
+    assert.equal(VaultLogValues.isUnusableSession(status), true, status);
+  }
+  // No session yet is not an error: a form can mount before its session arrives.
+  for (const status of ['valid', 'consumed', 'absent']) {
+    assert.equal(VaultLogValues.isUnusableSession(status), false, status);
+  }
+  const logger = VaultLogger.make(LOG_URL, 'ios');
+  VaultLogger.setLogInfo(logger, '{}', 'PAYMENT_ELEMENT_OPTIONS', '', '', undefined, 'ERROR');
+  assert.equal(batches.length, 1);
+  const [options] = batches[0];
+  assert.equal(options.event_name, 'PAYMENT_ELEMENT_OPTIONS');
+  assert.equal(options.log_type, 'ERROR');
+  assert.equal(options.category, 'USER_EVENT');
+  assert.equal(options.latency, '');
+});
+
+test('a crash is a USER_ERROR sent at once, with the component and the exception', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  VaultLogger.logCrash(
+    logger,
+    new TypeError('Cannot read properties of undefined'),
+    'cardNumber',
+    PUBLISHABLE_KEY,
+    SESSION_ID,
+  );
+  assert.equal(batches.length, 1);
+  const [crash] = batches[0];
+  assert.equal(crash.event_name, 'SDK_CRASH');
+  assert.equal(crash.log_type, 'ERROR');
+  assert.equal(crash.category, 'USER_ERROR');
+  assert.equal(crash.merchant_id, PUBLISHABLE_KEY);
+  assert.equal(crash.payment_id, SESSION_ID);
+  const value = JSON.parse(crash.value);
+  assert.equal(value.componentName, 'cardNumber');
+  assert.equal(value.message, 'Cannot read properties of undefined');
+  assert.equal(value.type, 'TypeError');
+  assert.equal(typeof value.stack, 'string');
+});
+
+test('a crash that throws something other than an Error logs the value itself', () => {
+  const logger = VaultLogger.make(LOG_URL, 'android');
+  VaultLogger.logCrash(logger, 'boom', 'cardCvc', PUBLISHABLE_KEY, SESSION_ID);
+  VaultLogger.logCrash(logger, null, 'cardExpiry', PUBLISHABLE_KEY, SESSION_ID);
+  assert.deepEqual(
+    logs().map(log => JSON.parse(log.value)),
+    [
+      { thrown: 'boom', componentName: 'cardCvc' },
+      { thrown: null, componentName: 'cardExpiry' },
+    ],
+  );
+});
+
+test('a crash rendered again with another stack has the same signature, so it is logged once', () => {
+  const first = new Error('render failed');
+  const retried = new Error('render failed');
+  retried.stack = `${retried.stack}\n    at a React retry frame`;
+  assert.notEqual(first.stack, retried.stack);
+  assert.equal(VaultLogger.crashSignature(first), VaultLogger.crashSignature(retried));
+  assert.notEqual(
+    VaultLogger.crashSignature(first),
+    VaultLogger.crashSignature(new TypeError('render failed')),
+  );
+  assert.notEqual(VaultLogger.crashSignature('boom'), VaultLogger.crashSignature('bang'));
+});
+
+test('the crash boundary logs a crash, then throws the very same value on', () => {
+  const thrownBy = render => {
+    try {
+      render();
+    } catch (thrown) {
+      return { thrown };
+    }
+    return undefined;
+  };
+  for (const thrown of [new Error('render failed'), 'boom', undefined]) {
+    const reported = [];
+    const boundary = new VaultCrashBoundary({
+      onCrash: value => reported.push(value),
+      children: 'fields',
+    });
+    assert.equal(boundary.render(), 'fields');
+    boundary.state = VaultCrashBoundary.getDerivedStateFromError(thrown);
+    assert.deepEqual(thrownBy(() => boundary.render()), { thrown });
+    assert.equal(reported.length, 1);
+    assert.equal(reported[0], thrown);
+  }
+});
+
+test('a crash log that fails does not change what the boundary throws', () => {
+  const thrown = new Error('render failed');
+  const boundary = new VaultCrashBoundary({
+    onCrash: () => {
+      throw new Error('logging failed');
+    },
+    children: null,
+  });
+  boundary.state = VaultCrashBoundary.getDerivedStateFromError(thrown);
+  assert.throws(() => boundary.render(), error => error === thrown);
 });
