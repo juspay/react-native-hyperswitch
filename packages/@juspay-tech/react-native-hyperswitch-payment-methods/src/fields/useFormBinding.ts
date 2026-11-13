@@ -31,5 +31,6 @@ export function useFormBinding(
     reportChange: core.reportChange,
     registerField: core.registerField,
     forgetField: core.forgetField,
+    ...(core.log ? { log: core.log } : {}),
   };
 }

@@ -15,8 +15,11 @@ import type { FormContextValue } from './FormContext';
 import { createFormSession } from './formSession';
 import type { CreateFormSessionOptions } from './formSession';
 import { registerForm } from './formRegistry';
-import { resolveAdapter } from '../providers/registry';
+import { isMissingSdkError, resolveAdapter } from '../providers/registry';
 import { SessionContext } from '../session/SessionContext';
+import { createFormLog } from '../logging/formLog';
+import type { FormProblem } from '../logging/formLog';
+import { LoggerContext } from '../logging/LoggerContext';
 import type { ProviderAdapter } from './ProviderAdapter';
 import { errorResult, tokenizedCardOf } from './results';
 import {
@@ -137,9 +140,31 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
     ref
   ) {
     const session = useContext(SessionContext);
+    const logger = useContext(LoggerContext);
 
     const details = vaultDetails ?? session?.vaultDetails;
     const vaultType = details?.vaultType;
+    const vaultTypeRef = useRef(vaultType);
+    vaultTypeRef.current = vaultType;
+
+    /* The form's logs, inside a session only. Read through a ref, so the callbacks the provider
+       and the app hold keep their identity. */
+    const readyTimeoutRef = useRef(readyTimeoutMs);
+    readyTimeoutRef.current = readyTimeoutMs;
+    const formLog = useMemo(
+      () => (logger ? createFormLog(logger) : undefined),
+      [logger]
+    );
+    const formLogRef = useRef(formLog);
+    formLogRef.current = formLog;
+    useEffect(() => {
+      if (!formLog) return;
+      formLog.created();
+      return () => formLog.deinitialized();
+    }, [formLog]);
+    /* Why the form failed, logged once the session's logger is there: it can arrive after the
+       provider has already answered. */
+    const problemRef = useRef<FormProblem | undefined>(undefined);
 
     const { adapter, resolveError } = useMemo(() => {
       if (!vaultType) {
@@ -290,28 +315,40 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
       [formSession, onError]
     );
 
+    const handleHostError = useCallback(
+      (error: unknown) => {
+        problemRef.current = 'provider_failed';
+        handleError(error);
+      },
+      [handleError]
+    );
+
     const tokenize = useCallback(
       async (providerData?: unknown): Promise<TokenizeResult> => {
-        const mounted = mountedRef.current;
+        const run = async (): Promise<TokenizeResult> => {
+          const mounted = mountedRef.current;
 
-        const problem = checkConfiguration(
-          vaultType,
-          mounted,
-          unresolvedRef.current
-        );
-        if (problem) return problem;
+          const problem = checkConfiguration(
+            vaultType,
+            mounted,
+            unresolvedRef.current
+          );
+          if (problem) return problem;
 
-        const result = await formSession.tokenize(providerData);
-        setStatus(formSession.status);
-        if (result.status !== 'success') return result;
+          const result = await formSession.tokenize(providerData);
+          setStatus(formSession.status);
+          if (result.status !== 'success') return result;
 
-        const card = tokenizedCardOf(detailsRef.current);
-        return withSavedCard(
-          card ? { ...result, card } : result,
-          savedCardOf(mounted)
-        );
+          const card = tokenizedCardOf(detailsRef.current);
+          return withSavedCard(
+            card ? { ...result, card } : result,
+            savedCardOf(mounted)
+          );
+        };
+        const log = formLogRef.current;
+        return log ? log.tokenize(vaultType, adapter, run) : run();
       },
-      [formSession, vaultType]
+      [formSession, vaultType, adapter]
     );
 
     useImperativeHandle(
@@ -332,9 +369,33 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
 
     useEffect(() => {
       if (!validated.ok && validated.error !== undefined) {
+        problemRef.current =
+          validated.error !== resolveError
+            ? 'invalid_vault_data'
+            : isMissingSdkError(resolveError)
+              ? 'missing_provider_package'
+              : 'no_adapter';
         handleError(validated.error);
       }
-    }, [validated, handleError]);
+    }, [validated, handleError, resolveError]);
+
+    /* The provider starts once the vault details are known, so a slow session lookup is not
+       counted against the form's readiness. */
+    const providerStarting = validated.ok && adapter !== null;
+    useEffect(() => {
+      if (formLog && providerStarting) {
+        formLog.providerStarting(readyTimeoutRef.current);
+      }
+    }, [formLog, providerStarting]);
+
+    useEffect(() => {
+      if (!formLog) return;
+      if (status === 'error') {
+        formLog.failed(problemRef.current ?? 'provider_failed');
+      } else if (collector !== undefined) {
+        formLog.ready(collector, vaultTypeRef.current);
+      }
+    }, [formLog, status, collector]);
 
     const appearances = useMemo<readonly Appearance[]>(() => {
       const layers: Appearance[] = [];
@@ -355,6 +416,7 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
         reportChange,
         registerField,
         forgetField,
+        log: formLog,
       }),
       [
         vaultType,
@@ -367,6 +429,7 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
         reportChange,
         registerField,
         forgetField,
+        formLog,
       ]
     );
 
@@ -378,7 +441,7 @@ export const CardForm = forwardRef<CardFormHandle, CardFormProps>(
           <Host
             vaultData={validated.value}
             onReady={handleReady}
-            onError={handleError}
+            onError={handleHostError}
             onCardDetails={handleCardDetails}
           >
             {children}

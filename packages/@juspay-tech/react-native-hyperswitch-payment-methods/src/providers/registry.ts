@@ -8,11 +8,27 @@ declare const require: (moduleId: string) => unknown;
 const registered = new Map<VaultType, ProviderAdapter>();
 const loaderCache = new Map<VaultType, ProviderAdapter>();
 
+/* The errors missingSdk made, so the logs can tell a missing package from an unknown vault type. */
+const missingSdkErrors = new WeakSet<Error>();
+
 function missingSdk(pkg: string): Error {
-  return new Error(
+  const error = new Error(
     `This vault_type needs the "${pkg}" package, which is not installed. ` +
       `Install it in your app (e.g. \`npm install ${pkg}\`) and rebuild.`
   );
+  missingSdkErrors.add(error);
+  return error;
+}
+
+export function isMissingSdkError(error: unknown): boolean {
+  return error instanceof Error && missingSdkErrors.has(error);
+}
+
+/* Whether the app registered this adapter itself, rather than one of the built-in providers. */
+export function isRegisteredAdapter(
+  adapter: ProviderAdapter | null | undefined
+): boolean {
+  return !!adapter && registered.get(adapter.vaultType) === adapter;
 }
 
 const loaders: Partial<Record<VaultType, AdapterLoader>> = {
