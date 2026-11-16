@@ -10,7 +10,6 @@ import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentManager
 import androidx.webkit.WebMessageCompat
@@ -33,6 +32,7 @@ import com.hyperswitchsdkreactnative.modules.NativeLog
 import io.hyperswitch.payments.GooglePayCallbackManager
 import io.hyperswitch.paymentsession.LaunchOptions
 import io.hyperswitch.paymentsession.PaymentSheetCallbackManager
+import io.hyperswitch.webview.utils.HSWebViewClient
 import io.hyperswitch.webview.utils.HSWebViewManagerImpl
 import io.hyperswitch.webview.utils.HSWebViewWrapper
 import java.io.ByteArrayInputStream
@@ -375,8 +375,7 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
         } finally {
           wrapper.webView.destroy()
         }
-      } catch (e: Exception) {
-        Log.e("HyperDDC", "cleanup error: ${e.message}")
+      } catch (_: Exception) {
       }
     }
 
@@ -416,8 +415,11 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
       webViewWrapper = resolvedWrapper
 
       manager.setJavaScriptEnabled(resolvedWrapper, true)
-      resolvedWrapper.webView.webViewClient = object : WebViewClient() {
+      /* The wrapper's own client keeps its common handling (SSL errors, auth, events); DDC only
+         adds its navigation rules and fails fast when the renderer dies. */
+      resolvedWrapper.webView.webViewClient = object : HSWebViewClient() {
         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+          super.onRenderProcessGone(view, detail)
           // A dead renderer's WebView must be destroyed without calling stopLoading().
           cleanupWebView(rendererGone = true)
           invokeCallback("")
@@ -434,7 +436,7 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
           if (request.isForMainFrame) {
             WebResourceResponse("text/plain", "UTF-8", ByteArrayInputStream(ByteArray(0)))
           } else {
-            null
+            super.shouldInterceptRequest(view, request)
           }
       }
       try {
