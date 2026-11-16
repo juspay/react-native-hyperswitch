@@ -156,7 +156,7 @@ class HyperFragment : ReactFragment() {
   }
 
   private fun getRootTag(): Int {
-    return reactDelegate.reactRootView?.rootViewTag ?: -1
+    return reactDelegate.reactRootView?.getRootViewTag() ?: -1
   }
 
   fun updatePaymentIntentInit(callback: (() -> Unit)?) {
