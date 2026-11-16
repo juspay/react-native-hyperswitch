@@ -1,0 +1,82 @@
+{
+  "name": "@juspay-tech/react-native-hyperswitch-airborne",
+  "version": "1.0.0",
+  "description": "React Native Hyperswitch Airborne OTA update companion library",
+  "main": "lib/commonjs/index",
+  "module": "lib/module/index",
+  "types": "lib/typescript/index.d.ts",
+  "react-native": "src/index",
+  "source": "src/index",
+  "files": [
+    "src",
+    "lib",
+    "android",
+    "ios",
+    "react-native.config.js",
+    "react-native-hyperswitch-airborne.podspec",
+    "!android/build",
+    "!ios/build",
+    "!**/__tests__"
+  ],
+  "scripts": {
+    "test": "jest",
+    "typescript": "tsc --noEmit",
+    "lint": "eslint \"**/*.{js,ts,tsx}\"",
+    "prepare": "bob build"
+  },
+  "keywords": [
+    "react-native",
+    "hyperswitch",
+    "airborne",
+    "ota",
+    "android",
+    "ios"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/juspay/react-native-hyperswitch",
+    "directory": "packages/@juspay-tech/react-native-hyperswitch-airborne"
+  },
+  "bugs": {
+    "url": "https://github.com/juspay/react-native-hyperswitch/issues"
+  },
+  "homepage": "https://hyperswitch.io",
+  "author": "Hyperswitch",
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-native": ">=0.76.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "react": "19.1.0",
+    "react-native": "0.81.1",
+    "react-native-builder-bob": "^0.40.13",
+    "typescript": "^5.9.2"
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      "commonjs",
+      "module",
+      [
+        "typescript",
+        {
+          "project": "tsconfig.build.json"
+        }
+      ]
+    ]
+  },
+  "codegenConfig": {
+    "name": "RNHyperswitchAirborneSpec",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "com.hyperswitchairborne"
+    }
+  }
+}
