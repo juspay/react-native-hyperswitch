@@ -145,12 +145,12 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
   // Method to launch Google Pay payment
   @ReactMethod
   override fun launchGPay(googlePayRequest: String, callBack: Callback) {
-    val activityName = currentActivity?.javaClass?.simpleName
+    val activityName = reactApplicationContext.currentActivity?.javaClass?.simpleName
     NativeLog.debug("wallet_launch_called", mapOf("wallet" to "google_pay", "activity" to activityName))
-    if (currentActivity == null) {
+    if (reactApplicationContext.currentActivity == null) {
       NativeLog.warning("wallet_launch_without_activity", mapOf("wallet" to "google_pay"))
     }
-    currentActivity?.let {
+    reactApplicationContext.currentActivity?.let {
       GooglePayCallbackManager.setCallback(
         it,
         googlePayRequest,
@@ -210,9 +210,9 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
     val isFragment = PaymentSheetCallbackManager.executeCallback(paymentResult)
     NativeLog.debug(
       "exit_payment_sheet_resolved",
-      mapOf("isFragment" to isFragment, "activityPresent" to (currentActivity != null))
+      mapOf("isFragment" to isFragment, "activityPresent" to (reactApplicationContext.currentActivity != null))
     )
-    (currentActivity as? FragmentActivity)?.let {
+    (reactApplicationContext.currentActivity as? FragmentActivity)?.let {
       if (isFragment) it.supportFragmentManager.findFragmentByTag("paymentSheet")
         ?.let { fragment ->
           it.supportFragmentManager.beginTransaction().hide(fragment)
@@ -363,7 +363,7 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
     }
 
     mainHandler.post {
-      val activity = currentActivity ?: run {
+      val activity = reactApplicationContext.currentActivity ?: run {
         invokeCallback("")
         return@post
       }

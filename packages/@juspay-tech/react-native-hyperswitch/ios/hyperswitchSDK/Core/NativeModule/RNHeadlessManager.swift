@@ -103,7 +103,7 @@ internal class RNHeadlessManager: RCTDefaultReactNativeFactoryDelegate, ReactHos
         }
     }
 
-    public override func bridgelessEnabled() -> Bool {
+    public func bridgelessEnabled() -> Bool {
         return true
     }
 

@@ -36,7 +36,7 @@ internal class RNFactoryDelegate: RCTDefaultReactNativeFactoryDelegate {
 
     internal weak var manager: ReactHostManager?
 
-    public override func bridgelessEnabled() -> Bool {
+    public func bridgelessEnabled() -> Bool {
         return true
     }
 
