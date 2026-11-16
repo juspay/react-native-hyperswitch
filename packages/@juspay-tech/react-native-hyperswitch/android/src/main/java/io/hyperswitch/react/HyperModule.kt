@@ -2,14 +2,20 @@ package io.hyperswitch.react
 
 import android.os.Handler
 import android.os.Looper
+import android.text.TextUtils
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentManager
+import androidx.webkit.WebMessageCompat
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Callback
 import com.facebook.react.bridge.ReactApplicationContext
@@ -29,6 +35,9 @@ import io.hyperswitch.paymentsession.LaunchOptions
 import io.hyperswitch.paymentsession.PaymentSheetCallbackManager
 import io.hyperswitch.webview.utils.HSWebViewManagerImpl
 import io.hyperswitch.webview.utils.HSWebViewWrapper
+import java.io.ByteArrayInputStream
+import java.net.URI
+import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import org.json.JSONObject
@@ -330,11 +339,23 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
 
   @ReactMethod
   override fun openIframeBridge(url: String, timeoutMs: Double, callback: Callback) {
-    if (timeoutMs <= 0) {
-      callback.invoke("")
-      return
+    fun webOrigin(value: String): String? {
+      return try {
+        val uri = URI(value)
+        val host = uri.host?.lowercase(Locale.ROOT) ?: return null
+        val scheme = uri.scheme?.lowercase(Locale.ROOT)
+        if ((scheme != "https" && scheme != "http") || uri.rawUserInfo != null ||
+          (uri.port != -1 && uri.port !in 1..65535)) return null
+        val defaultPort = if (scheme == "https") 443 else 80
+        val port = if (uri.port == -1 || uri.port == defaultPort) "" else ":${uri.port}"
+        "$scheme://$host$port"
+      } catch (_: Exception) {
+        null
+      }
     }
-    if (url.isBlank()) {
+
+    val iframeOrigin = webOrigin(url)
+    if (!timeoutMs.isFinite() || timeoutMs <= 0 || iframeOrigin == null) {
       callback.invoke("")
       return
     }
@@ -344,20 +365,25 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
     var webViewWrapper: HSWebViewWrapper? = null
     var timeoutRunnable: Runnable? = null
 
+    fun cleanupWebView(rendererGone: Boolean = false) {
+      val wrapper = webViewWrapper ?: return
+      webViewWrapper = null
+      try {
+        try {
+          (wrapper.parent as? ViewGroup)?.removeView(wrapper)
+          if (!rendererGone) wrapper.webView.stopLoading()
+        } finally {
+          wrapper.webView.destroy()
+        }
+      } catch (e: Exception) {
+        Log.e("HyperDDC", "cleanup error: ${e.message}")
+      }
+    }
+
     val invokeCallback = { redirectUrl: String ->
       if (callbackInvoked.compareAndSet(false, true)) {
         timeoutRunnable?.let { mainHandler.removeCallbacks(it) }
-        mainHandler.post {
-          webViewWrapper?.let { wrapper ->
-            try {
-              (wrapper.parent as? ViewGroup)?.removeView(wrapper)
-              wrapper.webView.stopLoading()
-              wrapper.webView.destroy()
-            } catch (_: Exception) {
-            }
-          }
-          webViewWrapper = null
-        }
+        mainHandler.post { cleanupWebView() }
         callback.invoke(redirectUrl)
       }
     }
@@ -374,6 +400,10 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
       repeat(2) { attempt ->
         if (wrapper != null) return@repeat
         try {
+          if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            invokeCallback("")
+            return@post
+          }
           wrapper = manager.createViewInstance()
         } catch (e: Exception) {
           if (attempt == 0) Thread.sleep(200)
@@ -383,32 +413,49 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
         invokeCallback("")
         return@post
       }
+      webViewWrapper = resolvedWrapper
 
       manager.setJavaScriptEnabled(resolvedWrapper, true)
-
-      val ddcBridge = object : Any() {
-        @android.webkit.JavascriptInterface
-        fun onMessage(data: String) {
-          invokeCallback(data)
-        }
-      }
-      resolvedWrapper.webView.addJavascriptInterface(ddcBridge, "HyperDDCBridge")
-
       resolvedWrapper.webView.webViewClient = object : WebViewClient() {
-        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-          if (request.isForMainFrame) {
-            val url = request.url.toString()
-            invokeCallback("{\"next_action\":{\"type\":\"redirect_to_url\",\"url\":\"$url\"}}")
-            return true
-          }
-          return false
-        }
-
-        @Suppress("DEPRECATION")
-        override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-          invokeCallback("{\"next_action\":{\"type\":\"redirect_to_url\",\"url\":\"$url\"}}")
+        override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+          // A dead renderer's WebView must be destroyed without calling stopLoading().
+          cleanupWebView(rendererGone = true)
+          invokeCallback("")
           return true
         }
+
+        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
+          request.isForMainFrame
+
+        @Deprecated("Deprecated in Java")
+        override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean = true
+
+        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
+          if (request.isForMainFrame) {
+            WebResourceResponse("text/plain", "UTF-8", ByteArrayInputStream(ByteArray(0)))
+          } else {
+            null
+          }
+      }
+      try {
+        WebViewCompat.addWebMessageListener(
+          resolvedWrapper.webView, "HyperDDCBridge", setOf(iframeOrigin),
+        ) { _, message, sourceOrigin, isMainFrame, _ ->
+          if (!isMainFrame || webOrigin(sourceOrigin.toString()) != iframeOrigin ||
+            message.type != WebMessageCompat.TYPE_STRING) return@addWebMessageListener
+          val data = message.data ?: return@addWebMessageListener
+          val json = try { JSONObject(data) } catch (_: Exception) { return@addWebMessageListener }
+          // As on web: any message carrying next_action settles DDC, failing unless it is an http(s) redirect.
+          if (!json.has("next_action")) return@addWebMessageListener
+          val action = json.optJSONObject("next_action")
+          val redirect = action?.opt("url") as? String
+          val isValidRedirect = action?.opt("type") == "redirect_to_url" &&
+            redirect != null && webOrigin(redirect) != null
+          invokeCallback(if (isValidRedirect) json.toString() else "")
+        }
+      } catch (_: Exception) {
+        invokeCallback("")
+        return@post
       }
 
       resolvedWrapper.apply {
@@ -421,19 +468,22 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
       }
 
       activity.findViewById<ViewGroup>(android.R.id.content).addView(resolvedWrapper)
-      webViewWrapper = resolvedWrapper
 
       val wrapperHtml = """
-                <html><body>
-                <iframe src="$url" style="display:none;width:1px;height:1px;"></iframe>
-                <script>
-                window.addEventListener('message', function(event) {
-                  var str = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
-                  try { HyperDDCBridge.onMessage(str); } catch(e) {}
-                });
-                </script>
-                </body></html>
-            """.trimIndent()
+        <html><body>
+        <iframe id="ddc-frame" src="${TextUtils.htmlEncode(url)}" style="display:none;width:1px;height:1px;"></iframe>
+        <script>
+        window.addEventListener('message', function(event) {
+         if (event.source !== document.getElementById('ddc-frame').contentWindow ||
+           event.origin !== ${JSONObject.quote(iframeOrigin)}) return;
+         try {
+          var str = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
+          if (typeof str === 'string') HyperDDCBridge.postMessage(str);
+         } catch(e) {}
+        });
+        </script>
+        </body></html>
+      """.trimIndent()
       resolvedWrapper.webView.loadDataWithBaseURL(url, wrapperHtml, "text/html", "UTF-8", null)
 
       timeoutRunnable = Runnable { invokeCallback("") }.also {
