@@ -25,9 +25,9 @@ enum HyperBundleResolver {
     static func bundleURL(for bundleClass: AnyClass) -> URL? {
         let legacyURL = Bundle(for: bundleClass).url(forResource: "hyperswitch", withExtension: "bundle")
 
-        #if canImport(HyperOTA)
-            return OTAServices.shared.getBundleURL()
-        #else
+        // #if canImport(HyperOTA)
+        //     // return OTAServices.shared.getBundleURL()
+        // #else
             // Detect merchant app's React Native version.
             guard let rnVersion = RCTGetReactNativeVersion() else {
                 return legacyURL
@@ -51,6 +51,6 @@ enum HyperBundleResolver {
             }
 
             return Bundle(for: bundleClass).url(forResource: bundleName, withExtension: "bundle") ?? legacyURL
-        #endif
+        // #endif
     }
 }

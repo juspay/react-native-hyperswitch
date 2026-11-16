@@ -39,7 +39,7 @@ public class PaymentSession {
         if let hyperswitchConfiguration = hyperswitchConfiguration {
             NativeLog.debug("sdk_initialised", ["environment": hyperswitchConfiguration.environment?.rawValue])
             #if canImport(HyperOTA)
-            OTAServices.shared.initialize(publishableKey: hyperswitchConfiguration.publishableKey)
+            // OTAServices.shared.initialize(publishableKey: hyperswitchConfiguration.publishableKey)
             LogManager.initialize(
                 publishableKey: hyperswitchConfiguration.publishableKey,
                 environment: hyperswitchConfiguration.environment,

@@ -70,36 +70,36 @@ object ReactNativeController {
    * @return Path to the JS bundle (OTA or bundled asset)
    */
   private fun getBundleFromAirborne(application: Application): String {
-    try {
-//            val environment = SDKEnvironment.PROD
-      // TODO: change this to ENV check based on the Configuration.
-      val airborneUrl = application.getString(
-        R.string.hyperOTAEndPoint
-      )
+//     try {
+// //            val environment = SDKEnvironment.PROD
+//       // TODO: change this to ENV check based on the Configuration.
+//       val airborneUrl = application.getString(
+//         R.string.hyperOTAEndPoint
+//       )
 
-      // Ensure OTA endpoint is valid
-      if (airborneUrl != "hyperOTA_END_POINT_") {
-        val airborneClass =
-          Class.forName("io.hyperswitch.airborne.AirborneOTA")
+//       // Ensure OTA endpoint is valid
+//       if (airborneUrl != "hyperOTA_END_POINT_") {
+//         val airborneClass =
+//           Class.forName("io.hyperswitch.airborne.AirborneOTA")
 
-        val constructor = airborneClass.getConstructor(
-          Context::class.java,
-          String::class.java,
-          String::class.java
-        )
+//         val constructor = airborneClass.getConstructor(
+//           Context::class.java,
+//           String::class.java,
+//           String::class.java
+//         )
 
-        val instance = constructor.newInstance(
-          application.applicationContext,
-          BuildConfig.VERSION_NAME,
-          airborneUrl
-        )
+//         val instance = constructor.newInstance(
+//           application.applicationContext,
+//           BuildConfig.VERSION_NAME,
+//           airborneUrl
+//         )
 
-        val getBundlePath =
-          airborneClass.getMethod("getBundlePath")
-        return getBundlePath.invoke(instance) as String
-      }
-    } catch (_: Exception) {
-    }
+//         val getBundlePath =
+//           airborneClass.getMethod("getBundlePath")
+//         return getBundlePath.invoke(instance) as String
+//       }
+//     } catch (_: Exception) {
+//     }
     return "assets://hyperswitch.bundle"
   }
 
