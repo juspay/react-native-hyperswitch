@@ -10,6 +10,7 @@ import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentManager
 import androidx.webkit.WebMessageCompat
@@ -32,7 +33,6 @@ import com.hyperswitchsdkreactnative.modules.NativeLog
 import io.hyperswitch.payments.GooglePayCallbackManager
 import io.hyperswitch.paymentsession.LaunchOptions
 import io.hyperswitch.paymentsession.PaymentSheetCallbackManager
-import io.hyperswitch.webview.utils.HSWebViewClient
 import io.hyperswitch.webview.utils.HSWebViewManagerImpl
 import io.hyperswitch.webview.utils.HSWebViewWrapper
 import java.io.ByteArrayInputStream
@@ -415,11 +415,8 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
       webViewWrapper = resolvedWrapper
 
       manager.setJavaScriptEnabled(resolvedWrapper, true)
-      /* The wrapper's own client keeps its common handling (SSL errors, auth, events); DDC only
-         adds its navigation rules and fails fast when the renderer dies. */
-      resolvedWrapper.webView.webViewClient = object : HSWebViewClient() {
+      resolvedWrapper.webView.webViewClient = object : WebViewClient() {
         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
-          super.onRenderProcessGone(view, detail)
           // A dead renderer's WebView must be destroyed without calling stopLoading().
           cleanupWebView(rendererGone = true)
           invokeCallback("")
@@ -432,11 +429,12 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
         @Deprecated("Deprecated in Java")
         override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean = true
 
+        // Backstop for top-level navigations shouldOverrideUrlLoading never sees (e.g. POST form submits).
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
           if (request.isForMainFrame) {
             WebResourceResponse("text/plain", "UTF-8", ByteArrayInputStream(ByteArray(0)))
           } else {
-            super.shouldInterceptRequest(view, request)
+            null
           }
       }
       try {
