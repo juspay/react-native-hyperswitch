@@ -33,7 +33,7 @@ final internal class HeadlessWebView: NSObject, WKNavigationDelegate, WKUIDelega
     }
 
     /// Normalised `scheme://host[:port]` for https URLs without user info; nil for anything else.
-    static func webOrigin(_ value: String) -> String? {
+    private static func webOrigin(_ value: String) -> String? {
         guard let components = URLComponents(string: value),
               let scheme = components.scheme?.lowercased(),
               scheme == "https",
