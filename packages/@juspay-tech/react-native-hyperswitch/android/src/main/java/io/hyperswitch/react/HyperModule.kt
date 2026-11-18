@@ -320,7 +320,8 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
 
   @ReactMethod
   override fun openIframeBridge(url: String, timeoutMs: Double, callback: Callback) {
-    HiddenIframe { currentActivity }.open(url, timeoutMs) { callback.invoke(it) }
+    val activity = currentActivity ?: return callback.invoke("")
+    HiddenIframe(activity).open(url, timeoutMs) { callback.invoke(it) }
   }
 
   private fun findViewWithRootTag(rootTag: Int, onFound: (HyperFragment?) -> Unit) {
