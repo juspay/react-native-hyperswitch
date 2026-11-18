@@ -32,11 +32,11 @@ final internal class HeadlessWebView: NSObject, WKNavigationDelegate, WKUIDelega
         if !callbackInvoked { callback([""]) }
     }
 
-    /// Normalised `scheme://host[:port]` for http(s) URLs without user info; nil for anything else.
+    /// Normalised `scheme://host[:port]` for https URLs without user info; nil for anything else.
     static func webOrigin(_ value: String) -> String? {
         guard let components = URLComponents(string: value),
               let scheme = components.scheme?.lowercased(),
-              scheme == "https" || scheme == "http",
+              scheme == "https",
               let host = components.host?.lowercased(), !host.isEmpty,
               components.user == nil, components.password == nil
         else { return nil }
@@ -45,15 +45,14 @@ final internal class HeadlessWebView: NSObject, WKNavigationDelegate, WKUIDelega
 
     private static func origin(scheme: String, host: String, port: Int?) -> String? {
         if let port = port, !(1...65535).contains(port) { return nil }
-        let defaultPort = scheme == "https" ? 443 : 80
-        let portSuffix = (port == nil || port == defaultPort) ? "" : ":\(port!)"
+        let portSuffix = (port == nil || port == 443) ? "" : ":\(port!)"
         let formattedHost = host.contains(":") && !host.hasPrefix("[") ? "[\(host)]" : host
         return "\(scheme)://\(formattedHost)\(portSuffix)"
     }
 
     private static func origin(of securityOrigin: WKSecurityOrigin) -> String? {
         let scheme = securityOrigin.protocol.lowercased()
-        guard scheme == "https" || scheme == "http", !securityOrigin.host.isEmpty else { return nil }
+        guard scheme == "https", !securityOrigin.host.isEmpty else { return nil }
         return origin(scheme: scheme, host: securityOrigin.host.lowercased(),
                       port: securityOrigin.port == 0 ? nil : securityOrigin.port)
     }
@@ -115,7 +114,7 @@ final internal class HeadlessWebView: NSObject, WKNavigationDelegate, WKUIDelega
 
         let baseHtml = """
                 <html><body>
-                <iframe id="ddc-frame" src="\(HeadlessWebView.htmlEscape(url))" style="display:none;width:1px;height:1px;"></iframe>
+                <iframe id="ddc-frame" src="\(HeadlessWebView.htmlEscape(baseURL.absoluteString))" style="display:none;width:1px;height:1px;"></iframe>
                 <script>
                 window.addEventListener('message', function(event) {
                   if (event.source !== document.getElementById('ddc-frame').contentWindow ||
@@ -165,7 +164,7 @@ final internal class HeadlessWebView: NSObject, WKNavigationDelegate, WKUIDelega
               let data = body.data(using: .utf8),
               let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         else { return }
-        // As on web: any message carrying next_action settles DDC, failing unless it is an http(s) redirect.
+        // Any message carrying next_action settles DDC, failing unless it is an https redirect (web also allows http).
         guard json["next_action"] != nil else { return }
         let action = json["next_action"] as? [String: Any]
         let redirect = action?["url"] as? String
