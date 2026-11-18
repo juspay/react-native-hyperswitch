@@ -20,7 +20,7 @@ import com.hyperswitchsdkreactnative.modules.NativeLog
 import io.hyperswitch.payments.GooglePayCallbackManager
 import io.hyperswitch.paymentsession.LaunchOptions
 import io.hyperswitch.paymentsession.PaymentSheetCallbackManager
-import io.hyperswitch.webview.utils.DeviceDataCollector
+import io.hyperswitch.webview.utils.HiddenIframe
 import java.util.concurrent.atomic.AtomicInteger
 import org.json.JSONObject
 
@@ -320,7 +320,7 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
 
   @ReactMethod
   override fun openIframeBridge(url: String, timeoutMs: Double, callback: Callback) {
-    DeviceDataCollector.open({ currentActivity }, url, timeoutMs) { callback.invoke(it) }
+    HiddenIframe { currentActivity }.open(url, timeoutMs) { callback.invoke(it) }
   }
 
   private fun findViewWithRootTag(rootTag: Int, onFound: (HyperFragment?) -> Unit) {
