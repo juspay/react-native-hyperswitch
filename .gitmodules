@@ -1,3 +1,0 @@
-[submodule "packages/@juspay-tech/react-native-hyperswitch-vault/shared-code"]
-	path = packages/@juspay-tech/react-native-hyperswitch-vault/shared-code
-	url = https://github.com/juspay/hyperswitch-sdk-utils.git
