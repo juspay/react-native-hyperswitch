@@ -163,6 +163,68 @@ export declare const createCardForm: (
   config?: Partial<Omit<CardFormProps, 'children'>>
 ) => CardFormInstance;
 
+/*
+ * What a detached form takes: every <CardForm> setting a merchant can pass, with the same defaults.
+ * `environment` also accepts the web's lowercase names, and is optional (PROD when left out).
+ */
+export type DetachedCardFormConfig = Partial<
+  Pick<
+    CardFormProps,
+    | 'session'
+    | 'sdkAuthorization'
+    | 'vaultDetails'
+    | 'customEndpoints'
+    | 'locale'
+    | 'localisation'
+    | 'appearance'
+    | 'disabled'
+    | 'accessible'
+    | 'enabledCardSchemes'
+    | 'cardholderName'
+    | 'unstyled'
+    | 'onReady'
+    | 'onChange'
+  >
+> & {
+  readonly environment?:
+    | CardFormProps['environment']
+    | 'prod'
+    | 'prod_eu'
+    | 'sandbox'
+    | 'integ';
+};
+
+/*
+ * A card form whose fields are not its children: render `Host` once, and each field inside a
+ * `Field` in whatever React root it lives in. The handle carries no card data.
+ */
+export type DetachedCardFormInstance = {
+  readonly Host: React.ComponentType;
+  readonly Field: React.ComponentType<{ children: React.ReactNode }>;
+
+  tokenize(): Promise<VaultTokenizeResult>;
+  reset(): void;
+  focus(field: VaultField): void;
+
+  /*
+   * What a prop change is to a <CardForm>. Merges over the settings so far; a key set to
+   * `undefined` returns to its default. Every root re-renders, and the card is kept.
+   */
+  update(changes: DetachedCardFormConfig): void;
+
+  getState(): VaultCardFormChange | null;
+
+  on(event: 'ready', listener: (event: VaultCardFormEvent) => void): () => void;
+  on(
+    event: 'change',
+    listener: (event: VaultCardFormChange) => void
+  ): () => void;
+};
+
+export declare const createDetachedCardForm: (
+  config?: DetachedCardFormConfig
+) => DetachedCardFormInstance;
+
 export type VaultFieldStyles = fieldStyles;
 export type VaultCardNumberStyles = fieldStyles;
 export type VaultCardExpiryStyles = expiryStyles;
