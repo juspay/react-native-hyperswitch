@@ -23,6 +23,14 @@ type host = {
 
 let useHost = (
   ~store: option<VaultCardStore.t>=?,
+  // A detached form's roots each run this hook over one store. These three keep its logs one form's:
+  // `loggerFor` hands every root the same logger; only the Host root (`ownsFormLogs`) logs what
+  // belongs to the form as a whole; and `fieldsSettleMs` is how long its settings log waits after
+  // the last field arrived, because its fields mount in roots of their own, one after another,
+  // where a <CardForm>'s arrive in one commit. A <CardForm> passes none of them.
+  ~loggerFor: option<(~url: option<string>, ~platform: string) => VaultLogger.t>=?,
+  ~ownsFormLogs: bool=true,
+  ~fieldsSettleMs: int=0,
   ~session: option<JSON.t>,
 
   ~sdkAuthorization: option<string>,
@@ -71,17 +79,20 @@ let useHost = (
   | Ready({authorization}) => authorization
   | Unusable(_) => ""
   }
-  let logger = React.useMemo1(
-    () => VaultLogger.make(~url=loggingUrl, ~platform=(ReactNative.Platform.os :> string)),
-    [loggingUrl],
-  )
+  let logger = React.useMemo1(() => {
+    let platform = (ReactNative.Platform.os :> string)
+    switch loggerFor {
+    | Some(shared) => shared(~url=loggingUrl, ~platform)
+    | None => VaultLogger.make(~url=loggingUrl, ~platform)
+    }
+  }, [loggingUrl])
   // A session that replaces another starts the logger afresh, as web loads its frames afresh for
   // each. The first session to arrive does not: what the customer did before it keeps its session_id.
   let lastResolvedSdkAuthorizationRef = React.useRef("")
   React.useEffect2(() => {
     if resolvedSdkAuthorization !== "" {
       let previous = lastResolvedSdkAuthorizationRef.current
-      if previous !== "" && previous !== resolvedSdkAuthorization {
+      if ownsFormLogs && previous !== "" && previous !== resolvedSdkAuthorization {
         logger->VaultLogger.startNewSession
       }
       lastResolvedSdkAuthorizationRef.current = resolvedSdkAuthorization
@@ -332,13 +343,14 @@ let useHost = (
           ~paymentId,
         )
       }
-    if loggedSessionStatus === "consumed" || loggedSettingsRef.current === key {
+    if !ownsFormLogs || loggedSessionStatus === "consumed" || loggedSettingsRef.current === key {
       None
-    } else if hasFields {
+    } else if hasFields && fieldsSettleMs <= 0 {
       logSettings()
       None
     } else {
-      let timer = setTimeout(logSettings, 1000)
+      // Restarted by every change to `settings`, so a field that arrives resets the wait.
+      let timer = setTimeout(logSettings, hasFields ? fieldsSettleMs : 1000)
       Some(() => clearTimeout(timer))
     }
   }, (settings, resolvedSdkAuthorization, logger, hasFields))
@@ -420,7 +432,9 @@ let useHost = (
   // Once per logger session, as web logs it once per frame.
   let coBadgedLoggedInRef = React.useRef("")
   React.useEffect3(() => {
-    if controller.values.isCoBadged && coBadgedLoggedInRef.current !== logger.sessionId {
+    if (
+      ownsFormLogs && controller.values.isCoBadged && coBadgedLoggedInRef.current !== logger.sessionId
+    ) {
       coBadgedLoggedInRef.current = logger.sessionId
       logUserEvent(~eventName=CARD_SCHEME_SELECTION, ~value="Card detected as co-badged")
     }
