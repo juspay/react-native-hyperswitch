@@ -5,9 +5,8 @@
  * there executes). The two must agree; `scripts/verify-public-surface.mjs` fails the build if they
  * drift.
  *
- * Everything below is a binding over the ReScript components. No wrapper component: a wrapper
- * would break `===` identity, add a render frame, and give React.memo and devtools a second name
- * for the same thing.
+ * The form and the fields are small choosers over the ReScript components (see below): one render
+ * frame that decides where the field runs. Everything else is a direct binding.
  *
  * The names are the web SDK's: `cardNumber`, `cardExpiry`, `cardCvc` become `CardNumberField`,
  * `CardExpiryField`, `CardCVCField`. The legacy `*Widget` spellings, the `HyperswitchVault`
@@ -16,19 +15,27 @@
  */
 
 import { make as HyperswitchVaultFormImpl } from './HyperswitchVaultForm.bs.js';
-import { make as CardFormImpl } from './CardForm.bs.js';
-import { make as CardNumberFieldImpl } from './CardNumberField.bs.js';
-import { make as CardExpiryFieldImpl } from './CardExpiryField.bs.js';
-import { make as CardCVCFieldImpl } from './CardCVCField.bs.js';
-import { make as CardholderNameFieldImpl } from './CardholderNameField.bs.js';
+import {
+  CardForm as CardFormChooser,
+  CardNumberField as CardNumberFieldChooser,
+  CardExpiryField as CardExpiryFieldChooser,
+  CardCVCField as CardCVCFieldChooser,
+  CardholderNameField as CardholderNameFieldChooser,
+} from './native/choosers.mjs';
 import { createCardForm as createCardFormImpl } from './createCardForm.mjs';
 import { createDetachedCardForm as createDetachedCardFormImpl } from './createDetachedCardForm.mjs';
 
-export const CardForm = CardFormImpl;
-export const CardNumberField = CardNumberFieldImpl;
-export const CardExpiryField = CardExpiryFieldImpl;
-export const CardCVCField = CardCVCFieldImpl;
-export const CardholderNameField = CardholderNameFieldImpl;
+/*
+ * The form and its fields choose, when they render, between the native path (each field a native
+ * view whose content runs in the vault's own engine) and the plain JavaScript one. The choice and
+ * its rule are in ./native/choosers.mjs and ./native/availability.mjs. The names, props, events and
+ * handles are the same on both paths.
+ */
+export const CardForm = CardFormChooser;
+export const CardNumberField = CardNumberFieldChooser;
+export const CardExpiryField = CardExpiryFieldChooser;
+export const CardCVCField = CardCVCFieldChooser;
+export const CardholderNameField = CardholderNameFieldChooser;
 
 /* The ready-made form: the same provider with the four fields laid out by the library. */
 export const HyperswitchVaultForm = HyperswitchVaultFormImpl;
