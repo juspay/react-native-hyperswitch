@@ -38,6 +38,8 @@
     "dist/types/**",
     "dist/assets/**",
     "android",
+    "ios",
+    "react-native-hyperswitch-vault.podspec",
     "src/specs",
     "react-native.config.js",
     "BUNDLE-PROVENANCE.md",
@@ -55,6 +57,15 @@
     "jsSrcsDir": "src/specs",
     "android": {
       "javaPackageName": "io.hyperswitch.vault"
+    },
+    "ios": {
+      "modulesProvider": {
+        "HyperswitchVaultForms": "HyperswitchVaultFormsModule",
+        "HyperswitchVaultHosted": "HyperswitchVaultHostedModule"
+      },
+      "componentProvider": {
+        "HyperswitchVaultFieldView": "HyperswitchVaultFieldView"
+      }
     }
   },
   "engines": {
