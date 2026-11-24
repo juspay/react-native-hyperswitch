@@ -75,9 +75,9 @@ class ReactNativeHyperswitchModule(reactContext: ReactApplicationContext) :
 
   /**
    * Accepts the same spellings as the iOS module ("PROD"/"PRODUCTION", "SANDBOX", "INTEG",
-   * case-insensitive). Anything else yields null (SDK picks the environment from the
-   * publishable key) instead of throwing from `valueOf`.
+   * case-insensitive).
    */
+  // By design, absent or unrecognized environment values use PROD as the default; merchants must explicitly select a test environment.
   private fun parseEnvironment(value: String?): HyperswitchEnvironment? =
     when (value?.trim()?.uppercase()) {
       "PROD", "PRODUCTION" -> HyperswitchEnvironment.PROD

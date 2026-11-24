@@ -10,6 +10,7 @@ import React
 
 extension PaymentSession {
 
+    // By design, shared bridge completion state assumes one active payment flow at a time; overlapping flows are unsupported.
     private static var hasResponded: Bool = false
     internal static var headlessCompletion: ((PaymentSessionHandler) -> Void)?
     internal static var walletCompletion: ((WalletSessionHandler) -> Void)?
