@@ -168,3 +168,57 @@ let buildFinalPaymentMethodData = (
   cardSubtree->Option.forEach(((key, value)) => out->Dict.set(key, value))
   out->Dict.toArray->Array.length > 0 ? Some(out->JSON.Encode.object) : None
 }
+
+type jsDate
+@new external dateNow: unit => jsDate = "Date"
+@send external dateToISOString: jsDate => string = "toISOString"
+
+@genType
+type acceptanceType = [#online | #offline]
+
+@genType
+type hostOnlineAcceptance = {userAgent?: string}
+
+@genType
+type hostCustomerAcceptance = {
+  acceptanceType: acceptanceType,
+  acceptedAt: string,
+  online: hostOnlineAcceptance,
+}
+
+let acceptanceTypeToWire = (value: acceptanceType) =>
+  switch value {
+  | #online => "online"
+  | #offline => "offline"
+  }
+
+let encodeCustomerAcceptance = (acceptance: hostCustomerAcceptance): JSON.t => {
+  let online =
+    objectOf([entry("user_agent", acceptance.online.userAgent)])
+    ->Option.getOr(Dict.make()->JSON.Encode.object)
+
+  [
+    ("acceptance_type", acceptance.acceptanceType->acceptanceTypeToWire->JSON.Encode.string),
+    ("accepted_at", acceptance.acceptedAt->JSON.Encode.string),
+    ("online", online),
+  ]
+  ->Dict.fromArray
+  ->JSON.Encode.object
+}
+
+/* The platform's device browser string — no navigator in React Native, so the
+   SDK owns a faithful stand-in (mirrors the SDK's payments acceptance builder). */
+let nativeUserAgent = () =>
+  switch ReactNative.Platform.os {
+  | #ios => "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
+  | #android => "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
+  | _ => ""
+  }
+
+/* PMM parity with the web SDK: the management save always stamps
+   `customer_acceptance` at the moment of save. */
+let acceptanceNow = (~userAgent: option<string>): hostCustomerAcceptance => {
+  acceptanceType: #online,
+  acceptedAt: dateNow()->dateToISOString,
+  online: {userAgent: ?userAgent},
+}

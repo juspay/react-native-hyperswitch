@@ -107,7 +107,7 @@ type eligibilityConfig = {
 @genType
 type vaultFormHandle = {
 
-  tokenize: unit => promise<vaultTokenizeResult>,
+  tokenize: option<VaultPaymentMethodData.hostPaymentMethodData> => promise<vaultTokenizeResult>,
 
   confirmPayment: paymentConfirmInput => promise<vaultPaymentResult>,
   reset: unit => unit,

@@ -74,10 +74,11 @@ export function createCardForm(config = {}) {
 
   return {
     Form,
-    /* The only route to a token. Refuses, never throws, when nothing is mounted. */
-    tokenize: () =>
+    /* The only route to a token. Refuses, never throws, when nothing is mounted.
+     * `paymentMethodData` (e.g. { nickName }) is forwarded to the confirm call. */
+    tokenize: (paymentMethodData) =>
       ref.current
-        ? ref.current.tokenize()
+        ? ref.current.tokenize(paymentMethodData)
         : Promise.resolve(tokenizeIncompleteFieldSet(incompleteFieldSetMessage)),
     reset: () => {
       if (ref.current) ref.current.reset();

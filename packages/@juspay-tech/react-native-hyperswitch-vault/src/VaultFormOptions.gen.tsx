@@ -9,6 +9,8 @@ import type {brandIconMode as CardIcons_brandIconMode} from './CardIcons.gen';
 
 import type {elementType as VaultPublicState_elementType} from './VaultPublicState.gen';
 
+import type {hostPaymentMethodData as VaultPaymentMethodData_hostPaymentMethodData} from './VaultPaymentMethodData.gen';
+
 import type {labelBehavior as CardFieldOptions_labelBehavior} from './CardFieldOptions.gen';
 
 import type {paymentConfirmInput as VaultFormCoordinator_paymentConfirmInput} from './VaultFormCoordinator.gen';
@@ -101,7 +103,7 @@ export type eligibilityConfig = {
 };
 
 export type vaultFormHandle = {
-  readonly tokenize: () => Promise<vaultTokenizeResult>; 
+  readonly tokenize: (_1:(undefined | VaultPaymentMethodData_hostPaymentMethodData)) => Promise<vaultTokenizeResult>; 
   readonly confirmPayment: (_1:paymentConfirmInput) => Promise<vaultPaymentResult>; 
   readonly reset: () => void; 
   readonly focus: (_1:vaultField) => void
