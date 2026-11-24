@@ -13,3 +13,9 @@ lib/
 
 node_modules/
 .DS_Store
+
+# The hosted bundle's toolchain and its intermediate build. The bundles themselves are tracked.
+bundle/build/
+bundle/node_modules/
+# The monorepo ignores package-lock.json (it uses yarn). This one is the toolchain's pin: keep it.
+!bundle/package-lock.json

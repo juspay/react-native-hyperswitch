@@ -11,7 +11,7 @@
  */
 
 /* The <CardForm> settings a detached form reads. The two callbacks are kept apart: see callbacks(). */
-const SETTINGS = [
+export const SETTINGS = [
   'session',
   'sdkAuthorization',
   'vaultDetails',
