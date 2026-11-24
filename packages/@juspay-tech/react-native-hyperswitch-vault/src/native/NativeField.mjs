@@ -8,6 +8,7 @@ import * as React from 'react';
 import { StyleSheet } from 'react-native';
 import { FieldEvent } from '../hosted/protocol.mjs';
 import { VaultFieldView } from './fieldView.mjs';
+import * as focus from './focus.mjs';
 import { fieldOut, read } from './out.mjs';
 
 /* The native view fills the width its parent gives it, as the plain field's outer view does. */
@@ -24,6 +25,17 @@ export const NativeField = React.forwardRef(function NativeField({ context, elem
   const callbacks = React.useRef(props);
   callbacks.current = props;
 
+  /* The native view, which stands in for the field's input in this engine's focus record. */
+  const view = React.useRef(null);
+  React.useEffect(() => {
+    const mounted = view.current;
+    focus.register(mounted);
+    return () => {
+      focus.blurred(mounted);
+      focus.unregister(mounted);
+    };
+  }, []);
+
   const onFieldEvent = React.useCallback((event) => {
     const { name, payload: text } = event.nativeEvent;
     const payload = read(text);
@@ -35,9 +47,11 @@ export const NativeField = React.forwardRef(function NativeField({ context, elem
         callbacks.current.onReady?.(payload);
         break;
       case FieldEvent.Focus:
+        focus.focused(view.current);
         callbacks.current.onFocus?.(payload);
         break;
       case FieldEvent.Blur:
+        focus.blurred(view.current);
         callbacks.current.onBlur?.(payload);
         break;
       case FieldEvent.Change:
@@ -65,6 +79,7 @@ export const NativeField = React.forwardRef(function NativeField({ context, elem
   );
 
   return React.createElement(VaultFieldView, {
+    ref: view,
     formId,
     elementType,
     settings,

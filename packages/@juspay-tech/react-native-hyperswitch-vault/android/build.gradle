@@ -31,6 +31,48 @@ def isNewArchitectureEnabled() {
   return project.hasProperty("newArchEnabled") && project.newArchEnabled == "true"
 }
 
+/*
+ * The minor version of the React Native this app is built with (86 for 0.86.3), or 0 when it cannot
+ * be found. Read from React Native's own gradle.properties, as its version is not a Gradle property.
+ */
+def reactNativeMinorVersion() {
+  try {
+    def location = rootProject.ext.has("REACT_NATIVE_NODE_MODULES_DIR") ? file(rootProject.ext.get("REACT_NATIVE_NODE_MODULES_DIR")) : null
+    if (location == null) {
+      def packageJson = file(
+        providers.exec {
+          workingDir(rootDir)
+          commandLine("node", "--print", "require.resolve('react-native/package.json')")
+        }.standardOutput.asText.get().trim()
+      )
+      location = packageJson.parentFile
+    }
+    def properties = new Properties()
+    file("$location/ReactAndroid/gradle.properties").withInputStream { properties.load(it) }
+    def version = properties.getProperty("VERSION_NAME")
+    return version.startsWith("0.0.0-") ? 1000 : version.split("\\.")[1].toInteger()
+  } catch (Exception ignored) {
+    return 0
+  }
+}
+
+/*
+ * Does this app get the vault's own engine (each card field a native view)? Only when all hold:
+ *   - the new architecture is on;
+ *   - React Native is 0.82 or newer, which is what the bundle is built for;
+ *   - the app did not opt out with HyperswitchVault_nativeFields=false in its gradle.properties.
+ * Otherwise the library compiles src/stub instead: one empty package and no bundle. The app still
+ * builds, and the card fields render in plain JavaScript as before.
+ */
+def MIN_REACT_NATIVE_MINOR = 82
+def reactNativeMinor = reactNativeMinorVersion()
+def optedOut = project.hasProperty("HyperswitchVault_nativeFields") && project.property("HyperswitchVault_nativeFields").toString() == "false"
+def hostsOwnEngine = isNewArchitectureEnabled() && reactNativeMinor >= MIN_REACT_NATIVE_MINOR && !optedOut
+if (!hostsOwnEngine) {
+  logger.lifecycle("[@juspay-tech/react-native-hyperswitch-vault] card fields: plain JavaScript in this build " +
+    "(new architecture: ${isNewArchitectureEnabled()}, React Native minor: ${reactNativeMinor}, opted out: ${optedOut}).")
+}
+
 android {
   namespace "io.hyperswitch.vault"
 
@@ -44,6 +86,11 @@ android {
 
   buildFeatures {
     buildConfig true
+  }
+
+  sourceSets.main {
+    java.srcDirs = hostsOwnEngine ? ["src/main/java"] : ["src/stub/java"]
+    assets.srcDirs = hostsOwnEngine ? ["src/main/assets"] : []
   }
 
   buildTypes {

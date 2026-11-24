@@ -6,6 +6,7 @@ import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.FrameLayout
 import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.uimanager.SimpleViewManager
 import com.facebook.react.uimanager.ThemedReactContext
@@ -52,6 +53,19 @@ class HyperswitchVaultFieldViewManager :
   override fun onAfterUpdateTransaction(view: VaultFieldView) {
     super.onAfterUpdateTransaction(view)
     view.render()
+  }
+
+  /*
+   * The merchant's React Native treats this view as the focused text input while its field has the
+   * keyboard, and sends it the commands it would send a text input: "blur" when the user taps
+   * outside a field or the app calls Keyboard.dismiss(), "focus" to give it the keyboard. The real
+   * input is in the vault's engine, so the command is passed on to the field there.
+   */
+  override fun receiveCommand(view: VaultFieldView, commandId: String, args: ReadableArray?) {
+    when (commandId) {
+      "blur", "focus" -> view.command(commandId)
+      else -> super.receiveCommand(view, commandId, args)
+    }
   }
 
   override fun onDropViewInstance(view: VaultFieldView) {
@@ -113,6 +127,13 @@ class VaultFieldView(private val reactContext: ThemedReactContext) : FrameLayout
     startedFor = identity
     renderedSettings = settings
     started.view?.let { addView(it, LayoutParams(MATCH_PARENT, WRAP_CONTENT)) }
+  }
+
+  /* A command for this view's field, sent through its form. Nothing waits for the answer. */
+  fun command(name: String) {
+    val formId = formId?.takeIf { it.isNotEmpty() } ?: return
+    val elementType = elementType?.takeIf { it.isNotEmpty() } ?: return
+    VaultForms.get(formId)?.command(name, elementType) {}
   }
 
   fun stop() {
