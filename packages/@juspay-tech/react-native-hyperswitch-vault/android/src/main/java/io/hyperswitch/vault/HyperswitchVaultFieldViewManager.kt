@@ -8,6 +8,7 @@ import android.widget.FrameLayout
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.WritableMap
+import com.facebook.react.uimanager.ReactCompoundViewGroup
 import com.facebook.react.uimanager.SimpleViewManager
 import com.facebook.react.uimanager.ThemedReactContext
 import com.facebook.react.uimanager.UIManagerHelper
@@ -83,10 +84,26 @@ class HyperswitchVaultFieldViewManager :
 }
 
 @SuppressLint("ViewConstructor")
-class VaultFieldView(private val reactContext: ThemedReactContext) : FrameLayout(reactContext) {
+class VaultFieldView(private val reactContext: ThemedReactContext) :
+  FrameLayout(reactContext),
+  ReactCompoundViewGroup {
   var formId: String? = null
   var elementType: String? = null
   var settings: String? = null
+
+  /*
+   * A touch on this view belongs to this view, as far as the merchant's engine is concerned. To
+   * find what was touched, the merchant's React Native walks down the Android views under the
+   * finger and takes the id of the deepest one. Left alone it would walk into the child added in
+   * render(), whose views belong to the vault's engine, and come back with one of their ids. Both
+   * engines number their views from the same small integers, so the merchant's engine would then
+   * press whichever of its own views has that number: a button somewhere else on the screen.
+   * These two answers stop the walk here. The vault's engine still gets the touch, the normal
+   * Android way, through its own root view.
+   */
+  override fun interceptsTouchEvent(touchX: Float, touchY: Float): Boolean = true
+
+  override fun reactTagForTouch(touchX: Float, touchY: Float): Int = id
 
   private var surface: VaultSurface? = null
 
