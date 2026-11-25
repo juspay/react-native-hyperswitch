@@ -40,6 +40,8 @@ import { nodeResolve } from '@rollup/plugin-node-resolve';
 
 /* Always external: the host application's own React / React Native must be the only instances. */
 const hostRuntime = ['react', 'react/jsx-runtime', 'react-native', 'react-native-svg'];
+/* React Native's own files, reached by path (the native view's registry): the app's copy, never ours. */
+const isHostRuntime = (id) => hostRuntime.includes(id) || id.startsWith('react-native/');
 
 
 
@@ -106,7 +108,7 @@ export default [
    */
   {
     input: {index: 'src/standalone-entry.mjs'},
-    external: (id) => hostRuntime.includes(id),
+    external: isHostRuntime,
     plugins,
     treeshake,
     output: outputs('shared'),
@@ -124,7 +126,7 @@ export default [
    */
   {
     input: {orchestration: 'src/orchestration-entry.mjs'},
-    external: (id) => hostRuntime.includes(id),
+    external: isHostRuntime,
     plugins,
     treeshake,
     output: outputs('orch'),
@@ -140,7 +142,7 @@ export default [
    */
   {
     input: {host: 'src/host-entry.mjs'},
-    external: (id) => hostRuntime.includes(id) || /standalone-entry\.mjs$/.test(id),
+    external: (id) => isHostRuntime(id) || /standalone-entry\.mjs$/.test(id),
     plugins,
     treeshake,
     output: outputs('host').map((o) => ({
@@ -159,7 +161,7 @@ export default [
    */
   {
     input: {'vault-fields': 'src/hosted-entry.mjs'},
-    external: (id) => hostRuntime.includes(id),
+    external: isHostRuntime,
     plugins,
     treeshake,
     output: {

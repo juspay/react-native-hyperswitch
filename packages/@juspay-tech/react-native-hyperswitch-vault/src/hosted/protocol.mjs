@@ -1,16 +1,43 @@
 /*
- * The contract between the vault's hosted bundle and the native code that hosts it. The native side
- * (android/, ios/) and the merchant-side wrappers keep their own copy of these names;
- * PROTOCOL_VERSION is how the three notice they have drifted. Every name is listed here and nowhere
- * else in the bundle.
+ * The contract between the vault's JavaScript and the native code that hosts it. Two pieces of
+ * JavaScript read this file: the hosted bundle (src/hosted, in the vault's own engine) and the
+ * wrappers in the merchant's engine (src/native). The native side (android/, ios/) keeps its own
+ * copy of the names. PROTOCOL_VERSION is how the three notice they have drifted: the bundle is
+ * built into the app, while the wrappers can arrive later in an over-the-air update.
  *
- * "Hosted" means: this JavaScript runs in an engine the vault's native code started, not in the
- * merchant's. The merchant's engine never loads this folder.
+ * "Hosted" means: JavaScript that runs in an engine the vault's native code started, not in the
+ * merchant's. This file holds names only, so the merchant's engine loading it loads no field code.
  */
 export const PROTOCOL_VERSION = 1;
 
-/* The native module this bundle talks to. */
+/* The native module the hosted bundle talks to. It exists only in the vault's own engine. */
 export const NATIVE_MODULE = 'HyperswitchVaultHosted';
+
+/* The native module and the native view the merchant's engine uses. */
+export const FORMS_MODULE = 'HyperswitchVaultForms';
+export const FIELD_VIEW = 'HyperswitchVaultFieldView';
+
+/*
+ * The React Native minor versions the bundle has been run on. Outside this range the fields render
+ * in plain JavaScript, as they did before there was a native path. Widen it only with a test run.
+ */
+export const TESTED_REACT_NATIVE = { from: 82, to: 88 };
+
+/* The field props that are data, and so can cross to the other engine. Callbacks stay behind. */
+export const FIELD_SETTINGS = [
+  'styles',
+  'placeholder',
+  'label',
+  'labelBehavior',
+  'errorDisplay',
+  'unstyled',
+  'accessibilityLabel',
+  'accessibilityHint',
+  'testID',
+  'cardBrandIcon',
+  'cvcIcon',
+  'options',
+];
 
 /* The roots the native side starts by name. One hidden FORM_ROOT per form; one FIELD_ROOT per field. */
 export const FORM_ROOT = 'HyperswitchVaultForm';

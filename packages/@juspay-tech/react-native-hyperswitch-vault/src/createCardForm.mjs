@@ -27,7 +27,8 @@
  * mounted last, so create one instance per form.
  */
 import * as React from 'react';
-import { make as CardFormImpl } from './CardForm.bs.js';
+/* The chooser, not the plain implementation: a form made here takes the native path when it can. */
+import { CardForm as CardFormImpl } from './native/choosers.mjs';
 import { tokenizeIncompleteFieldSet, incompleteFieldSetMessage } from './VaultResult.bs.js';
 
 const EVENTS = ['ready', 'change'];

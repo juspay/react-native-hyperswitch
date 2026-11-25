@@ -26,7 +26,7 @@ import { make as CardholderNameField } from '../CardholderNameField.bs.js';
 import { createDetachedCardForm } from '../createDetachedCardForm.mjs';
 import { SETTINGS } from '../detachedSettings.mjs';
 import { attachField, getForm, openForm, subscribe } from './forms.mjs';
-import { ELEMENT_TYPES, FieldEvent, FormEvent, PROTOCOL_VERSION } from './protocol.mjs';
+import { ELEMENT_TYPES, FIELD_SETTINGS, FieldEvent, FormEvent, PROTOCOL_VERSION } from './protocol.mjs';
 
 const FIELDS = {
   cardNumber: CardNumberField,
@@ -34,22 +34,6 @@ const FIELDS = {
   cardCvc: CardCVCField,
   cardholderName: CardholderNameField,
 };
-
-/* The field props a merchant can pass that are data. The callbacks stay on the merchant's side. */
-const FIELD_SETTINGS = [
-  'styles',
-  'placeholder',
-  'label',
-  'labelBehavior',
-  'errorDisplay',
-  'unstyled',
-  'accessibilityLabel',
-  'accessibilityHint',
-  'testID',
-  'cardBrandIcon',
-  'cvcIcon',
-  'options',
-];
 
 /*
  * The listed keys of a JSON object, or null when the text is not one. EVERY listed key is present
