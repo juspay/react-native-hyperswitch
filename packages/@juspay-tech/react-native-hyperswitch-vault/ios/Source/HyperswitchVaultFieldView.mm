@@ -79,6 +79,10 @@ static NSString *StringOf(const std::string &value)
     return;
   }
   _surface = [HyperswitchVaultEngine.shared start:HyperswitchVaultFieldRoot props:[self propsOf:settings] owner:self];
+  if (_surface == nil) {
+    /* The engine cannot start in this app; the form reports it and falls back to plain fields. */
+    return;
+  }
   _startedFor = identity;
   _renderedSettings = settings;
 

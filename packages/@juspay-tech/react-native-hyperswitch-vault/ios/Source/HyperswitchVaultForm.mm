@@ -6,10 +6,15 @@
 /* The bundle has to load and its root has to mount. Long for a slow first start, short for a person waiting. */
 static const NSTimeInterval OpenTimeout = 15;
 
-/* Longer than the vault's own network timeouts, so a tokenize that is still working is not cut off. */
+/*
+ * The only limit on a command: the vault's tokenize request has no timeout of its own, and neither
+ * has React Native's HTTP client. A tokenize cut off here was delivered and may still save the
+ * card, so its refusal says so (see refusal:delivered:).
+ */
 static const NSTimeInterval CommandTimeout = 90;
 
 static NSString *const NotBundled = @"This build of the app has no card-form bundle.";
+static NSString *const EngineUnavailable = @"The card form's engine could not start.";
 static NSString *const NotStarted = @"The card form did not start.";
 static NSString *const NotOpen = @"The card form is not open.";
 static NSString *const Closed = @"The card form was closed.";
@@ -58,7 +63,18 @@ static NSString *JsonOf(NSDictionary *value)
 
 + (NSString *)refusal:(NSString *)message
 {
-  return JsonOf(@{@"ok" : @NO, @"message" : message});
+  return [self refusal:message delivered:NO];
+}
+
+/*
+ * A command with no answer from the bundle. `delivered` marks one that HAD reached the bundle
+ * (timeout, form closed, engine stopped): a tokenize may then have saved the card, and the
+ * merchant's side reports an unknown outcome, never a failure.
+ */
++ (NSString *)refusal:(NSString *)message delivered:(BOOL)delivered
+{
+  return delivered ? JsonOf(@{@"ok" : @NO, @"message" : message, @"delivered" : @YES})
+                   : JsonOf(@{@"ok" : @NO, @"message" : message});
 }
 
 - (instancetype)initWithFormId:(NSString *)formId emit:(HyperswitchVaultEmit)emit
@@ -81,6 +97,11 @@ static NSString *JsonOf(NSDictionary *value)
   }
   /* The hidden root's view is never put on screen. */
   _surface = [HyperswitchVaultEngine.shared start:HyperswitchVaultFormRoot props:[self propsOf:settings] owner:self];
+  if (_surface == nil) {
+    /* Before it mounts, so the merchant's side shows the plain fields. */
+    [self fail:EngineUnavailable];
+    return;
+  }
 
   NSInteger generation = ++_openGeneration;
   __weak HyperswitchVaultForm *weakSelf = self;
@@ -113,7 +134,7 @@ static NSString *JsonOf(NSDictionary *value)
     NSString *commandId = NSUUID.UUID.UUIDString;
     form->_pending[commandId] = [reply copy];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(CommandTimeout * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      [weakSelf answer:commandId result:[HyperswitchVaultForm refusal:NoAnswer]];
+      [weakSelf answer:commandId result:[HyperswitchVaultForm refusal:NoAnswer delivered:YES]];
     });
 
     NSMutableDictionary *command = [@{
@@ -141,7 +162,7 @@ static NSString *JsonOf(NSDictionary *value)
   [_surface stop];
   _surface = nil;
   [self settle:PhaseFailed failure:Closed];
-  [self answerAll:[HyperswitchVaultForm refusal:Closed]];
+  [self answerAll:[HyperswitchVaultForm refusal:Closed delivered:YES]];
 }
 
 #pragma mark - Events from the form's root
@@ -181,7 +202,7 @@ static NSString *JsonOf(NSDictionary *value)
   _phase = PhaseFailed;
   _failure = message;
   [self drain];
-  [self answerAll:[HyperswitchVaultForm refusal:message]];
+  [self answerAll:[HyperswitchVaultForm refusal:message delivered:YES]];
   _emit(HyperswitchVaultFormError, JsonOf(@{@"message" : message}));
 }
 

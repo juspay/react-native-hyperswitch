@@ -42,10 +42,13 @@ NS_ASSUME_NONNULL_BEGIN
 /* Whether this build of the app carries the bundle. */
 + (BOOL)isBundled;
 
-/* Starts a root of the bundle. `owner` receives its events until stop. */
-- (HyperswitchVaultSurface *)start:(NSString *)rootName
-                             props:(NSDictionary *)props
-                             owner:(id<HyperswitchVaultEventTarget>)owner;
+/*
+ * Starts a root of the bundle. `owner` receives its events until stop. nil when the engine cannot
+ * start in this app: the form then fails before it mounts, and the fields render the plain way.
+ */
+- (nullable HyperswitchVaultSurface *)start:(NSString *)rootName
+                                      props:(NSDictionary *)props
+                                      owner:(id<HyperswitchVaultEventTarget>)owner;
 
 /* From the bundle: hand the event to the root's owner. */
 - (void)deliver:(NSInteger)rootTag eventName:(NSString *)eventName payload:(NSString *)payloadJson;

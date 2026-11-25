@@ -1,6 +1,8 @@
 #import "HyperswitchVaultEngine.h"
 
 #import <React/RCTBundleManager.h>
+#import <React/RCTComponentViewFactory.h>
+#import <React/RCTConvert.h>
 #import <React/RCTSurfaceHostingProxyRootView.h>
 #import <React/RCTSurfaceProtocol.h>
 #import <ReactAppDependencyProvider/RCTAppDependencyProvider.h>
@@ -90,9 +92,32 @@
 
 #pragma mark - Engine
 
+/*
+ * The release level the app's own React Native factory uses. React Native allows one per process:
+ * a second factory created with another level raises. Expo apps record theirs in Info.plist
+ * (expo-build-properties `ios.reactNativeReleaseLevel`); without that key it is Stable, React
+ * Native's default.
+ */
+static RCTReleaseLevel AppReleaseLevel(void)
+{
+  id value = [NSBundle.mainBundle objectForInfoDictionaryKey:@"ReactNativeReleaseLevel"];
+  if ([value isKindOfClass:NSString.class]) {
+    NSString *level = [(NSString *)value lowercaseString];
+    if ([level isEqualToString:@"experimental"]) {
+      return Experimental;
+    }
+    if ([level isEqualToString:@"canary"]) {
+      return Canary;
+    }
+  }
+  return Stable;
+}
+
 @implementation HyperswitchVaultEngine {
   HyperswitchVaultEngineDelegate *_delegate;
   RCTReactNativeFactory *_factory;
+  /* Set once, if the factory could not be made. Never retried in this process. */
+  BOOL _unavailable;
   __weak HyperswitchVaultHostedModule *_module;
 
   /*
@@ -128,20 +153,51 @@
   return self;
 }
 
-/* The second host, made the first time a root is asked for. */
-- (RCTReactNativeFactory *)factory
+/*
+ * The second host, made the first time a root is asked for, or nil when it cannot be made here.
+ *
+ * RCTReactNativeFactory assumes it is the app's only factory. Creating it
+ *   - raises if the app's own factory chose another release level (one per process);
+ *   - makes itself the process-wide provider of third-party Fabric components;
+ *   - sets the process-wide default colour space.
+ * So it is created with the app's release level, the provider and the colour space are put back
+ * right after, and any failure (an Objective-C or a C++ exception) is caught, remembered and never
+ * retried: React Native's set-up may be half done after one. The forms then use the plain fields.
+ */
+- (nullable RCTReactNativeFactory *)factory
 {
-  if (_factory == nil) {
-    _factory = [[RCTReactNativeFactory alloc] initWithDelegate:_delegate];
+  if (_factory != nil || _unavailable) {
+    return _factory;
   }
+  RCTComponentViewFactory *components = [RCTComponentViewFactory currentComponentViewFactory];
+  id<RCTComponentViewFactoryComponentProvider> provider = components.thirdPartyFabricComponentsProvider;
+  RCTColorSpace colorSpace = RCTGetDefaultColorSpace();
+  RCTReactNativeFactory *factory = nil;
+  @try {
+    try {
+      factory = [[RCTReactNativeFactory alloc] initWithDelegate:_delegate releaseLevel:AppReleaseLevel()];
+    } catch (...) {
+      factory = nil;
+    }
+  } @catch (NSException *exception) {
+    factory = nil;
+  }
+  components.thirdPartyFabricComponentsProvider = provider;
+  RCTSetDefaultColorSpace(colorSpace);
+  _factory = factory;
+  _unavailable = factory == nil;
   return _factory;
 }
 
-- (HyperswitchVaultSurface *)start:(NSString *)rootName
-                             props:(NSDictionary *)props
-                             owner:(id<HyperswitchVaultEventTarget>)owner
+- (nullable HyperswitchVaultSurface *)start:(NSString *)rootName
+                                      props:(NSDictionary *)props
+                                      owner:(id<HyperswitchVaultEventTarget>)owner
 {
-  UIView *rootView = [[self factory].rootViewFactory viewWithModuleName:rootName initialProperties:props];
+  RCTReactNativeFactory *factory = [self factory];
+  if (factory == nil) {
+    return nil;
+  }
+  UIView *rootView = [factory.rootViewFactory viewWithModuleName:rootName initialProperties:props];
   rootView.backgroundColor = UIColor.clearColor;
 
   HyperswitchVaultSurface *surface = [HyperswitchVaultSurface new];
