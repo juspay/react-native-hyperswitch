@@ -1,0 +1,17 @@
+{
+  "name": "hyperswitch-vault-fields-bundle-toolchain",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Builds hyperswitch-vault-fields.bundle. Not a workspace of the monorepo and not published: it pins the React Native line whose JavaScript the bundle carries.",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@juspay-tech/react-native-hyperswitch-scancard": "0.3.1",
+    "@react-native/babel-preset": "0.86.0",
+    "@react-native/metro-config": "0.86.0",
+    "react": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-svg": "15.15.5"
+  }
+}

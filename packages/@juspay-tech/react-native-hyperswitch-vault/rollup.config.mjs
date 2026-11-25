@@ -148,4 +148,25 @@ export default [
       paths: (id) => (/standalone-entry\.mjs$/.test(id) ? './index.js' : id),
     })),
   },
+
+  /*
+   * The hosted bundle's JavaScript: what runs in the engine the vault's own native host starts.
+   *
+   * NOT PUBLISHED AS A MODULE. It is written to bundle/build/, outside dist/ and outside `files`,
+   * and bundle/build.mjs turns it into hyperswitch-vault-fields.bundle with a pinned React Native.
+   * Going through rollup first gives the bundle the same tree-shaking the library gets, which
+   * Metro cannot do. One file, so the fields and the detached form share one widget context.
+   */
+  {
+    input: {'vault-fields': 'src/hosted-entry.mjs'},
+    external: (id) => hostRuntime.includes(id),
+    plugins,
+    treeshake,
+    output: {
+      dir: 'bundle/build',
+      format: 'es',
+      entryFileNames: '[name].js',
+      inlineDynamicImports: true,
+    },
+  },
 ];
