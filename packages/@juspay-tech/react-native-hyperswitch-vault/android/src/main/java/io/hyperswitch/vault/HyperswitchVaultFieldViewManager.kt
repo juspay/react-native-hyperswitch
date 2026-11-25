@@ -135,7 +135,7 @@ class VaultFieldView(private val reactContext: ThemedReactContext) :
     val activity = reactContext.currentActivity ?: return
     /* The form reports a missing bundle or a stopped engine; its fields just stay empty. */
     if (!VaultEngine.isBundled(activity)) return
-    val engine = VaultEngine.get(activity.application)
+    val engine = VaultEngine.get(activity.application) ?: return
     if (engine.failed) return
     engine.follow(activity)
 

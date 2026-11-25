@@ -60,17 +60,21 @@ def reactNativeMinorVersion() {
  * Does this app get the vault's own engine (each card field a native view)? Only when all hold:
  *   - the new architecture is on;
  *   - React Native is 0.82 or newer, which is what the bundle is built for;
+ *   - the app runs Hermes. The vault's engine is a Hermes instance, and in an app built without
+ *     Hermes React Native's Gradle plugin leaves the Hermes libraries out of the APK, so starting
+ *     the engine there would crash the app. Not set means on: Hermes is React Native's default;
  *   - the app did not opt out with HyperswitchVault_nativeFields=false in its gradle.properties.
  * Otherwise the library compiles src/stub instead: one empty package and no bundle. The app still
  * builds, and the card fields render in plain JavaScript as before.
  */
 def MIN_REACT_NATIVE_MINOR = 82
 def reactNativeMinor = reactNativeMinorVersion()
+def hermes = !project.hasProperty("hermesEnabled") || project.property("hermesEnabled").toString().toLowerCase() != "false"
 def optedOut = project.hasProperty("HyperswitchVault_nativeFields") && project.property("HyperswitchVault_nativeFields").toString() == "false"
-def hostsOwnEngine = isNewArchitectureEnabled() && reactNativeMinor >= MIN_REACT_NATIVE_MINOR && !optedOut
+def hostsOwnEngine = isNewArchitectureEnabled() && reactNativeMinor >= MIN_REACT_NATIVE_MINOR && hermes && !optedOut
 if (!hostsOwnEngine) {
   logger.lifecycle("[@juspay-tech/react-native-hyperswitch-vault] card fields: plain JavaScript in this build " +
-    "(new architecture: ${isNewArchitectureEnabled()}, React Native minor: ${reactNativeMinor}, opted out: ${optedOut}).")
+    "(new architecture: ${isNewArchitectureEnabled()}, React Native minor: ${reactNativeMinor}, Hermes: ${hermes}, opted out: ${optedOut}).")
 }
 
 android {

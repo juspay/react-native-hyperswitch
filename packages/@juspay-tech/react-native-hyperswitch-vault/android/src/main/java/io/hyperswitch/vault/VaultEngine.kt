@@ -36,7 +36,8 @@ import java.util.concurrent.atomic.AtomicReference
  * the text inputs it draws; the merchant's engine never holds them.
  *
  * WHAT THIS ENGINE CAN REACH. A fixed, short list of packages: React Native's own, react-native-svg
- * (the fields draw their icons with it), and the one module the bundle talks to. Not the app's
+ * (the fields draw their icons with it), scan card when the app has it (the number field's scan
+ * button), and the one module the bundle talks to. Not the app's
  * autolinked packages: the card engine has no use for them, and the vault's own merchant-side
  * module must not be in here, or the bundle could try to start an engine from inside an engine.
  *
@@ -160,6 +161,8 @@ internal class VaultEngine private constructor(private val application: Applicat
   private fun createReactHost(): ReactHost {
     val packages = mutableListOf<ReactPackage>(MainReactPackage(), HyperswitchVaultHostedPackage(this))
     optionalPackage(SVG_PACKAGE)?.let(packages::add)
+    /* When the app has scan card, the number field's scan button works here as in the plain fields. */
+    optionalPackage(SCANCARD_PACKAGE)?.let(packages::add)
 
     val delegate = DefaultReactHostDelegate(
       jsMainModulePath = VaultProtocol.ENTRY_FILE,
@@ -193,9 +196,14 @@ internal class VaultEngine private constructor(private val application: Applicat
   companion object {
     private const val TAG = "HyperswitchVault"
     private const val SVG_PACKAGE = "com.horcrux.svg.SvgPackage"
+    private const val SCANCARD_PACKAGE = "com.reactnativehyperswitchscancard.HyperswitchScancardPackage"
 
     @Volatile
     private var instance: VaultEngine? = null
+
+    /* Set once, if the engine could not be created. Never retried in this process. */
+    @Volatile
+    private var unavailable = false
 
     @Volatile
     private var bundled: Boolean? = null
@@ -204,10 +212,24 @@ internal class VaultEngine private constructor(private val application: Applicat
     fun isBundled(context: Context): Boolean =
       bundled ?: (context.assets.list("")?.contains(VaultProtocol.BUNDLE_NAME) == true).also { bundled = it }
 
-    fun get(application: Application): VaultEngine =
-      instance ?: synchronized(this) {
-        instance ?: VaultEngine(application).also { instance = it }
+    /*
+     * The engine, or null when it cannot start in this app. The first call builds the React host
+     * and its Hermes runtime. If that throws (a library the app's build left out, for example), the
+     * failure is logged by class name, remembered, and never retried: every form then falls back to
+     * the plain fields instead of crashing the app.
+     */
+    fun get(application: Application): VaultEngine? {
+      instance?.let { return it }
+      return synchronized(this) {
+        instance ?: if (unavailable) null else try {
+          VaultEngine(application).also { instance = it }
+        } catch (t: Throwable) {
+          Log.e(TAG, "The card form's engine could not start: ${t.javaClass.simpleName}")
+          unavailable = true
+          null
+        }
       }
+    }
   }
 }
 

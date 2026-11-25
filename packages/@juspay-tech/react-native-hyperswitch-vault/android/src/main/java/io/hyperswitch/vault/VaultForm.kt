@@ -51,7 +51,9 @@ internal class VaultForm(
 
   fun open(activity: Activity, settings: String) {
     if (!VaultEngine.isBundled(activity)) return fail(NOT_BUNDLED)
-    val engine = VaultEngine.get(activity.application).also { this.engine = it }
+    /* An engine that cannot start ends the form before it mounts, so the merchant's side goes plain. */
+    val engine = VaultEngine.get(activity.application) ?: return fail(ENGINE_UNAVAILABLE)
+    this.engine = engine
     if (engine.failed) return fail(ENGINE_STOPPED)
     engine.onFailure(onEngineFailure)
     engine.follow(activity)
@@ -75,7 +77,7 @@ internal class VaultForm(
         return@whenFormSettles
       }
       val commandId = UUID.randomUUID().toString()
-      val timeout = Runnable { pending.remove(commandId)?.reply?.invoke(refusal(NO_ANSWER)) }
+      val timeout = Runnable { pending.remove(commandId)?.reply?.invoke(refusal(NO_ANSWER, delivered = true)) }
       pending[commandId] = Pending(reply, timeout)
       main.postDelayed(timeout, COMMAND_TIMEOUT_MS)
 
@@ -99,7 +101,7 @@ internal class VaultForm(
     surface?.stop()
     surface = null
     settle(Phase.Failed(CLOSED))
-    answerAll(refusal(CLOSED))
+    answerAll(refusal(CLOSED, delivered = true))
   }
 
   /* ---- events from the form's root ---- */
@@ -133,7 +135,7 @@ internal class VaultForm(
     main.removeCallbacks(openTimeout)
     phase = Phase.Failed(message)
     drain()
-    answerAll(refusal(message))
+    answerAll(refusal(message, delivered = true))
     emit(VaultProtocol.FORM_ERROR, JSONObject(mapOf("message" to message)).toString())
   }
 
@@ -173,10 +175,15 @@ internal class VaultForm(
     /* The bundle has to load and its root has to mount. Long for a slow first start, short for a person waiting. */
     private const val OPEN_TIMEOUT_MS = 15_000L
 
-    /* Longer than the vault's own network timeouts, so a tokenize that is still working is not cut off. */
+    /*
+     * The only limit on a command: the vault's tokenize request has no timeout of its own, and
+     * neither has React Native's HTTP client. A tokenize cut off here was delivered and may still
+     * save the card, so its refusal says so (see refusal()).
+     */
     private const val COMMAND_TIMEOUT_MS = 90_000L
 
     const val NOT_BUNDLED = "This build of the app has no card-form bundle."
+    private const val ENGINE_UNAVAILABLE = "The card form's engine could not start."
     private const val NOT_STARTED = "The card form did not start."
     private const val NOT_OPEN = "The card form is not open."
     private const val CLOSED = "The card form was closed."
@@ -184,8 +191,17 @@ internal class VaultForm(
     private const val UNREACHABLE = "The card form cannot be reached."
     private const val NO_ANSWER = "The card form did not answer."
 
-    /* A command that did not run: the same shape the bundle uses for one. */
-    fun refusal(message: String): String = JSONObject(mapOf("ok" to false, "message" to message)).toString()
+    /*
+     * A command with no answer from the bundle: the same shape the bundle uses for one that did not
+     * run. `delivered` marks one that HAD reached the bundle (timeout, form closed, engine stopped):
+     * a tokenize may then have saved the card, and the merchant's side reports an unknown outcome,
+     * never a failure.
+     */
+    fun refusal(message: String, delivered: Boolean = false): String =
+      JSONObject(
+        if (delivered) mapOf("ok" to false, "message" to message, "delivered" to true)
+        else mapOf("ok" to false, "message" to message)
+      ).toString()
 
     private fun fieldOf(json: String, key: String): String? =
       try {
