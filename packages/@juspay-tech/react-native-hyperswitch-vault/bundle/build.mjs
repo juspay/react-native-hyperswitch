@@ -74,6 +74,7 @@ Written by \`bundle/build.mjs\`. Do not edit by hand: rebuild instead.
 | react-native | ${versionOf('react-native')} |
 | react | ${versionOf('react')} |
 | react-native-svg | ${versionOf('react-native-svg')} |
+| @juspay-tech/react-native-hyperswitch-scancard | ${versionOf('@juspay-tech/react-native-hyperswitch-scancard')} |
 | metro | ${versionOf('metro')} |
 | node | ${process.version} |
 | Mode | production, minified, plain JavaScript (not Hermes bytecode) |
@@ -82,9 +83,9 @@ Written by \`bundle/build.mjs\`. Do not edit by hand: rebuild instead.
 |---|---|---|---|
 ${built.map((one) => `| ${one.platform} | \`${one.file}\` | ${one.bytes} | \`${one.sha1}\` |`).join('\n')}
 
-The bundle carries the JavaScript of the react-native and react-native-svg versions above. It runs
-in the app's own native React Native and react-native-svg, so it is used only in apps whose React
-Native version is in the vault's tested range.
+The bundle carries the JavaScript of the react-native, react-native-svg and scan-card versions above.
+It runs in the app's own native React Native, react-native-svg and scan-card (when the app has it),
+so it is used only in apps whose React Native version is in the vault's tested range.
 `;
 writeFileSync(join(vault, 'BUNDLE-PROVENANCE.md'), record);
 

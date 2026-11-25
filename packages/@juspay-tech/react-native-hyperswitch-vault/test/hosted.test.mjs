@@ -8,6 +8,7 @@ import { encode, payloadOf, tokenizeResult, MAX_TEXT, NOT_PASSED_ON } from '../s
 import { attachField, getForm, openForm, subscribe } from '../src/hosted/forms.mjs';
 import { run, startCommands } from '../src/hosted/commands.mjs';
 import { makeBridge } from '../src/hosted/bridge.mjs';
+import { silenceConsole } from '../src/hosted/quiet.mjs';
 import { FormEvent, FieldEvent } from '../src/hosted/protocol.mjs';
 
 const PAN = '4242424242424242';
@@ -268,10 +269,39 @@ test('commands: a form that throws, or whose tokenize rejects, still answers', a
   const answers = Object.fromEntries(native.sent.map((sent) => [sent.payload.commandId, sent.payload]));
   assert.equal(native.sent.length, 2);
   assert.deepEqual(answers.x, { commandId: 'x', name: 'reset', ok: false, message: 'reset broke on [redacted]' });
-  assert.deepEqual(answers.y, { commandId: 'y', name: 'tokenize', ok: false, message: 'network down' });
+  /* A rejected tokenize may have reached the vault: never "failed", always an unknown outcome. */
+  assert.equal(answers.y.ok, true);
+  assert.equal(answers.y.result.status, 'error');
+  assert.equal(answers.y.result.error.code, 'unknown_outcome');
+  assert.equal(typeof answers.y.result.error.message, 'string');
   closeA();
   closeB();
   stop();
+});
+
+test('quiet: log, info, debug and trace go nowhere; warn and error stay', () => {
+  const written = [];
+  const target = {
+    log: (...a) => written.push(['log', ...a]),
+    info: (...a) => written.push(['info', ...a]),
+    debug: (...a) => written.push(['debug', ...a]),
+    trace: (...a) => written.push(['trace', ...a]),
+    warn: (...a) => written.push(['warn', ...a]),
+    error: (...a) => written.push(['error', ...a]),
+  };
+  silenceConsole(target);
+  silenceConsole(target);
+  const props = JSON.stringify({ settings: JSON.stringify({ sdkAuthorization: 'secret-value' }) });
+  target.log(`Updating props for Surface "HyperswitchVaultForm" with ${props}`);
+  target.info('x');
+  target.debug('x');
+  target.trace('x');
+  assert.deepEqual(written, []);
+  target.warn('w');
+  target.error('e');
+  assert.deepEqual(written.map(([level]) => level), ['warn', 'error']);
+  silenceConsole(null);
+  silenceConsole({});
 });
 
 test('bridge: with no native module nothing is sent and nothing breaks', () => {

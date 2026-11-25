@@ -5,20 +5,34 @@
  * delivered twice), exactly one VAULT_COMMAND_RESULT goes back for a commandId, to the form's root.
  * The caller on the other side is a promise that must settle.
  */
-import { tokenizeIncompleteFieldSet } from '../VaultResult.bs.js';
+import {
+  tokenizeFailedWith,
+  tokenizeIncompleteFieldSet,
+  unknownOutcomeMessage,
+} from '../VaultResult.bs.js';
 import { COMMANDS, FIELD_COMMANDS, FormEvent } from './protocol.mjs';
 
 const messageOf = (error) => (error instanceof Error ? error.message : 'The command failed.');
 
-/* `ok` says whether the command ran. A tokenize the vault refused still ran: its refusal is the result. */
+/*
+ * `ok` says whether the command ran. A tokenize the vault refused still ran: its refusal is the result.
+ *
+ * A tokenize that THROWS is not a refusal. It may have failed after the request reached the vault,
+ * and the card may be saved, so it is an unknown outcome, never "failed": the same answer the plain
+ * <CardForm> gives when a request is cut off.
+ */
 export async function run(command, getForm) {
   const entry = getForm(command.formId);
 
   if (command.name === 'tokenize') {
-    const result = entry
-      ? await entry.form.tokenize()
-      : tokenizeIncompleteFieldSet(`No card form "${command.formId}" is open.`);
-    return { ok: true, result };
+    if (!entry) {
+      return { ok: true, result: tokenizeIncompleteFieldSet(`No card form "${command.formId}" is open.`) };
+    }
+    try {
+      return { ok: true, result: await entry.form.tokenize() };
+    } catch {
+      return { ok: true, result: tokenizeFailedWith('unknown_outcome', unknownOutcomeMessage) };
+    }
   }
 
   if (!entry) return { ok: false, message: `No card form "${command.formId}" is open.` };
