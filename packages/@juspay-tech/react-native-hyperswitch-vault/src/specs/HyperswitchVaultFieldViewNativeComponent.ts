@@ -19,6 +19,4 @@ export interface NativeProps extends ViewProps {
   }>;
 }
 
-export default codegenNativeComponent<NativeProps>('HyperswitchVaultFieldView', {
-  excludedPlatforms: ['iOS'],
-});
+export default codegenNativeComponent<NativeProps>('HyperswitchVaultFieldView');
