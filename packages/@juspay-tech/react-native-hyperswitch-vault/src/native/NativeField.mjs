@@ -7,7 +7,7 @@
 import * as React from 'react';
 import { StyleSheet } from 'react-native';
 import { FieldEvent } from '../hosted/protocol.mjs';
-import { VaultFieldView } from './fieldView.mjs';
+import { vaultFieldView } from './fieldView.mjs';
 import * as focus from './focus.mjs';
 import { fieldOut, read } from './out.mjs';
 
@@ -78,7 +78,7 @@ export const NativeField = React.forwardRef(function NativeField({ context, elem
     [forms, formId, elementType]
   );
 
-  return React.createElement(VaultFieldView, {
+  return React.createElement(vaultFieldView(), {
     ref: view,
     formId,
     elementType,

@@ -8,6 +8,7 @@
  */
 import { SETTINGS } from '../detachedSettings.mjs';
 import { FIELD_SETTINGS } from '../hosted/protocol.mjs';
+import { tokenizationFailedMessage, tokenizeFailedWith, unknownOutcomeMessage } from '../VaultResult.bs.js';
 
 /* undefined is dropped by JSON.stringify, which is what "not given" should be on the other side. */
 const pick = (source, names) => {
@@ -87,22 +88,20 @@ export function read(text) {
   }
 }
 
-const refusal = (message) => ({
-  status: 'error',
-  error: {
-    code: 'tokenization_failed',
-    message: typeof message === 'string' && message !== '' ? message : 'The card could not be tokenized.',
-    type: 'api_error',
-  },
-});
-
 /*
  * The answer to a tokenize command, as the vault's public result. The hosted bundle already shaped
- * `result`; a command that did not run at all (`ok: false`) becomes an ordinary refusal, so the
- * caller of tokenize() always gets a result and never an exception.
+ * `result`. With no result from the bundle (`ok: false`):
+ *   - `delivered`: the command HAD reached the vault's engine (it timed out, the form closed, the
+ *     engine stopped). The card may already be saved, so this is an unknown outcome, the answer the
+ *     plain <CardForm> gives when its request is cut off. Never "failed".
+ *   - otherwise the command never ran, and it is an ordinary refusal.
+ * Either way the caller of tokenize() gets a result and never an exception.
  */
 export function tokenizeResultOf(text) {
   const answer = read(text);
   if (answer.ok === true && typeof answer.result === 'object' && answer.result !== null) return answer.result;
-  return refusal(answer.message);
+  if (answer.delivered === true) return tokenizeFailedWith('unknown_outcome', unknownOutcomeMessage);
+  const message =
+    typeof answer.message === 'string' && answer.message !== '' ? answer.message : tokenizationFailedMessage;
+  return tokenizeFailedWith('tokenization_failed', message);
 }

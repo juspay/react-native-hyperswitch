@@ -10,21 +10,31 @@
  * to blur, the request reaches the native view as the same "blur" command a text input gets, and
  * the view passes it on to the real field.
  *
- * The record is React Native's own file, reached by path. Everything here checks that a function
- * exists before calling it and never throws: without it the fields still work, and only the
- * closing of the keyboard from outside is lost.
+ * The record is React Native's own file, reached by path, and required only when a native field
+ * first uses it (see fieldView.mjs for why nothing is imported at the top). Everything here checks
+ * that a function exists before calling it and never throws: without it the fields still work, and
+ * only the closing of the keyboard from outside is lost.
  */
-import TextInputStateModule from 'react-native/Libraries/Components/TextInput/TextInputState';
 
-/* The file is an ES module in newer React Native and CommonJS in older ones. */
-const state =
-  TextInputStateModule && typeof TextInputStateModule.default === 'object'
-    ? TextInputStateModule.default
-    : TextInputStateModule;
+let state;
+
+const stateOf = () => {
+  if (state === undefined) {
+    try {
+      const module = require('react-native/Libraries/Components/TextInput/TextInputState');
+      /* The file is an ES module in newer React Native and CommonJS in older ones. */
+      state = module && typeof module.default === 'object' ? module.default : module;
+    } catch {
+      state = null;
+    }
+  }
+  return state;
+};
 
 const call = (name, view) => {
   try {
-    if (view != null && state && typeof state[name] === 'function') state[name](view);
+    const record = view != null ? stateOf() : null;
+    if (record && typeof record[name] === 'function') record[name](view);
   } catch {
     /* A changed internal must not break a card form. */
   }

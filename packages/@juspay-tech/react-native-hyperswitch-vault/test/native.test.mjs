@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 
 import { supports } from '../src/native/rule.mjs';
 import { fieldOut, formSettings, read, tokenizeResultOf } from '../src/native/out.mjs';
+import { forwardingHandle } from '../src/native/handle.mjs';
 import { PROTOCOL_VERSION, TESTED_REACT_NATIVE } from '../src/hosted/protocol.mjs';
 
 const good = { newArchitecture: true, bundled: true, protocolVersion: PROTOCOL_VERSION, reactNativeMinor: 86 };
@@ -115,4 +116,53 @@ test('out: a tokenize answer is the vault\'s result; a command that did not run 
     assert.equal(out.error.code, 'tokenization_failed');
     assert.equal(typeof out.error.message, 'string');
   }
+});
+
+test('out: a tokenize that reached the vault\'s engine and got no answer is an unknown outcome, never a failure', () => {
+  for (const message of ['The card form did not answer.', 'The card form was closed.', "The card form's engine stopped."]) {
+    const out = tokenizeResultOf(JSON.stringify({ ok: false, message, delivered: true }));
+    assert.equal(out.status, 'error');
+    assert.equal(out.error.code, 'unknown_outcome');
+    assert.equal(out.error.type, 'api_error');
+    assert.equal(typeof out.error.message, 'string');
+  }
+  /* Not delivered (never reached the engine): an ordinary refusal, as before. */
+  assert.equal(tokenizeResultOf(JSON.stringify({ ok: false, message: 'The card form is not open.' })).error.code, 'tokenization_failed');
+  assert.equal(tokenizeResultOf(JSON.stringify({ ok: false, message: 'x', delivered: 'yes' })).error.code, 'tokenization_failed');
+});
+
+test('handle: one object that follows whichever form is mounted, and refuses when none is', async () => {
+  let mounted = null;
+  const handle = forwardingHandle(() => mounted);
+
+  /* Nothing mounted: refusals, never a throw. */
+  assert.equal((await handle.tokenize()).error.code, 'incomplete_field_set');
+  assert.equal((await handle.confirmPayment({})).error.code, 'unsupported_configuration');
+  handle.reset();
+  handle.focus('cardNumber');
+
+  /* The native form (no confirmPayment), then a switch to the plain one: the same handle reaches each. */
+  const calls = [];
+  mounted = {
+    tokenize: async () => ({ status: 'success', token: 'from-native' }),
+    reset: () => calls.push('native reset'),
+    focus: (field) => calls.push(`native focus ${field}`),
+  };
+  assert.equal((await handle.tokenize()).token, 'from-native');
+  assert.equal((await handle.confirmPayment({})).error.code, 'unsupported_configuration');
+  handle.reset();
+  handle.focus('cardCvc');
+
+  mounted = {
+    tokenize: async () => ({ status: 'success', token: 'from-plain' }),
+    confirmPayment: async (input) => ({ status: 'succeeded', input }),
+    reset: () => calls.push('plain reset'),
+    focus: (field) => calls.push(`plain focus ${field}`),
+  };
+  assert.equal((await handle.tokenize()).token, 'from-plain');
+  assert.deepEqual(await handle.confirmPayment({ a: 1 }), { status: 'succeeded', input: { a: 1 } });
+  handle.reset();
+  handle.focus('cardExpiry');
+
+  assert.deepEqual(calls, ['native reset', 'native focus cardCvc', 'plain reset', 'plain focus cardExpiry']);
 });
