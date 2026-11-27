@@ -319,6 +319,7 @@ class HyperModule internal constructor(private val rct: ReactApplicationContext)
   }
 
   @ReactMethod
+  // By design, iframe loading and URL policy are delegated to the Android HiddenIframe utility to support provider-specific DDC URLs and URL scheme checks
   override fun openIframeBridge(url: String, timeoutMs: Double, callback: Callback) {
     val activity = currentActivity ?: return callback.invoke("")
     HiddenIframe(activity).open(url, timeoutMs) { callback.invoke(it) }

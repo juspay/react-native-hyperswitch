@@ -20,6 +20,8 @@ final internal class HeadlessWebView: NSObject, WKNavigationDelegate, WKUIDelega
     private var selfRetain: HeadlessWebView?
     private var callbackInvoked = false
     private var iframeOrigin: String?
+    /// Set once the wrapper document's own load is allowed; every later main-frame navigation is cancelled.
+    private var mainFrameLoadStarted = false
 
     init(url: String, timeoutMs: NSNumber, callback: @escaping RCTResponseSenderBlock) {
         self.url = url
@@ -94,7 +96,8 @@ final internal class HeadlessWebView: NSObject, WKNavigationDelegate, WKUIDelega
         let configuration = WKWebViewConfiguration()
         configuration.userContentController = contentController
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
-        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+        // A popup would be a second hidden WebView that cleanup never destroys.
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
 
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView?.isHidden = false  // Keep visible to prevent freezing
@@ -165,6 +168,8 @@ final internal class HeadlessWebView: NSObject, WKNavigationDelegate, WKUIDelega
               let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         else { return }
         // Any message carrying next_action settles DDC, failing unless it is an https redirect (web also allows http).
+        // the redirect is either the Hyperswitch redirect URL or the merchant's return_url, which vary
+        // per merchant and self-hosted backend;
         guard json["next_action"] != nil else { return }
         let action = json["next_action"] as? [String: Any]
         let redirect = action?["url"] as? String
@@ -178,6 +183,22 @@ final internal class HeadlessWebView: NSObject, WKNavigationDelegate, WKUIDelega
             return
         }
         invokeCallback(result)
+    }
+
+    /// The main frame only ever shows the wrapper document; any redirect is returned to the caller, which opens it visibly.
+    /// The iframe may navigate (DDC hops across 3DS servers) but only over https.
+    /// iframe_url comes from the Hyperswitch API and its host varies by connector and
+    /// self-hosted backend
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if navigationAction.targetFrame?.isMainFrame == true {
+        // Only the wrapper's own load; the main frame never navigates after that.
+        decisionHandler(mainFrameLoadStarted ? .cancel : .allow)
+        mainFrameLoadStarted = true
+        return
+    }
+        let scheme = navigationAction.request.url?.scheme?.lowercased()
+        decisionHandler(scheme == "https" || scheme == "about" ? .allow : .cancel)
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

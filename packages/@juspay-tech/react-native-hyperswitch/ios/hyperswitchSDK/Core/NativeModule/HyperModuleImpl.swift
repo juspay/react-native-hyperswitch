@@ -293,6 +293,7 @@ public class HyperModuleImpl: NSObject {
         return NSMutableDictionary(dictionary: obj)
     }
 
+    // By design, this maps the embedded SDK bundle's client result; merchants must verify payment status on their backend before fulfillment.
     private func paymentResult(from rnMessage: String) -> PaymentResult {
         guard let data = rnMessage.data(using: .utf8) else {
             return .failed(
